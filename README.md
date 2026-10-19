@@ -3,8 +3,9 @@
 A lightweight 2D CAD drawing tool built with Python and Tkinter, featuring
 core drawing, editing and dimensioning tools, plus DXF import/export.
 
-![KatieCAD Screenshot](docs/screenshot.png)  
-<!-- Replace with an actual screenshot of your app -->
+![Screenshot1](Shot1.png)
+
+![Screenshot2](Shot2.png)
 
 ## Features
 
