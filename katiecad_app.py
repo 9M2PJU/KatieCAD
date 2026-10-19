@@ -135,6 +135,98 @@ def _style_setup(root):
 
 
 # ============================================================
+# MIT-Lizenztext (für das separate Lizenz-Fenster)
+# ============================================================
+MIT_LICENSE_TEXT = """MIT License
+
+Copyright (c) 2026 Merecete
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE."""
+
+
+def zeige_lizenz_fenster(parent):
+    """Zeigt die MIT-Lizenz in einem eigenen, scrollbaren Fenster."""
+    win = tk.Toplevel(parent)
+    win.title("License – KatieCAD")
+    win.geometry("620x520")
+    win.minsize(400, 300)
+    win.transient(parent)
+    win.configure(bg=FARBEN["bg_mittel"])
+
+    # Footer zuerst packen, damit er immer sichtbar bleibt
+    footer = tk.Frame(win, bg=FARBEN["bg_mittel"], padx=20, pady=14)
+    footer.pack(side="bottom", fill="x")
+
+    tk.Button(footer, text=tr("dlg.schliessen"), command=win.destroy,
+              bg=FARBEN["bg_hell"], fg=FARBEN["text"],
+              activebackground=FARBEN["bg_hover"],
+              activeforeground=FARBEN["cyan"],
+              relief="raised", bd=1, font=("Helvetica", 9, "bold"),
+              padx=14, pady=4, cursor="hand2").pack(side="right")
+
+    # Header
+    header = tk.Frame(win, bg=FARBEN["bg_mittel"], padx=20, pady=14)
+    header.pack(side="top", fill="x")
+    tk.Label(header, text="MIT LICENSE",
+             font=("Helvetica", 12, "bold"),
+             bg=FARBEN["bg_mittel"], fg=FARBEN["cyan"]).pack(anchor="w")
+
+    tk.Frame(win, bg=FARBEN["rand"], height=1).pack(side="top", fill="x", padx=20)
+
+    # Body mit Text + Scrollbar
+    body = tk.Frame(win, bg=FARBEN["bg_mittel"], padx=20, pady=14)
+    body.pack(side="top", fill="both", expand=True)
+
+    text_wrap = tk.Frame(body, bg=FARBEN["bg_dunkel"], bd=0, highlightthickness=0)
+    text_wrap.pack(fill="both", expand=True)
+
+    txt = tk.Text(text_wrap, wrap="word",
+                  bg=FARBEN["bg_dunkel"], fg=FARBEN["text_dim"],
+                  insertbackground=FARBEN["text"],
+                  selectbackground=FARBEN["cyan"],
+                  selectforeground=FARBEN["bg_dunkel"],
+                  relief="flat", bd=0, highlightthickness=0,
+                  font=("Courier New", 9), padx=14, pady=12)
+    txt.pack(side="left", fill="both", expand=True)
+
+    sb = tk.Scrollbar(text_wrap, command=txt.yview,
+                      bg=FARBEN["bg_hell"], troughcolor=FARBEN["bg_dunkel"],
+                      activebackground=FARBEN["cyan"],
+                      relief="flat", bd=0, highlightthickness=0, width=12)
+    sb.pack(side="right", fill="y")
+    txt.config(yscrollcommand=sb.set)
+
+    txt.insert("1.0", MIT_LICENSE_TEXT)
+    txt.config(state="disabled")
+
+    win.bind("<Escape>", lambda e: win.destroy())
+
+    # Zentrieren
+    win.update_idletasks()
+    mx = parent.winfo_rootx() + parent.winfo_width() // 2
+    my = parent.winfo_rooty() + parent.winfo_height() // 2
+    w = win.winfo_width()
+    h = win.winfo_height()
+    win.geometry(f"+{mx - w // 2}+{my - h // 2}")
+
+
+# ============================================================
 # Hauptanwendung
 # ============================================================
 class CadApp:
@@ -277,7 +369,7 @@ class CadApp:
         self._rc_start = None
         self._rc_bewegt = False
 
-        # NEU: Strecken
+        # Strecken
         self._stretch_rechteck_start = None
         self._stretch_rechteck_id = None
 
@@ -656,7 +748,6 @@ class CadApp:
                             command=lambda: self._op_start("array"))
         m_bearb.add_command(label=tr("menu.bearbeiten.drehen"),
                             command=lambda: self._op_start("rotate"))
-        # NEU: Strecken
         m_bearb.add_command(label=tr("menu.bearbeiten.strecken"),
                             command=lambda: self._op_start("stretch"))
         m_bearb.add_separator()
@@ -2160,7 +2251,6 @@ class CadApp:
             self._paste_vorschau_aktualisieren(event.x, event.y)
             self._paste_platzieren()
             return
-        # NEU: Strecken - Fenster aufziehen
         if (self._op is not None and self._op["typ"] == "stretch"
                 and self._op["stufe"] == "fenster"):
             self.auswahl_rechteck_start(event)
@@ -2442,7 +2532,6 @@ class CadApp:
         x0_px, y0_px, x0_mm, y0_mm = self._auswahl_rechteck_start
         x1_px, y1_px = event.x, event.y
         x1_mm, y1_mm = self.px_to_mm(x1_px, y1_px)
-        # NEU: Strecken - Fenster abschließen
         if (self._op is not None and self._op["typ"] == "stretch"
                 and self._op["stufe"] == "fenster"):
             if abs(x1_px - x0_px) < 4 and abs(y1_px - y0_px) < 4:
@@ -2463,7 +2552,6 @@ class CadApp:
                 self.canvas.delete(self._auswahl_rechteck_id)
                 self._auswahl_rechteck_id = None
             self.canvas.delete("auswahlvorschau")
-            # Betroffene Elemente zur Orientierung markieren
             self.auswahl = self._elemente_im_auswahlrechteck(bbox, "rechts")
             self.redraw()
             self._op_hinweis()
@@ -2662,12 +2750,12 @@ class CadApp:
             self.redraw()
 
     # --------------------------------------------------------
-    # Info-Fenster (an XZN-Stil angepasst)
+    # Info-Fenster (XZN-Stil, mit separatem Lizenz-Fenster)
     # --------------------------------------------------------
     def zeige_info_fenster(self):
         info_win = tk.Toplevel(self.root)
         info_win.title(tr("info.titel"))
-        info_win.geometry("450x560")
+        info_win.geometry("450x420")
         info_win.transient(self.root)
         info_win.configure(bg=FARBEN["bg_mittel"])
         info_win.resizable(False, False)
@@ -2686,7 +2774,6 @@ class CadApp:
         if os.path.isfile(logo_path) and PILLOW_VERFUEGBAR:
             try:
                 logo_img = Image.open(logo_path).convert("RGBA")
-                # Auf 64x64 skalieren, wie im XZN-Fenster
                 logo_img = logo_img.resize((64, 64), Image.Resampling.LANCZOS)
                 logo_photo = ImageTk.PhotoImage(logo_img)
                 logo_lbl = tk.Label(title_row, image=logo_photo,
@@ -2711,63 +2798,30 @@ class CadApp:
 
         tk.Label(frame, text=tr("info.copyright"),
                  font=("Helvetica", 9, "italic"),
+                 bg=FARBEN["bg_mittel"], fg=FARBEN["text_dim"]).pack(anchor="w", pady=(0, 6))
+
+        tk.Label(frame, text="Released under the MIT License.",
+                 font=("Helvetica", 9),
                  bg=FARBEN["bg_mittel"], fg=FARBEN["text_dim"]).pack(anchor="w", pady=(0, 16))
 
         # Trennlinie
         tk.Frame(frame, bg=FARBEN["rand"], height=1).pack(fill="x", pady=(0, 14))
 
-        # --- Lizenz Bereich ---
-        tk.Label(frame, text="Lizenz / License:",
-                 font=("Helvetica", 9, "bold"),
-                 bg=FARBEN["bg_mittel"], fg=FARBEN["cyan"]).pack(anchor="w", pady=(0, 6))
-
-        lizenz_text = (
-            "Dieses Programm ist unter der MIT-Lizenz lizenziert.\n"
-            "This program is licensed under the MIT License.\n\n"
-            "Copyright (c) 2026 Merecete\n\n"
-            "Permission is hereby granted, free of charge, to any person "
-            "obtaining a copy of this software and associated documentation "
-            "files (the \"Software\"), to deal in the Software without "
-            "restriction, including without limitation the rights to use, "
-            "copy, modify, merge, publish, distribute, sublicense, and/or "
-            "sell copies of the Software, and to permit persons to whom the "
-            "Software is furnished to do so, subject to the following "
-            "conditions:\n\n"
-            "The above copyright notice and this permission notice shall be "
-            "included in all copies or substantial portions of the "
-            "Software.\n\n"
-            "THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY "
-            "KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE "
-            "WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE "
-            "AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT "
-            "HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, "
-            "WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING "
-            "FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR "
-            "OTHER DEALINGS IN THE SOFTWARE."
-        )
-
-        text_wrap = tk.Frame(frame, bg=FARBEN["bg_dunkel"], bd=0, highlightthickness=0)
-        text_wrap.pack(fill=tk.BOTH, expand=True, pady=(0, 16))
-
-        text_widget = tk.Text(text_wrap, height=10, width=50,
-                              bg=FARBEN["bg_dunkel"], fg=FARBEN["text_dim"],
-                              font=("Courier New", 9), relief=tk.FLAT,
-                              wrap=tk.WORD, padx=10, pady=10)
-        text_widget.insert("1.0", lizenz_text)
-        text_widget.config(state=tk.DISABLED)
-        text_widget.pack(fill=tk.BOTH, expand=True)
-
-        # --- Button (Rechtsbündig, flach) ---
+        # --- Button-Reihe: License (links) + Close (rechts) ---
         btn_row = tk.Frame(frame, bg=FARBEN["bg_mittel"])
-        btn_row.pack(fill="x")
+        btn_row.pack(fill="x", side="bottom")
 
-        close_btn = tk.Button(btn_row, text=tr("dlg.ok"), command=info_win.destroy,
-                              bg=FARBEN["bg_hell"], fg=FARBEN["text"],
-                              activebackground=FARBEN["bg_hover"],
-                              activeforeground=FARBEN["cyan"],
-                              relief="raised", bd=1, font=("Helvetica", 9, "bold"),
-                              padx=14, pady=4, cursor="hand2")
-        close_btn.pack(side="right")
+        def make_btn(text, cmd):
+            b = tk.Button(btn_row, text=text, command=cmd,
+                          bg=FARBEN["bg_hell"], fg=FARBEN["text"],
+                          activebackground=FARBEN["bg_hover"],
+                          activeforeground=FARBEN["cyan"],
+                          relief="raised", bd=1, font=("Helvetica", 9, "bold"),
+                          padx=14, pady=4, cursor="hand2")
+            return b
+
+        make_btn("License", lambda: zeige_lizenz_fenster(info_win)).pack(side="left")
+        make_btn(tr("dlg.schliessen"), info_win.destroy).pack(side="right")
 
         # Fenster zentrieren
         info_win.update_idletasks()
@@ -4057,7 +4111,6 @@ class CadApp:
             self.status.set(("Bitte zuerst den Viewport verlassen (ESC)." if de
                              else "Please leave the viewport first (ESC)."))
             return
-        # NEU: Strecken
         if typ == "stretch":
             self.aktives_werkzeug.set("auswahl")
             self._pts = []
@@ -4101,7 +4154,6 @@ class CadApp:
         if op is None:
             return
         de = SPRACHE["aktuell"] == "de"
-        # NEU: Strecken - Fenster-Stufe
         if op.get("stufe") == "fenster":
             t = ("Fenster überkreuzend aufziehen (umfasst zu streckende Punkte)"
                  if de else
@@ -4181,7 +4233,6 @@ class CadApp:
         if op is None:
             return
         de = SPRACHE["aktuell"] == "de"
-        # NEU: Strecken
         if op["typ"] == "stretch":
             if op["stufe"] == "basis":
                 op["basis"] = pt
@@ -4255,7 +4306,6 @@ class CadApp:
                      f"dy={dy / self._einh_faktor():.3f}). Specify another "
                      "target point or Enter/right-click = done."))
 
-    # NEU: Strecken - Hilfsfunktionen
     def _stretch_anwenden(self, fenster, dx, dy):
         xmin, ymin, xmax, ymax = fenster
 
@@ -4369,7 +4419,6 @@ class CadApp:
         stil = {"farbe": FARBEN["gruen"], "w": 1, "dash": (4, 3)}
         einh = self._einh_faktor()
 
-        # NEU: Strecken - Vorschau
         if op["typ"] == "stretch":
             dx, dy = pt[0] - op["basis"][0], pt[1] - op["basis"][1]
             xmin, ymin, xmax, ymax = op["fenster"]
@@ -4461,7 +4510,6 @@ class CadApp:
         op = self._op
         if op is None:
             return
-        # NEU: Strecken - Eingabe
         if op["typ"] == "stretch":
             if op["stufe"] == "basis":
                 self._op_klick(self._parse_xy(text, einh))
