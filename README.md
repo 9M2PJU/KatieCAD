@@ -1,6 +1,6 @@
 # KatieCAD
 
-A lightweight 2D CAD drawing tool built with Python and Tkinter, featuring
+A lightweight CAD drawing tool built with Python and Tkinter, featuring
 core drawing, editing and dimensioning tools, plus DXF import/export.
 
 ![Screenshot1](Shot1.png)
