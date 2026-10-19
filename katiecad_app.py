@@ -2662,50 +2662,64 @@ class CadApp:
             self.redraw()
 
     # --------------------------------------------------------
-    # Info-Fenster (aus blatt_leeren herausgezogen - jetzt korrekt)
+    # Info-Fenster (an XZN-Stil angepasst)
     # --------------------------------------------------------
     def zeige_info_fenster(self):
         info_win = tk.Toplevel(self.root)
         info_win.title(tr("info.titel"))
-        info_win.geometry("420x480")
+        info_win.geometry("450x560")
         info_win.transient(self.root)
-        info_win.grab_set()
         info_win.configure(bg=FARBEN["bg_mittel"])
         info_win.resizable(False, False)
 
-        f = ttk.Frame(info_win, padding=20)
-        f.pack(fill=tk.BOTH, expand=True)
+        frame = tk.Frame(info_win, bg=FARBEN["bg_mittel"], padx=26, pady=22)
+        frame.pack(fill=tk.BOTH, expand=True)
 
-        # --- LOGO BEREICH ---
-        logo_pfad = "KatieCAD.png"
-        if os.path.exists(logo_pfad) and PILLOW_VERFUEGBAR:
+        # --- Logo + Titel (Horizontal) ---
+        title_row = tk.Frame(frame, bg=FARBEN["bg_mittel"])
+        title_row.pack(anchor="w", fill="x")
+
+        logo_path = "KatieCAD.png"
+        if not os.path.isfile(logo_path):
+            logo_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "KatieCAD.png")
+
+        if os.path.isfile(logo_path) and PILLOW_VERFUEGBAR:
             try:
-                img = Image.open(logo_pfad)
-                img.thumbnail((200, 200), Image.Resampling.LANCZOS)
-                self._info_logo = ImageTk.PhotoImage(img)
-                logo_label = tk.Label(f, image=self._info_logo,
-                                      bg=FARBEN["bg_mittel"])
-                logo_label.pack(pady=(0, 10))
+                logo_img = Image.open(logo_path).convert("RGBA")
+                # Auf 64x64 skalieren, wie im XZN-Fenster
+                logo_img = logo_img.resize((64, 64), Image.Resampling.LANCZOS)
+                logo_photo = ImageTk.PhotoImage(logo_img)
+                logo_lbl = tk.Label(title_row, image=logo_photo,
+                                    bg=FARBEN["bg_mittel"], bd=0,
+                                    highlightthickness=0)
+                logo_lbl.image = logo_photo  # Referenz speichern
+                logo_lbl.pack(side="left", padx=(0, 14))
             except Exception as e:
                 print(f"Logo konnte nicht geladen werden: {e}")
 
-        # --- TEXT BEREICH ---
-        ttk.Label(f, text="KatieCAD", font=("Segoe UI", 16, "bold"),
-                  foreground=FARBEN["cyan"]).pack(pady=(0, 2))
+        tk.Label(title_row, text="KatieCAD",
+                 font=("Helvetica", 15, "bold"),
+                 bg=FARBEN["bg_mittel"], fg=FARBEN["cyan"]).pack(side="left", anchor="w")
 
-        ttk.Label(f, text=tr("info.version"), font=("Segoe UI", 10),
-                  foreground=FARBEN["text"]).pack(pady=2)
+        # Trennlinie
+        tk.Frame(frame, bg=FARBEN["rand"], height=1).pack(fill="x", pady=(8, 14))
 
-        ttk.Label(f, text=tr("info.copyright"), font=("Segoe UI", 9, "italic"),
-                  foreground=FARBEN["text_dim"]).pack(pady=(2, 10))
+        # --- Info Texte ---
+        tk.Label(frame, text=tr("info.version"),
+                 font=("Helvetica", 9),
+                 bg=FARBEN["bg_mittel"], fg=FARBEN["text"]).pack(anchor="w", pady=(0, 6))
 
-        # --- LIZENZ BEREICH ---
-        lizenz_frame = ttk.Frame(f)
-        lizenz_frame.pack(fill=tk.X, pady=10)
+        tk.Label(frame, text=tr("info.copyright"),
+                 font=("Helvetica", 9, "italic"),
+                 bg=FARBEN["bg_mittel"], fg=FARBEN["text_dim"]).pack(anchor="w", pady=(0, 16))
 
-        ttk.Label(lizenz_frame, text="Lizenz / License:",
-                  font=("Segoe UI", 9, "bold"),
-                  foreground=FARBEN["cyan"]).pack(anchor=tk.W)
+        # Trennlinie
+        tk.Frame(frame, bg=FARBEN["rand"], height=1).pack(fill="x", pady=(0, 14))
+
+        # --- Lizenz Bereich ---
+        tk.Label(frame, text="Lizenz / License:",
+                 font=("Helvetica", 9, "bold"),
+                 bg=FARBEN["bg_mittel"], fg=FARBEN["cyan"]).pack(anchor="w", pady=(0, 6))
 
         lizenz_text = (
             "Dieses Programm ist unter der MIT-Lizenz lizenziert.\n"
@@ -2732,17 +2746,36 @@ class CadApp:
             "OTHER DEALINGS IN THE SOFTWARE."
         )
 
-        text_widget = tk.Text(lizenz_frame, height=8, width=50,
+        text_wrap = tk.Frame(frame, bg=FARBEN["bg_dunkel"], bd=0, highlightthickness=0)
+        text_wrap.pack(fill=tk.BOTH, expand=True, pady=(0, 16))
+
+        text_widget = tk.Text(text_wrap, height=10, width=50,
                               bg=FARBEN["bg_dunkel"], fg=FARBEN["text_dim"],
-                              font=("Consolas", 8), relief=tk.FLAT,
-                              wrap=tk.WORD, padx=5, pady=5)
+                              font=("Courier New", 9), relief=tk.FLAT,
+                              wrap=tk.WORD, padx=10, pady=10)
         text_widget.insert("1.0", lizenz_text)
         text_widget.config(state=tk.DISABLED)
-        text_widget.pack(fill=tk.X, pady=5)
+        text_widget.pack(fill=tk.BOTH, expand=True)
 
-        # --- BUTTON ---
-        ttk.Button(f, text=tr("dlg.ok"),
-                   command=info_win.destroy).pack(pady=10)
+        # --- Button (Rechtsbündig, flach) ---
+        btn_row = tk.Frame(frame, bg=FARBEN["bg_mittel"])
+        btn_row.pack(fill="x")
+
+        close_btn = tk.Button(btn_row, text=tr("dlg.ok"), command=info_win.destroy,
+                              bg=FARBEN["bg_hell"], fg=FARBEN["text"],
+                              activebackground=FARBEN["bg_hover"],
+                              activeforeground=FARBEN["cyan"],
+                              relief="raised", bd=1, font=("Helvetica", 9, "bold"),
+                              padx=14, pady=4, cursor="hand2")
+        close_btn.pack(side="right")
+
+        # Fenster zentrieren
+        info_win.update_idletasks()
+        mx = self.root.winfo_rootx() + self.root.winfo_width() // 2
+        my = self.root.winfo_rooty() + self.root.winfo_height() // 2
+        w = info_win.winfo_width()
+        h = info_win.winfo_height()
+        info_win.geometry(f"+{mx - w // 2}+{my - h // 2}")
 
     def neu(self):
         de = SPRACHE["aktuell"] == "de"
