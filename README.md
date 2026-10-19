@@ -22,14 +22,12 @@ core drawing, editing and dimensioning tools, plus DXF import/export.
 
 ## Requirements
 
-- Python **3.8+**
-- `tkinter` (included in standard Python on Windows/macOS; on Linux install
-  `python3-tk` via your package manager)
+- **Python 3.10+** (required by `ezdwg`)
+- `tkinter` (included in standard Python on Windows/macOS; on Linux install `python3-tk`)
 
-Optional:
-
-- `ezdxf` for DXF import/export
-- `ezdwg` for DWG import (rarely needed, may require manual build)
+The following packages are installed automatically via `requirements.txt`:
+- `ezdxf` – for DXF import/export
+- `ezdwg` – for DWG import
 
 ## Installation
 
