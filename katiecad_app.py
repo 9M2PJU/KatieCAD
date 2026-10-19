@@ -10,13 +10,6 @@ import math, json, re
 import os, sys, tempfile, subprocess
 import tkinter.font as tkfont
 
-# NEU: Pillow für Bildverarbeitung (Icons)
-try:
-    from PIL import Image, ImageTk
-    PILLOW_VERFUEGBAR = True
-except ImportError:
-    PILLOW_VERFUEGBAR = False
-
 try:
     import ezdxf
     EZDXF_VERFUEGBAR = True
@@ -144,12 +137,6 @@ class CadApp:
         self.root.title("KatieCAD")
         self.root.geometry("1500x950")
         self.root.configure(bg=FARBEN["bg_dunkel"])
-
-        # NEU: Icon-Referenzen speichern (verhindert Garbage Collection)
-        self._icon_refs = []
-
-        # NEU: Fenster-Icon setzen
-        self._set_window_icon()
 
         _style_setup(root)
 
@@ -299,54 +286,6 @@ class CadApp:
         self._build_koord_bar()
 
         self.root.protocol("WM_DELETE_WINDOW", self.beenden)
-
-    # --------------------------------------------------------
-    # NEU: Icon-Hilfsfunktionen
-    # --------------------------------------------------------
-    def _set_window_icon(self):
-        """Setzt das Fenster-Icon (Taskleiste/Dock) plattformübergreifend."""
-        icon_pfad_png = "icon.png"
-        icon_pfad_ico = "icon.ico"
-        icon_pfad_icns = "icon.icns"
-
-        # macOS (Dock-Icon) - benötigt .icns
-        if sys.platform == "darwin" and os.path.exists(icon_pfad_icns):
-            try:
-                self.root.iconbitmap(icon_pfad_icns)
-                return
-            except Exception as e:
-                print(f"Mac Icon Fehler: {e}")
-
-        # Windows (Taskleiste) - benötigt .ico
-        if sys.platform.startswith("win") and os.path.exists(icon_pfad_ico):
-            try:
-                self.root.iconbitmap(icon_pfad_ico)
-                return
-            except Exception as e:
-                print(f"Windows Icon Fehler: {e}")
-
-        # Linux / Fallback (PNG via Pillow)
-        if os.path.exists(icon_pfad_png) and PILLOW_VERFUEGBAR:
-            try:
-                img = Image.open(icon_pfad_png)
-                # Auf 64x64 skalieren für das Fenster-Icon
-                img = img.resize((64, 64), Image.Resampling.LANCZOS)
-                self._window_icon = ImageTk.PhotoImage(img)
-                self.root.iconphoto(True, self._window_icon)
-            except Exception as e:
-                print(f"PNG Icon Fehler: {e}")
-
-    def _lade_icon(self, pfad, groesse=(24, 24)):
-        """Lädt ein Icon für Buttons/Toolbars und skaliert es."""
-        if not PILLOW_VERFUEGBAR or not os.path.exists(pfad):
-            return None
-        try:
-            img = Image.open(pfad)
-            img = img.resize(groesse, Image.Resampling.LANCZOS)
-            return ImageTk.PhotoImage(img)
-        except Exception as e:
-            print(f"Fehler beim Laden von {pfad}: {e}")
-            return None
 
     @property
     def view(self):
@@ -951,24 +890,15 @@ class CadApp:
         self._tb3_anker = ttk.Frame(tb3, width=1)
         self._tb3_anker.pack(side=tk.LEFT)
         ttk.Separator(tb3, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=8)
-        
-        # NEU: Beispiel für Icon-Integration in der Toolbar
-        icon_zoom = self._lade_icon("icon_zoom.png", (16, 16))
-        if icon_zoom:
-            self._icon_refs.append(icon_zoom)
-            btn_zoom = ttk.Button(tb3, image=icon_zoom, command=self.zoom_grenzen)
-            btn_zoom.pack(side=tk.LEFT, padx=2)
-        else:
-            ttk.Button(tb3, text=tr("tb.zoom_grenzen"), width=14,
-                       command=self.zoom_grenzen).pack(side=tk.LEFT, padx=2)
-
         ttk.Button(tb3, text=tr("tb.zoom_plus"), width=8,
                    command=lambda: self._zoom(1.25)).pack(side=tk.LEFT, padx=2)
         ttk.Button(tb3, text=tr("tb.zoom_minus"), width=8,
                    command=lambda: self._zoom(0.8)).pack(side=tk.LEFT, padx=2)
         ttk.Button(tb3, text=tr("tb.reset"), width=8,
                    command=self._reset_view).pack(side=tk.LEFT, padx=2)
-        
+        ttk.Button(tb3, text=tr("tb.zoom_grenzen"), width=14,
+                   command=self.zoom_grenzen).pack(side=tk.LEFT, padx=2)
+
         ttk.Separator(tb3, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=8)
         ttk.Label(tb3, text=tr("tb.hintergrund"), style="Title.TLabel").pack(side=tk.LEFT)
         self.bg_btn = tk.Button(tb3, bg=self.bg_modell, width=3,
@@ -2722,22 +2652,84 @@ class CadApp:
             self._aktiver_viewport = None
             self.redraw()
 
-    def zeige_info_fenster(self):
+        def zeige_info_fenster(self):
         info_win = tk.Toplevel(self.root)
         info_win.title(tr("info.titel"))
-        info_win.geometry("320x220")
+        info_win.geometry("420x480") # Etwas größer für das Logo und die Lizenz
         info_win.transient(self.root)
         info_win.grab_set()
         info_win.configure(bg=FARBEN["bg_mittel"])
+        
+        # Verhindert, dass das Fenster in der Größe verändert werden kann
+        info_win.resizable(False, False)
+
         f = ttk.Frame(info_win, padding=20)
         f.pack(fill=tk.BOTH, expand=True)
-        ttk.Label(f, text="KatieCAD", font=("Segoe UI", 14, "bold"),
-                  foreground=FARBEN["cyan"]).pack(pady=(10, 5))
+
+        # --- LOGO BEREICH ---
+        logo_pfad = "KatieCAD.png"
+        if os.path.exists(logo_pfad) and PILLOW_VERFUEGBAR:
+            try:
+                # Logo laden und auf eine schöne Größe skalieren (z.B. max 200px breit)
+                img = Image.open(logo_pfad)
+                # Seitenverhältnis beibehalten
+                img.thumbnail((200, 200), Image.Resampling.LANCZOS)
+                self._info_logo = ImageTk.PhotoImage(img) # Referenz speichern!
+                
+                logo_label = tk.Label(f, image=self._info_logo, bg=FARBEN["bg_mittel"])
+                logo_label.pack(pady=(0, 10))
+            except Exception as e:
+                print(f"Logo konnte nicht geladen werden: {e}")
+
+        # --- TEXT BEREICH ---
+        ttk.Label(f, text="KatieCAD", font=("Segoe UI", 16, "bold"),
+                  foreground=FARBEN["cyan"]).pack(pady=(0, 2))
+        
         ttk.Label(f, text=tr("info.version"), font=("Segoe UI", 10),
-                  foreground=FARBEN["text"]).pack(pady=5)
+                  foreground=FARBEN["text"]).pack(pady=2)
+        
         ttk.Label(f, text=tr("info.copyright"), font=("Segoe UI", 9, "italic"),
-                  foreground=FARBEN["text_dim"]).pack(pady=(5, 15))
-        ttk.Button(f, text=tr("dlg.ok"), command=info_win.destroy).pack(pady=5)
+                  foreground=FARBEN["text_dim"]).pack(pady=(2, 10))
+
+        # --- LIZENZ BEREICH ---
+        lizenz_frame = ttk.Frame(f)
+        lizenz_frame.pack(fill=tk.X, pady=10)
+        
+        ttk.Label(lizenz_frame, text="Lizenz / License:", 
+                  font=("Segoe UI", 9, "bold"), foreground=FARBEN["cyan"]).pack(anchor=tk.W)
+        
+        lizenz_text = (
+            "Dieses Programm ist unter der MIT-Lizenz lizenziert.\n"
+            "This program is licensed under the MIT License.\n\n"
+            "Copyright (c) 2026 Merecete\n\n"
+            "Permission is hereby granted, free of charge, to any person obtaining a copy "
+            "of this software and associated documentation files (the \"Software\"), to deal "
+            "in the Software without restriction, including without limitation the rights "
+            "to use, copy, modify, merge, publish, distribute, sublicense, and/or sell "
+            "copies of the Software, and to permit persons to whom the Software is "
+            "furnished to do so, subject to the following conditions:\n\n"
+            "The above copyright notice and this permission notice shall be included in all "
+            "copies or substantial portions of the Software.\n\n"
+            "THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR "
+            "IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, "
+            "FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE "
+            "AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER "
+            "LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, "
+            "OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE "
+            "SOFTWARE."
+        )
+        
+        # Text-Widget für die Lizenz (damit man scrollen kann, falls nötig)
+        text_widget = tk.Text(lizenz_frame, height=8, width=50, 
+                              bg=FARBEN["bg_dunkel"], fg=FARBEN["text_dim"],
+                              font=("Consolas", 8), relief=tk.FLAT,
+                              wrap=tk.WORD, padx=5, pady=5)
+        text_widget.insert("1.0", lizenz_text)
+        text_widget.config(state=tk.DISABLED) # Nur lesen
+        text_widget.pack(fill=tk.X, pady=5)
+
+        # --- BUTTON ---
+        ttk.Button(f, text=tr("dlg.ok"), command=info_win.destroy).pack(pady=10)
 
     def neu(self):
         de = SPRACHE["aktuell"] == "de"
