@@ -18,6 +18,7 @@ core drawing, editing and dimensioning tools, plus DXF import/export.
 - **Dimensions:** Linear, aligned, radius, diameter, decimal comma toggle
 - **Layout view:** Paper space with viewports, standard scales, title block
 - **DXF import/export** (via `ezdxf`)
+- **DWG import** (via `ezdwg`)
 - **Bilingual UI:** German and English (switchable at runtime)
 
 ## Requirements
