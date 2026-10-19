@@ -8,4 +8,5 @@ ezdxf>=1.4
 # Note: ezdwg is a Rust-based parser, wheels are available for most platforms.
 ezdwg>=0.12
 
+# Logo in the info window
 Pillow>=10.0
