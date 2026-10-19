@@ -33,7 +33,7 @@ Optional:
 ## Installation
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/KatieCAD.git
+git clone https://github.com/Merecete/KatieCAD.git
 cd KatieCAD
 
 # Recommended: use a virtual environment
