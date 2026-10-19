@@ -1,0 +1,1066 @@
+# -*- coding: utf-8 -*-
+"""
+katiecad_core.py - Datenmodell, Geometrie und PDF-Ausgabe.
+Enthaelt KEIN Tkinter und keine GUI-Logik.
+"""
+
+import math, zlib
+
+from katiecad_i18n import tr, SPRACHE
+
+
+# ============================================================
+# Farbschema
+# ============================================================
+FARBEN = {
+    "bg_dunkel":    "#120a1f",
+    "bg_mittel":    "#1c132d",
+    "bg_hell":      "#281c3d",
+    "bg_hover":     "#362452",
+    "rand":         "#4a396b",
+    "text":         "#d8d0e8",
+    "text_dim":     "#8b7ea8",
+    "text_hell":    "#ffffff",
+    "cyan":         "#c29bff",
+    "cyan_dunkel":  "#805ad5",
+    "magenta":      "#ff2d95",
+    "gruen":        "#39ff14",
+    "gelb":         "#ffe600",
+    "rot":          "#ff1744",
+    "orange":       "#ff9500",
+    "select_bg":    "#321f5c",
+    "select_fg":    "#e2d4ff",
+}
+
+
+# ============================================================
+# Konstanten
+# ============================================================
+EINHEITEN = {"mm": 1.0, "cm": 10.0, "m": 1000.0, "in": 25.4}
+
+ZEICHNUNGSFORMATE = {
+    "A4 (297x210)":  (297, 210),
+    "A3 (420x297)":  (420, 297),
+    "A2 (594x420)":  (594, 420),
+    "A1 (841x594)":  (841, 594),
+    "A0 (1189x841)": (1189, 841),
+}
+
+MASSSTAEBE = ["1:1", "1:2", "1:5", "1:10", "1:20", "1:50",
+              "1:100", "1:200", "2:1", "5:1", "10:1"]
+
+LINIENTYPEN = {
+    "Volllinie (breit)":        {"dash": None,           "farbe": "#ffffff"},
+    "Volllinie (schmal)":       {"dash": None,           "farbe": "#ffffff"},
+    "Strichlinie (verdeckt)":   {"dash": (6, 4),         "farbe": "#b886fb"},
+    "Strichpunktlinie (Achse)": {"dash": (12, 4, 3, 4),  "farbe": "#ff2d95"},
+    "Freihandlinie":            {"dash": (2, 3),         "farbe": "#8b7ea8"},
+    "Schraffur":                {"dash": (2, 2),         "farbe": "#8b7ea8"},
+}
+
+RASTER_GROESSEN = [1, 2, 5, 10, 20, 25, 50, 100]
+
+BG_PRESETS = {
+    "Standard":     "#120a1f",
+    "Weiß (Papier)":        "#ffffff",
+    "Schwarz (CAD-Dunkel)": "#1e1e1e",
+    "Dunkelgrau":           "#333333",
+    "Hellgrau":             "#e8e8e8",
+    "Blau (klassisch)":     "#003366",
+    "Beige (Sepia)":        "#f4ecd8",
+}
+
+SCHRIFTARTEN = ["Arial", "Courier New", "Times New Roman",
+                "Consolas", "Verdana", "Tahoma", "Segoe UI"]
+
+LINIENSTAERKEN = [0.13, 0.18, 0.25, 0.35, 0.5, 0.7, 1.0, 1.4, 2.0]
+
+GRIFF_RADIUS = 5
+GRIFF_GROESSE_MM = 3.0
+MIN_VP_GROESSE = 10.0
+PASTE_OFFSET_MM = 10.0
+
+TEXT_BREITE = 0.72
+TEXT_ZEILE = 1.65
+CAD_VERSALHOEHE = 0.72
+LW_PX_FAKTOR = 6.5
+BEM_RICHTUNGEN = ("horizontal", "vertikal", "ausgerichtet",
+                  "radius", "durchmesser")
+
+
+def ist_dunkel(hexfarbe):
+    try:
+        hexc = hexfarbe.lstrip("#")
+        r = int(hexc[0:2], 16)
+        g = int(hexc[2:4], 16)
+        b = int(hexc[4:6], 16)
+        return (r * 0.299 + g * 0.587 + b * 0.114) < 128
+    except Exception:
+        return False
+
+
+# ============================================================
+# Geometrie-Hilfen
+# ============================================================
+def norm360(a):
+    return a % 360.0
+
+
+def bogen_sweep(start, ende):
+    s = (ende - start) % 360.0
+    return 360.0 if s < 1e-9 else s
+
+
+def bogen_punkte(cx, cy, r, start, ende, n):
+    sweep = bogen_sweep(start, ende)
+    n = max(2, int(n))
+    pts = []
+    for i in range(n + 1):
+        a = math.radians(start + sweep * i / n)
+        pts.append((cx + r * math.cos(a), cy + r * math.sin(a)))
+    return pts
+
+
+def winkel_im_bogen(winkel, start, ende, eps=1e-6):
+    return (winkel - start) % 360.0 <= bogen_sweep(start, ende) + eps
+
+
+def kreis_aus_3_punkten(p1, p2, p3):
+    ax, ay = p1
+    bx, by = p2
+    cx, cy = p3
+    kreuz = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax)
+    skala = max(math.hypot(bx - ax, by - ay) * math.hypot(cx - ax, cy - ay), 1e-12)
+    if abs(kreuz) / skala < 1e-9:
+        return None
+    d = 2.0 * (ax * (by - cy) + bx * (cy - ay) + cx * (ay - by))
+    a2, b2, c2 = ax * ax + ay * ay, bx * bx + by * by, cx * cx + cy * cy
+    ux = (a2 * (by - cy) + b2 * (cy - ay) + c2 * (ay - by)) / d
+    uy = (a2 * (cx - bx) + b2 * (ax - cx) + c2 * (bx - ax)) / d
+    return ux, uy, math.hypot(ax - ux, ay - uy)
+
+
+def bogen_aus_3_punkten(p1, p2, p3):
+    k = kreis_aus_3_punkten(p1, p2, p3)
+    if k is None:
+        return None
+    cx, cy, r = k
+    kreuz = (p2[0] - p1[0]) * (p3[1] - p1[1]) - (p2[1] - p1[1]) * (p3[0] - p1[0])
+    a1 = norm360(math.degrees(math.atan2(p1[1] - cy, p1[0] - cx)))
+    a3 = norm360(math.degrees(math.atan2(p3[1] - cy, p3[0] - cx)))
+    if kreuz > 0:
+        return cx, cy, r, a1, a3
+    return cx, cy, r, a3, a1
+
+
+def bogen_mitte_start_ende(c, s, e, richtung="auto"):
+    r = math.hypot(s[0] - c[0], s[1] - c[1])
+    if r < 1e-9:
+        return None
+    a_s = norm360(math.degrees(math.atan2(s[1] - c[1], s[0] - c[0])))
+    a_e = norm360(math.degrees(math.atan2(e[1] - c[1], e[0] - c[0])))
+    if richtung == "ccw":
+        start, ende = a_s, a_e
+    elif richtung == "cw":
+        start, ende = a_e, a_s
+    elif (a_e - a_s) % 360.0 <= 180.0:
+        start, ende = a_s, a_e
+    else:
+        start, ende = a_e, a_s
+    sw = bogen_sweep(start, ende)
+    if sw < 0.01 or sw > 359.99:
+        return None
+    return r, start, ende
+
+
+def abstand_punkt_segment(px, py, x1, y1, x2, y2):
+    dx, dy = x2 - x1, y2 - y1
+    L2 = dx * dx + dy * dy
+    if L2 < 1e-18:
+        return math.hypot(px - x1, py - y1)
+    t = max(0.0, min(1.0, ((px - x1) * dx + (py - y1) * dy) / L2))
+    return math.hypot(px - (x1 + t * dx), py - (y1 + t * dy))
+
+
+def naechster_punkt_segment(px, py, x1, y1, x2, y2):
+    dx, dy = x2 - x1, y2 - y1
+    L2 = dx * dx + dy * dy
+    if L2 < 1e-18:
+        return x1, y1
+    t = max(0.0, min(1.0, ((px - x1) * dx + (py - y1) * dy) / L2))
+    return x1 + t * dx, y1 + t * dy
+
+
+def clip_segment(x1, y1, x2, y2, xmin, ymin, xmax, ymax):
+    dx, dy = x2 - x1, y2 - y1
+    t0, t1 = 0.0, 1.0
+    for p, q in ((-dx, x1 - xmin), (dx, xmax - x1),
+                 (-dy, y1 - ymin), (dy, ymax - y1)):
+        if abs(p) < 1e-12:
+            if q < 0:
+                return None
+        else:
+            t = q / p
+            if p < 0:
+                if t > t1:
+                    return None
+                if t > t0:
+                    t0 = t
+            else:
+                if t < t0:
+                    return None
+                if t < t1:
+                    t1 = t
+    return (x1 + t0 * dx, y1 + t0 * dy, x1 + t1 * dx, y1 + t1 * dy)
+
+
+def clip_polyline(pts, rect):
+    xmin, ymin, xmax, ymax = rect
+    if all(xmin <= x <= xmax and ymin <= y <= ymax for (x, y) in pts):
+        return [list(pts)] if len(pts) >= 2 else []
+    out, cur = [], []
+    for i in range(len(pts) - 1):
+        seg = clip_segment(pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1],
+                           xmin, ymin, xmax, ymax)
+        if seg is None:
+            if len(cur) >= 2:
+                out.append(cur)
+            cur = []
+            continue
+        a, b = (seg[0], seg[1]), (seg[2], seg[3])
+        if cur and abs(cur[-1][0] - a[0]) < 1e-6 and abs(cur[-1][1] - a[1]) < 1e-6:
+            cur.append(b)
+        else:
+            if len(cur) >= 2:
+                out.append(cur)
+            cur = [a, b]
+    if len(cur) >= 2:
+        out.append(cur)
+    return out
+
+
+def gedrehtes_rechteck(cx, cy, w, h, winkel_deg):
+    a = math.radians(winkel_deg)
+    ex = (math.cos(a), math.sin(a))
+    ey = (-math.sin(a), math.cos(a))
+    pts = []
+    for sx, sy in ((-1, -1), (1, -1), (1, 1), (-1, 1)):
+        pts.append((cx + sx * w / 2 * ex[0] + sy * h / 2 * ey[0],
+                    cy + sx * w / 2 * ex[1] + sy * h / 2 * ey[1]))
+    return pts
+
+
+def punkt_in_gedrehtem_rechteck(px, py, cx, cy, w, h, winkel_deg, tol=0.0):
+    a = math.radians(-winkel_deg)
+    dx, dy = px - cx, py - cy
+    lx = dx * math.cos(a) - dy * math.sin(a)
+    ly = dx * math.sin(a) + dy * math.cos(a)
+    return abs(lx) <= w / 2 + tol and abs(ly) <= h / 2 + tol
+
+
+def punkte_drehen(px, py, cx, cy, winkel_deg):
+    """Dreht (px, py) um (cx, cy) um winkel_deg.
+    Das Modell hat Y nach oben, der Bildschirm Y nach unten. Damit ein
+    positiver Winkel auf dem Bildschirm gegen den Uhrzeigersinn dreht
+    (was der Nutzer erwartet), wird die Drehmatrix gespiegelt."""
+    a = math.radians(winkel_deg)
+    ca, sa = math.cos(a), math.sin(a)
+    dx, dy = px - cx, py - cy
+    return (cx + dx * ca + dy * sa,
+            cy - dx * sa + dy * ca)
+
+
+def bem_zahl(wert, dez, komma=True):
+    s = f"{wert:.{max(0, int(dez))}f}"
+    return s.replace(".", ",") if komma else s
+
+
+def parse_massstab(text):
+    a, b = text.replace(",", ".").split(":")
+    a, b = float(a), float(b)
+    if a <= 0 or b <= 0:
+        raise ValueError("Massstab muss positiv sein")
+    return a / b
+
+
+def massstab_text(zoom):
+    if zoom <= 0:
+        return "?"
+    if zoom >= 1.0:
+        return f"{zoom:g}:1" if abs(zoom - round(zoom)) > 1e-6 else f"{int(round(zoom))}:1"
+    n = 1.0 / zoom
+    return f"1:{int(round(n))}" if abs(n - round(n)) < 1e-6 else f"1:{n:.2f}"
+
+
+def normmassstab_unter(zoom, liste):
+    werte = sorted({parse_massstab(t) for t in liste})
+    kand = [w for w in werte if w <= zoom * (1 + 1e-9)]
+    return kand[-1] if kand else zoom
+
+
+def lot_fuss(px, py, x1, y1, x2, y2):
+    dx, dy = x2 - x1, y2 - y1
+    L2 = dx * dx + dy * dy
+    if L2 == 0:
+        return (x1, y1)
+    t = ((px - x1) * dx + (py - y1) * dy) / L2
+    return (x1 + t * dx, y1 + t * dy)
+
+
+def linien_schnitt(x1, y1, x2, y2, x3, y3, x4, y4):
+    d = (x2 - x1) * (y4 - y3) - (y2 - y1) * (x4 - x3)
+    if abs(d) < 1e-9:
+        return None
+    t = ((x3 - x1) * (y4 - y3) - (y3 - y1) * (x4 - x3)) / d
+    u = ((x3 - x1) * (y2 - y1) - (y3 - y1) * (x2 - x1)) / d
+    if 0 <= t <= 1 and 0 <= u <= 1:
+        return (x1 + t * (x2 - x1), y1 + t * (y2 - y1))
+    return None
+
+
+def bbox_enthalten(aussen, innen):
+    ax1, ay1, ax2, ay2 = aussen
+    bx1, by1, bx2, by2 = innen
+    return ax1 <= bx1 and ay1 <= by1 and ax2 >= bx2 and ay2 >= by2
+
+
+def bbox_ueberlappt(a, b):
+    ax1, ay1, ax2, ay2 = a
+    bx1, by1, bx2, by2 = b
+    return not (ax2 < bx1 or bx2 < ax1 or ay2 < by1 or by2 < ay1)
+
+
+# ============================================================
+# Befehlszeile (beide Sprachen immer verfügbar)
+# ============================================================
+BEFEHLE = {
+    "RASTER": "raster", "GRID": "raster",
+    "FANG": "fang", "SNAP": "fang", "RASTERFANG": "fang",
+    "OFANG": "ofang", "OSNAP": "ofang", "OBJEKTFANG": "ofang",
+    "ORTHO": "ortho",
+    "VERSCHIEBEN": "move", "V": "move", "MOVE": "move", "M": "move",
+    "KOPIEREN": "copy", "KO": "copy", "COPY": "copy", "CO": "copy", "CP": "copy",
+    "COPYBASE": "copybase", "KOPIERENBASIS": "copybase",
+    "KOPIERENMITBASISPUNKT": "copybase", "KOPIERENMITBASIS": "copybase",
+    "REIHE": "array", "ARRAY": "array", "AR": "array", "ANORDNUNG": "array",
+    "DREHEN": "rotate", "DREHE": "rotate", "ROTATE": "rotate", "RO": "rotate",
+    "STRECKEN": "stretch", "STRETCH": "stretch", "STR": "stretch", "ST": "stretch",
+    "EINFÜGEN": "paste", "EINFUEGEN": "paste", "PASTE": "paste",
+    "DRUCKEN": "druck", "PLOT": "druck", "PRINT": "druck",
+    "U": "undo", "UNDO": "undo", "RÜCKGÄNGIG": "undo", "RUECKGAENGIG": "undo",
+    "LÖSCHEN": "delete", "LOESCHEN": "delete", "DEL": "delete", "ERASE": "delete",
+    "ZG": "zg", "ZOOMGRENZEN": "zg",
+    "LINIE": "tool:linie", "LINE": "tool:linie", "L": "tool:linie",
+    "POLYLINIE": "tool:polylinie", "PL": "tool:polylinie", "PLINE": "tool:polylinie",
+    "KREIS": "tool:kreis", "CIRCLE": "tool:kreis", "K": "tool:kreis",
+    "BOGEN": "tool:bogen", "ARC": "tool:bogen", "A": "tool:bogen",
+    "RECHTECK": "tool:rechteck", "REC": "tool:rechteck", "RECTANG": "tool:rechteck",
+    "TEXT": "tool:text", "T": "tool:text",
+    "BEMASSUNG": "tool:bemassung", "BEM": "tool:bemassung", "DIM": "tool:bemassung",
+}
+
+
+# ============================================================
+# Minimaler PDF-Schreiber
+# ============================================================
+_HELV = [278, 278, 355, 556, 556, 889, 667, 191, 333, 333, 389, 584, 278, 333, 278, 278,
+         556, 556, 556, 556, 556, 556, 556, 556, 556, 556, 278, 278, 584, 584, 584, 556,
+         1015, 667, 667, 722, 722, 667, 611, 778, 722, 278, 500, 667, 556, 833, 722, 778,
+         667, 778, 722, 667, 611, 722, 667, 944, 667, 667, 611, 278, 278, 278, 469, 556,
+         333, 556, 556, 500, 556, 556, 278, 556, 556, 222, 222, 500, 222, 833, 556, 556,
+         556, 556, 333, 500, 278, 556, 500, 722, 500, 500, 500, 334, 260, 334, 584]
+
+
+def pdf_textbreite(s, schriftgroesse):
+    w = 0
+    for ch in s:
+        o = ord(ch)
+        if 32 <= o <= 126:
+            w += _HELV[o - 32]
+        elif ch == "\u00d8":
+            w += 778
+        else:
+            w += 556
+    return w * schriftgroesse / 1000.0
+
+
+def _pdf_str(s):
+    b = s.encode("cp1252", "replace").decode("latin-1")
+    return b.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+
+
+def _pdf_rgb(hexfarbe):
+    try:
+        h = hexfarbe.lstrip("#")
+        return tuple(int(h[i:i + 2], 16) / 255.0 for i in (0, 2, 4))
+    except Exception:
+        return (0.0, 0.0, 0.0)
+
+
+class PdfSeite:
+    MM = 72.0 / 25.4
+
+    def __init__(self, breite_mm, hoehe_mm):
+        self.b, self.h = float(breite_mm), float(hoehe_mm)
+        self.ops = []
+
+    def clip_start(self, x1, y1, x2, y2):
+        self.ops.append("q %.4f %.4f %.4f %.4f re W n" % (x1, y1, x2 - x1, y2 - y1))
+
+    def clip_ende(self):
+        self.ops.append("Q")
+
+    def linie(self, pts, breite, farbe="#000000", dash=None, geschlossen=False):
+        if len(pts) < 2:
+            return
+        r, g, b = _pdf_rgb(farbe)
+        o = ["q", "%.4f w" % max(breite, 0.02), "1 J 1 j",
+             "%.4f %.4f %.4f RG" % (r, g, b)]
+        o.append(("[%s] 0 d" % " ".join("%.3f" % d for d in dash)) if dash else "[] 0 d")
+        o.append("%.4f %.4f m" % pts[0])
+        for p in pts[1:]:
+            o.append("%.4f %.4f l" % p)
+        o.append("s" if geschlossen else "S")
+        o.append("Q")
+        self.ops.append(" ".join(o))
+
+    def flaeche(self, pts, farbe="#000000"):
+        if len(pts) < 3:
+            return
+        r, g, b = _pdf_rgb(farbe)
+        o = ["q", "%.4f %.4f %.4f rg" % (r, g, b), "%.4f %.4f m" % pts[0]]
+        for p in pts[1:]:
+            o.append("%.4f %.4f l" % p)
+        o.append("f")
+        o.append("Q")
+        self.ops.append(" ".join(o))
+
+    def text(self, x, y, inhalt, hoehe, winkel=0.0, farbe="#000000", mitte=False):
+        fs = hoehe / CAD_VERSALHOEHE
+        a = math.radians(winkel)
+        ex, ey = (math.cos(a), math.sin(a)), (-math.sin(a), math.cos(a))
+        zeilen = inhalt.split("\n") or [""]
+        n = len(zeilen)
+        r, g, b = _pdf_rgb(farbe)
+        for i, z in enumerate(zeilen):
+            up = (n - 1 - i) * TEXT_ZEILE * hoehe
+            ox, oy = x + ey[0] * up, y + ey[1] * up
+            if mitte:
+                w = pdf_textbreite(z, fs)
+                ox -= ex[0] * w / 2 + ey[0] * hoehe / 2
+                oy -= ex[1] * w / 2 + ey[1] * hoehe / 2
+            self.ops.append(
+                "BT /F1 %.4f Tf %.4f %.4f %.4f rg %.6f %.6f %.6f %.6f %.4f %.4f Tm (%s) Tj ET"
+                % (fs, r, g, b, ex[0], ex[1], -ex[1], ex[0], ox, oy, _pdf_str(z)))
+
+    def to_bytes(self):
+        inhalt = ("%.9f 0 0 %.9f 0 0 cm\n" % (self.MM, self.MM) + "\n".join(self.ops)).encode("latin-1")
+        strom = zlib.compress(inhalt)
+        w, h = self.b * self.MM, self.h * self.MM
+        objs = [
+            b"<< /Type /Catalog /Pages 2 0 R >>",
+            b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+            ("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 %.3f %.3f] /Contents 4 0 R "
+             "/Resources << /Font << /F1 5 0 R >> >> >>" % (w, h)).encode("latin-1"),
+            b"<< /Length %d /Filter /FlateDecode >>\nstream\n" % len(strom) + strom + b"\nendstream",
+            b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>",
+        ]
+        out = bytearray(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
+        offs = []
+        for i, o in enumerate(objs, 1):
+            offs.append(len(out))
+            out += b"%d 0 obj\n" % i + o + b"\nendobj\n"
+        xref = len(out)
+        out += b"xref\n0 %d\n0000000000 65535 f \n" % (len(objs) + 1)
+        for o in offs:
+            out += b"%010d 00000 n \n" % o
+        out += b"trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n" % (len(objs) + 1, xref)
+        return bytes(out)
+
+
+# ============================================================
+# Layer
+# ============================================================
+class Layer:
+    def __init__(self, name, farbe="#c29bff", staerke=0.35, sichtbar=True):
+        self.name = name
+        self.farbe = farbe
+        self.staerke = staerke
+        self.sichtbar = sichtbar
+
+    def to_dict(self):
+        return {"name": self.name, "farbe": self.farbe,
+                "staerke": self.staerke, "sichtbar": self.sichtbar}
+
+
+# ============================================================
+# Elemente
+# ============================================================
+class Element:
+    def __init__(self, typ, layer="0", farbe="#c29bff",
+                 linientyp="Volllinie (schmal)", eig_farbe=False,
+                 staerke=None):
+        self.typ = typ
+        self.layer = layer
+        self.farbe = farbe
+        self.linientyp = linientyp
+        self.eig_farbe = eig_farbe
+        self.staerke = staerke
+        self.id = None
+
+    def to_dict(self):
+        d = self.__dict__.copy()
+        d.pop("id", None)
+        return d
+
+    def bbox(self):
+        return (0, 0, 0, 0)
+
+    def verschieben(self, dx, dy):
+        pass
+
+    def griffe(self):
+        return []
+
+    def griff_bewegen(self, griff_id, x, y):
+        pass
+
+    def drehen(self, cx, cy, winkel_deg):
+        pass
+
+
+class Linie(Element):
+    def __init__(self, x1, y1, x2, y2, **kw):
+        super().__init__("linie", **kw)
+        self.x1, self.y1, self.x2, self.y2 = x1, y1, x2, y2
+
+    def bbox(self):
+        return (min(self.x1, self.x2), min(self.y1, self.y2),
+                max(self.x1, self.x2), max(self.y1, self.y2))
+
+    def verschieben(self, dx, dy):
+        self.x1 += dx; self.y1 += dy
+        self.x2 += dx; self.y2 += dy
+
+    def griffe(self):
+        return [("p1", self.x1, self.y1),
+                ("p2", self.x2, self.y2),
+                ("mid", (self.x1 + self.x2) / 2, (self.y1 + self.y2) / 2)]
+
+    def griff_bewegen(self, griff_id, x, y):
+        if griff_id == "p1":
+            self.x1, self.y1 = x, y
+        elif griff_id == "p2":
+            self.x2, self.y2 = x, y
+        elif griff_id == "mid":
+            mx, my = (self.x1 + self.x2) / 2, (self.y1 + self.y2) / 2
+            dx, dy = x - mx, y - my
+            self.x1 += dx; self.y1 += dy
+            self.x2 += dx; self.y2 += dy
+
+    def drehen(self, cx, cy, winkel_deg):
+        self.x1, self.y1 = punkte_drehen(self.x1, self.y1, cx, cy, winkel_deg)
+        self.x2, self.y2 = punkte_drehen(self.x2, self.y2, cx, cy, winkel_deg)
+
+
+class Kreis(Element):
+    def __init__(self, cx, cy, r, **kw):
+        super().__init__("kreis", **kw)
+        self.cx, self.cy, self.r = cx, cy, r
+
+    def bbox(self):
+        return (self.cx - self.r, self.cy - self.r,
+                self.cx + self.r, self.cy + self.r)
+
+    def verschieben(self, dx, dy):
+        self.cx += dx; self.cy += dy
+
+    def griffe(self):
+        return [("c", self.cx, self.cy),
+                ("r", self.cx + self.r, self.cy)]
+
+    def griff_bewegen(self, griff_id, x, y):
+        if griff_id == "c":
+            self.cx, self.cy = x, y
+        elif griff_id == "r":
+            self.r = max(0.001, math.hypot(x - self.cx, y - self.cy))
+
+    def drehen(self, cx, cy, winkel_deg):
+        self.cx, self.cy = punkte_drehen(self.cx, self.cy, cx, cy, winkel_deg)
+
+
+class Bogen(Element):
+    def __init__(self, cx, cy, r, start, ende, **kw):
+        super().__init__("bogen", **kw)
+        self.cx, self.cy, self.r = cx, cy, r
+        self.start, self.ende = start, ende
+
+    def bbox(self):
+        return (self.cx - self.r, self.cy - self.r,
+                self.cx + self.r, self.cy + self.r)
+
+    def verschieben(self, dx, dy):
+        self.cx += dx; self.cy += dy
+
+    def griffe(self):
+        sr = math.radians(self.start)
+        er = math.radians(self.ende)
+        return [("c", self.cx, self.cy),
+                ("start", self.cx + self.r * math.cos(sr),
+                          self.cy + self.r * math.sin(sr)),
+                ("ende",  self.cx + self.r * math.cos(er),
+                          self.cy + self.r * math.sin(er)),
+                ("r", self.cx + self.r, self.cy)]
+
+    def griff_bewegen(self, griff_id, x, y):
+        if griff_id == "c":
+            self.cx, self.cy = x, y
+        elif griff_id == "start":
+            self.start = math.degrees(math.atan2(y - self.cy, x - self.cx))
+        elif griff_id == "ende":
+            self.ende = math.degrees(math.atan2(y - self.cy, x - self.cx))
+        elif griff_id == "r":
+            self.r = max(0.001, math.hypot(x - self.cx, y - self.cy))
+
+    def drehen(self, cx, cy, winkel_deg):
+        self.cx, self.cy = punkte_drehen(self.cx, self.cy, cx, cy, winkel_deg)
+        self.start = (self.start + winkel_deg) % 360.0
+        self.ende = (self.ende + winkel_deg) % 360.0
+
+
+class Rechteck(Element):
+    def __init__(self, x1, y1, x2, y2, **kw):
+        super().__init__("rechteck", **kw)
+        self.x1, self.y1, self.x2, self.y2 = x1, y1, x2, y2
+
+    def bbox(self):
+        return (min(self.x1, self.x2), min(self.y1, self.y2),
+                max(self.x1, self.x2), max(self.y1, self.y2))
+
+    def verschieben(self, dx, dy):
+        self.x1 += dx; self.y1 += dy
+        self.x2 += dx; self.y2 += dy
+
+    def griffe(self):
+        return [("p1", self.x1, self.y1),
+                ("p2", self.x2, self.y1),
+                ("p3", self.x2, self.y2),
+                ("p4", self.x1, self.y2),
+                ("mid", (self.x1 + self.x2) / 2, (self.y1 + self.y2) / 2)]
+
+    def griff_bewegen(self, griff_id, x, y):
+        if griff_id == "p1":
+            self.x1, self.y1 = x, y
+        elif griff_id == "p2":
+            self.x2, self.y1 = x, y
+        elif griff_id == "p3":
+            self.x2, self.y2 = x, y
+        elif griff_id == "p4":
+            self.x1, self.y2 = x, y
+        elif griff_id == "mid":
+            mx, my = (self.x1 + self.x2) / 2, (self.y1 + self.y2) / 2
+            dx, dy = x - mx, y - my
+            self.x1 += dx; self.y1 += dy
+            self.x2 += dx; self.y2 += dy
+
+    def drehen(self, cx, cy, winkel_deg):
+        self.x1, self.y1 = punkte_drehen(self.x1, self.y1, cx, cy, winkel_deg)
+        self.x2, self.y2 = punkte_drehen(self.x2, self.y2, cx, cy, winkel_deg)
+
+
+class Polylinie(Element):
+    def __init__(self, punkte, geschlossen=False, **kw):
+        super().__init__("polylinie", **kw)
+        self.punkte = [tuple(p) for p in punkte]
+        self.geschlossen = geschlossen
+
+    def bbox(self):
+        if not self.punkte:
+            return (0, 0, 0, 0)
+        xs = [p[0] for p in self.punkte]
+        ys = [p[1] for p in self.punkte]
+        return (min(xs), min(ys), max(xs), max(ys))
+
+    def verschieben(self, dx, dy):
+        self.punkte = [(x + dx, y + dy) for (x, y) in self.punkte]
+
+    def griffe(self):
+        return [(f"p{i}", x, y) for i, (x, y) in enumerate(self.punkte)]
+
+    def griff_bewegen(self, griff_id, x, y):
+        if not griff_id.startswith("p"):
+            return
+        try:
+            idx = int(griff_id[1:])
+        except ValueError:
+            return
+        if 0 <= idx < len(self.punkte):
+            self.punkte[idx] = (x, y)
+
+    def drehen(self, cx, cy, winkel_deg):
+        self.punkte = [punkte_drehen(x, y, cx, cy, winkel_deg)
+                       for (x, y) in self.punkte]
+
+
+class Text(Element):
+    EINFUEGEPUNKTE = (
+        "oben_links", "oben_zentriert", "oben_rechts",
+        "mitte_links", "mitte_zentriert", "mitte_rechts",
+        "unten_links", "unten_zentriert", "unten_rechts",
+    )
+    STANDARD_EINFUEGEPUNKT = "unten_links"
+
+    def __init__(self, x, y, inhalt, hoehe=3.5, winkel=0.0,
+                 schriftart="Arial", einfuegepunkt=None, **kw):
+        super().__init__("text", **kw)
+        self.x, self.y = x, y
+        self.inhalt = inhalt
+        self.hoehe = hoehe
+        self.winkel = winkel
+        self.schriftart = schriftart
+        if einfuegepunkt not in self.EINFUEGEPUNKTE:
+            einfuegepunkt = self.STANDARD_EINFUEGEPUNKT
+        self.einfuegepunkt = einfuegepunkt
+
+    def masse(self):
+        zeilen = self.inhalt.split("\n") or [""]
+        w = max(max(len(z) for z in zeilen), 1) * TEXT_BREITE * self.hoehe
+        h = (len(zeilen) - 1) * TEXT_ZEILE * self.hoehe + 1.4 * self.hoehe
+        return w, h
+
+    def _versatz_lokal(self, w, h):
+        """Versatz vom Einfügepunkt zur linken unteren Ecke des Textblocks
+        im lokalen (ungedrehten) Koordinatensystem.
+        Rückgabe: (dx, dy) in Modell-mm, wobei dy in Modell-Y-Richtung
+        (nach oben) positiv ist."""
+        # einfuegepunkt ist z.B. "mitte_zentriert" -> vertikal="mitte", horizontal="zentriert"
+        vertikal, horizontal = self.einfuegepunkt.split("_")
+        
+        if horizontal == "links":
+            dx = 0.0
+        elif horizontal == "zentriert":
+            dx = -w / 2.0
+        else:  # rechts
+            dx = -w
+            
+        unterlaenge = 0.3 * self.hoehe
+        if vertikal == "unten":
+            dy = unterlaenge
+        elif vertikal == "mitte":
+            dy = -(h - unterlaenge) / 2.0
+        else:  # oben
+            dy = -(h - 0.3 * self.hoehe)
+        return dx, dy
+
+    def ecken_welt(self):
+        """Vier Eckpunkte des (ggf. gedrehten) Textblocks in Modellkoordinaten.
+        Reihenfolge: links-unten, rechts-unten, rechts-oben, links-oben
+        (relativ zur Textleserichtung)."""
+        w, h = self.masse()
+        dx, dy = self._versatz_lokal(w, h)
+        a = math.radians(self.winkel)
+        ex = (math.cos(a), math.sin(a))
+        ey = (-math.sin(a), math.cos(a))
+        ux = self.x + dx * ex[0] + dy * ey[0]
+        uy = self.y + dx * ex[1] + dy * ey[1]
+        ecken = []
+        for sx, sy in ((0, 0), (w, 0), (w, h), (0, h)):
+            ecken.append((ux + sx * ex[0] + sy * ey[0],
+                          uy + sx * ex[1] + sy * ey[1]))
+        return ecken
+
+    def rahmen(self):
+        return self.ecken_welt()
+
+    def bbox(self):
+        pts = self.rahmen()
+        xs = [p[0] for p in pts]
+        ys = [p[1] for p in pts]
+        return (min(xs), min(ys), max(xs), max(ys))
+
+    def punkt_im_rahmen(self, px, py, tol=0.0):
+        w, h = self.masse()
+        dx, dy = self._versatz_lokal(w, h)
+        a = math.radians(-self.winkel)
+        rel_x, rel_y = px - self.x, py - self.y
+        lx = rel_x * math.cos(a) - rel_y * math.sin(a)
+        ly = rel_x * math.sin(a) + rel_y * math.cos(a)
+        return (dx - tol <= lx <= dx + w + tol and
+                dy - tol <= ly <= dy + h + tol)
+
+    def verschieben(self, dx, dy):
+        self.x += dx; self.y += dy
+
+    def griffe(self):
+        """Der Griff MUSS exakt auf dem Einfügepunkt sitzen, den der Nutzer
+        gewählt hat (z.B. Mitte zentriert, Oben rechts, ...)."""
+        return [("p", self.x, self.y)]
+
+    def griff_bewegen(self, griff_id, x, y):
+        self.x, self.y = x, y
+
+    def drehen(self, cx, cy, winkel_deg):
+        self.x, self.y = punkte_drehen(self.x, self.y, cx, cy, winkel_deg)
+        self.winkel = (self.winkel + winkel_deg) % 360.0
+
+
+class Bemassung(Element):
+    def __init__(self, x1, y1, x2, y2, mx=None, my=None,
+                 richtung="ausgerichtet", text_override="",
+                 tx=None, ty=None, hoehe=2.5, pfeil=2.5, dez=2,
+                 offset=10.0, offset_x=0.0, offset_y=0.0,
+                 text_offset_x=0.0, text_offset_y=0.0, **kw):
+        super().__init__("bemassung", **kw)
+        self.x1, self.y1, self.x2, self.y2 = x1, y1, x2, y2
+        self.richtung = richtung if richtung in BEM_RICHTUNGEN else "ausgerichtet"
+        self.text_override = text_override or ""
+        self.hoehe = float(hoehe)
+        self.pfeil = float(pfeil)
+        self.dez = int(dez)
+        self.tx, self.ty = tx, ty
+        if mx is None or my is None:
+            mx, my = self._alte_massposition(offset, offset_x, offset_y)
+        self.mx, self.my = mx, my
+
+    def _alte_massposition(self, offset, offset_x, offset_y):
+        if self.richtung == "horizontal":
+            ay = self.y1 + offset if self.y2 >= self.y1 else self.y1 - offset
+            return ((self.x1 + self.x2) / 2 + offset_x, ay + offset_y)
+        if self.richtung == "vertikal":
+            ax = self.x1 + offset if self.x2 >= self.x1 else self.x1 - offset
+            return (ax + offset_x, (self.y1 + self.y2) / 2 + offset_y)
+        if self.richtung in ("radius", "durchmesser"):
+            return (self.x2, self.y2)
+        dx, dy = self.x2 - self.x1, self.y2 - self.y1
+        L = math.hypot(dx, dy)
+        if L < 1e-9:
+            return (self.x1, self.y1)
+        nx, ny = -dy / L, dx / L
+        return ((self.x1 + self.x2) / 2 + nx * offset + offset_x,
+                (self.y1 + self.y2) / 2 + ny * offset + offset_y)
+
+    @staticmethod
+    def linear_richtung(p1, p2, m):
+        cx, cy = (p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2
+        ex = abs(m[0] - cx) - abs(p2[0] - p1[0]) / 2
+        ey = abs(m[1] - cy) - abs(p2[1] - p1[1]) / 2
+        r = "horizontal" if ey >= ex else "vertikal"
+        if r == "horizontal" and abs(p2[0] - p1[0]) < 1e-9 < abs(p2[1] - p1[1]):
+            r = "vertikal"
+        elif r == "vertikal" and abs(p2[1] - p1[1]) < 1e-9 < abs(p2[0] - p1[0]):
+            r = "horizontal"
+        return r
+
+    def wert(self):
+        d = math.hypot(self.x2 - self.x1, self.y2 - self.y1)
+        if self.richtung == "radius":
+            return d
+        if self.richtung == "durchmesser":
+            return 2 * d
+        if self.richtung == "horizontal":
+            return abs(self.x2 - self.x1)
+        if self.richtung == "vertikal":
+            return abs(self.y2 - self.y1)
+        return d
+
+    def text(self, faktor=1.0, komma=True):
+        s = bem_zahl(self.wert() / faktor, self.dez, komma)
+        if self.richtung == "radius":
+            s = "R" + s
+        elif self.richtung == "durchmesser":
+            s = "\u00d8" + s
+        if self.text_override:
+            if "<>" in self.text_override:
+                return self.text_override.replace("<>", s)
+            return self.text_override
+        return s
+
+    def geometrie(self, faktor=1.0, komma=True):
+        h = max(0.05, self.hoehe)
+        pf = max(0.05, self.pfeil)
+        s = h / 2.5
+        gap, ueber, tgap = 0.625 * s, 1.25 * s, 0.625 * s
+        txt = self.text(faktor, komma)
+        tw = max(1, max(len(z) for z in txt.split("\n"))) * TEXT_BREITE * h
+        res = {"linien": [], "pfeile": [], "text": None, "mitte": None}
+        manuell = self.tx is not None and self.ty is not None
+        r = self.richtung
+
+        if r in ("horizontal", "vertikal", "ausgerichtet"):
+            p1, p2, m = (self.x1, self.y1), (self.x2, self.y2), (self.mx, self.my)
+            if r == "horizontal":
+                n, a_deg = (0.0, 1.0), 0.0
+            elif r == "vertikal":
+                n, a_deg = (1.0, 0.0), 90.0
+            else:
+                L0 = math.hypot(p2[0] - p1[0], p2[1] - p1[1])
+                if L0 < 1e-9:
+                    return res
+                n = (-(p2[1] - p1[1]) / L0, (p2[0] - p1[0]) / L0)
+                a_deg = math.degrees(math.atan2(p2[1] - p1[1], p2[0] - p1[0]))
+                if a_deg > 90.0 + 1e-9:
+                    a_deg -= 180.0
+                elif a_deg <= -90.0 + 1e-9:
+                    a_deg += 180.0
+
+            def fuss(p):
+                d = (m[0] - p[0]) * n[0] + (m[1] - p[1]) * n[1]
+                return (p[0] + n[0] * d, p[1] + n[1] * d)
+
+            a, b = fuss(p1), fuss(p2)
+            L = math.hypot(b[0] - a[0], b[1] - a[1])
+            if L < 1e-9:
+                return res
+            t = ((b[0] - a[0]) / L, (b[1] - a[1]) / L)
+
+            for p, q in ((p1, a), (p2, b)):
+                dx, dy = q[0] - p[0], q[1] - p[1]
+                dist = math.hypot(dx, dy)
+                if dist > gap + 1e-9:
+                    ux, uy = dx / dist, dy / dist
+                    res["linien"].append((p[0] + ux * gap, p[1] + uy * gap,
+                                          q[0] + ux * ueber, q[1] + uy * ueber))
+
+            innen = L >= 2.2 * pf
+            ext = 0.0 if innen else 1.5 * pf
+            res["linien"].append((a[0] - t[0] * ext, a[1] - t[1] * ext,
+                                  b[0] + t[0] * ext, b[1] + t[1] * ext))
+            if innen:
+                res["pfeile"].append((a[0], a[1], math.atan2(-t[1], -t[0]), pf))
+                res["pfeile"].append((b[0], b[1], math.atan2(t[1], t[0]), pf))
+            else:
+                res["pfeile"].append((a[0], a[1], math.atan2(t[1], t[0]), pf))
+                res["pfeile"].append((b[0], b[1], math.atan2(-t[1], -t[0]), pf))
+
+            ar = math.radians(a_deg)
+            up = (-math.sin(ar), math.cos(ar))
+            mid = ((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)
+            res["mitte"] = mid
+            if manuell:
+                c = (self.tx, self.ty)
+            elif tw + 2 * tgap <= L:
+                c = (mid[0] + up[0] * (tgap + h / 2), mid[1] + up[1] * (tgap + h / 2))
+            else:
+                d = ext + tgap + tw / 2
+                c = (b[0] + t[0] * d + up[0] * (tgap + h / 2),
+                     b[1] + t[1] * d + up[1] * (tgap + h / 2))
+            res["text"] = (txt, c[0], c[1], a_deg, tw, h)
+            return res
+
+        C, P = (self.x1, self.y1), (self.x2, self.y2)
+        rad = math.hypot(P[0] - C[0], P[1] - C[1])
+        if rad < 1e-9:
+            return res
+        u = ((P[0] - C[0]) / rad, (P[1] - C[1]) / rad)
+        if r == "radius":
+            k = 2.0 * s
+            res["linien"].append((C[0] - k, C[1], C[0] + k, C[1]))
+            res["linien"].append((C[0], C[1] - k, C[0], C[1] + k))
+            sd = max((self.mx - C[0]) * u[0] + (self.my - C[1]) * u[1], rad)
+            E = (C[0] + u[0] * sd, C[1] + u[1] * sd)
+            res["linien"].append((C[0], C[1], E[0], E[1]))
+            res["pfeile"].append((P[0], P[1], math.atan2(u[1], u[0]), pf))
+            res["mitte"] = ((C[0] + E[0]) / 2, (C[1] + E[1]) / 2)
+            d = tw / 2 * abs(u[0]) + h / 2 * abs(u[1]) + 2 * tgap
+            c = (self.tx, self.ty) if manuell else (E[0] + u[0] * d, E[1] + u[1] * d)
+            res["text"] = (txt, c[0], c[1], 0.0, tw, h)
+        else:
+            Q = (2 * C[0] - P[0], 2 * C[1] - P[1])
+            res["linien"].append((P[0], P[1], Q[0], Q[1]))
+            res["pfeile"].append((P[0], P[1], math.atan2(u[1], u[0]), pf))
+            res["pfeile"].append((Q[0], Q[1], math.atan2(-u[1], -u[0]), pf))
+            res["mitte"] = C
+            a_deg = math.degrees(math.atan2(u[1], u[0]))
+            if a_deg > 90.0 + 1e-9:
+                a_deg -= 180.0
+            elif a_deg <= -90.0 + 1e-9:
+                a_deg += 180.0
+            ar = math.radians(a_deg)
+            up = (-math.sin(ar), math.cos(ar))
+            c = (self.tx, self.ty) if manuell else \
+                (C[0] + up[0] * (tgap + h / 2), C[1] + up[1] * (tgap + h / 2))
+            res["text"] = (txt, c[0], c[1], a_deg, tw, h)
+        return res
+
+    def bbox(self):
+        g = self.geometrie()
+        xs, ys = [], []
+        for l in g["linien"]:
+            xs += [l[0], l[2]]; ys += [l[1], l[3]]
+        for p in g["pfeile"]:
+            xs.append(p[0]); ys.append(p[1])
+        if g["text"]:
+            _, cx, cy, ang, w, h = g["text"]
+            for (x, y) in gedrehtes_rechteck(cx, cy, w, h, ang):
+                xs.append(x); ys.append(y)
+        if not xs:
+            return (min(self.x1, self.x2), min(self.y1, self.y2),
+                    max(self.x1, self.x2), max(self.y1, self.y2))
+        return (min(xs), min(ys), max(xs), max(ys))
+
+    def verschieben(self, dx, dy):
+        self.x1 += dx; self.y1 += dy
+        self.x2 += dx; self.y2 += dy
+        self.mx += dx; self.my += dy
+        if self.tx is not None and self.ty is not None:
+            self.tx += dx; self.ty += dy
+
+    def griffe(self):
+        g = self.geometrie()
+        mx, my = g["mitte"] if g["mitte"] else (self.mx, self.my)
+        gr = [("p1", self.x1, self.y1), ("p2", self.x2, self.y2),
+              ("mass", mx, my)]
+        if g["text"]:
+            gr.append(("text", g["text"][1], g["text"][2]))
+        return gr
+
+    def griff_bewegen(self, griff_id, x, y):
+        if griff_id == "p1":
+            self.x1, self.y1 = x, y
+        elif griff_id == "p2":
+            self.x2, self.y2 = x, y
+        elif griff_id == "mass":
+            self.mx, self.my = x, y
+        elif griff_id == "text":
+            self.tx, self.ty = x, y
+
+    def drehen(self, cx, cy, winkel_deg):
+        self.x1, self.y1 = punkte_drehen(self.x1, self.y1, cx, cy, winkel_deg)
+        self.x2, self.y2 = punkte_drehen(self.x2, self.y2, cx, cy, winkel_deg)
+        self.mx, self.my = punkte_drehen(self.mx, self.my, cx, cy, winkel_deg)
+        if self.tx is not None and self.ty is not None:
+            self.tx, self.ty = punkte_drehen(self.tx, self.ty, cx, cy, winkel_deg)
+        if self.richtung in ("horizontal", "vertikal"):
+            self.richtung = "ausgerichtet"
+
+
+class Viewport(Element):
+    def __init__(self, x, y, breite, hoehe,
+                 modell_zentrum_x=0.0, modell_zentrum_y=0.0,
+                 zoom=1.0, gesperrt=False, **kw):
+        super().__init__("viewport", **kw)
+        self.x, self.y = x, y
+        self.breite, self.hoehe = breite, hoehe
+        self.modell_zentrum_x = modell_zentrum_x
+        self.modell_zentrum_y = modell_zentrum_y
+        self.zoom = zoom
+        self.gesperrt = bool(gesperrt)
+        self.aktiv = False
+
+    def bbox(self):
+        return (self.x, self.y, self.x + self.breite, self.y + self.hoehe)
+
+    def to_dict(self):
+        d = super().to_dict()
+        d.pop("aktiv", None)
+        return d
+
+    def verschieben(self, dx, dy):
+        self.x += dx; self.y += dy
+
+    def drehen(self, cx, cy, winkel_deg):
+        mx = self.x + self.breite / 2
+        my = self.y + self.hoehe / 2
+        nx, ny = punkte_drehen(mx, my, cx, cy, winkel_deg)
+        self.x = nx - self.breite / 2
+        self.y = ny - self.hoehe / 2
