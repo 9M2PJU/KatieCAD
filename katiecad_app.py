@@ -22,6 +22,12 @@ try:
 except ImportError:
     EZDWG_VERFUEGBAR = False
 
+try:
+    from PIL import Image, ImageTk
+    PILLOW_VERFUEGBAR = True
+except ImportError:
+    PILLOW_VERFUEGBAR = False
+
 from katiecad_i18n import tr, SPRACHE, setze_sprache, TEXTE
 from katiecad_core import (
     FARBEN, EINHEITEN, ZEICHNUNGSFORMATE, MASSSTAEBE, LINIENTYPEN,
@@ -278,6 +284,9 @@ class CadApp:
         self._warte_auf_basispunkt = False
 
         self.sprache_var = tk.StringVar(value=SPRACHE["aktuell"])
+
+        # Referenz für Logo im Info-Fenster (verhindert GC)
+        self._info_logo = None
 
         self._build_ui()
         self._bind_events()
@@ -2652,15 +2661,16 @@ class CadApp:
             self._aktiver_viewport = None
             self.redraw()
 
-        def zeige_info_fenster(self):
+    # --------------------------------------------------------
+    # Info-Fenster (aus blatt_leeren herausgezogen - jetzt korrekt)
+    # --------------------------------------------------------
+    def zeige_info_fenster(self):
         info_win = tk.Toplevel(self.root)
         info_win.title(tr("info.titel"))
-        info_win.geometry("420x480") # Etwas größer für das Logo und die Lizenz
+        info_win.geometry("420x480")
         info_win.transient(self.root)
         info_win.grab_set()
         info_win.configure(bg=FARBEN["bg_mittel"])
-        
-        # Verhindert, dass das Fenster in der Größe verändert werden kann
         info_win.resizable(False, False)
 
         f = ttk.Frame(info_win, padding=20)
@@ -2670,13 +2680,11 @@ class CadApp:
         logo_pfad = "KatieCAD.png"
         if os.path.exists(logo_pfad) and PILLOW_VERFUEGBAR:
             try:
-                # Logo laden und auf eine schöne Größe skalieren (z.B. max 200px breit)
                 img = Image.open(logo_pfad)
-                # Seitenverhältnis beibehalten
                 img.thumbnail((200, 200), Image.Resampling.LANCZOS)
-                self._info_logo = ImageTk.PhotoImage(img) # Referenz speichern!
-                
-                logo_label = tk.Label(f, image=self._info_logo, bg=FARBEN["bg_mittel"])
+                self._info_logo = ImageTk.PhotoImage(img)
+                logo_label = tk.Label(f, image=self._info_logo,
+                                      bg=FARBEN["bg_mittel"])
                 logo_label.pack(pady=(0, 10))
             except Exception as e:
                 print(f"Logo konnte nicht geladen werden: {e}")
@@ -2684,52 +2692,57 @@ class CadApp:
         # --- TEXT BEREICH ---
         ttk.Label(f, text="KatieCAD", font=("Segoe UI", 16, "bold"),
                   foreground=FARBEN["cyan"]).pack(pady=(0, 2))
-        
+
         ttk.Label(f, text=tr("info.version"), font=("Segoe UI", 10),
                   foreground=FARBEN["text"]).pack(pady=2)
-        
+
         ttk.Label(f, text=tr("info.copyright"), font=("Segoe UI", 9, "italic"),
                   foreground=FARBEN["text_dim"]).pack(pady=(2, 10))
 
         # --- LIZENZ BEREICH ---
         lizenz_frame = ttk.Frame(f)
         lizenz_frame.pack(fill=tk.X, pady=10)
-        
-        ttk.Label(lizenz_frame, text="Lizenz / License:", 
-                  font=("Segoe UI", 9, "bold"), foreground=FARBEN["cyan"]).pack(anchor=tk.W)
-        
+
+        ttk.Label(lizenz_frame, text="Lizenz / License:",
+                  font=("Segoe UI", 9, "bold"),
+                  foreground=FARBEN["cyan"]).pack(anchor=tk.W)
+
         lizenz_text = (
             "Dieses Programm ist unter der MIT-Lizenz lizenziert.\n"
             "This program is licensed under the MIT License.\n\n"
             "Copyright (c) 2026 Merecete\n\n"
-            "Permission is hereby granted, free of charge, to any person obtaining a copy "
-            "of this software and associated documentation files (the \"Software\"), to deal "
-            "in the Software without restriction, including without limitation the rights "
-            "to use, copy, modify, merge, publish, distribute, sublicense, and/or sell "
-            "copies of the Software, and to permit persons to whom the Software is "
-            "furnished to do so, subject to the following conditions:\n\n"
-            "The above copyright notice and this permission notice shall be included in all "
-            "copies or substantial portions of the Software.\n\n"
-            "THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR "
-            "IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, "
-            "FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE "
-            "AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER "
-            "LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, "
-            "OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE "
-            "SOFTWARE."
+            "Permission is hereby granted, free of charge, to any person "
+            "obtaining a copy of this software and associated documentation "
+            "files (the \"Software\"), to deal in the Software without "
+            "restriction, including without limitation the rights to use, "
+            "copy, modify, merge, publish, distribute, sublicense, and/or "
+            "sell copies of the Software, and to permit persons to whom the "
+            "Software is furnished to do so, subject to the following "
+            "conditions:\n\n"
+            "The above copyright notice and this permission notice shall be "
+            "included in all copies or substantial portions of the "
+            "Software.\n\n"
+            "THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY "
+            "KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE "
+            "WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE "
+            "AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT "
+            "HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, "
+            "WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING "
+            "FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR "
+            "OTHER DEALINGS IN THE SOFTWARE."
         )
-        
-        # Text-Widget für die Lizenz (damit man scrollen kann, falls nötig)
-        text_widget = tk.Text(lizenz_frame, height=8, width=50, 
+
+        text_widget = tk.Text(lizenz_frame, height=8, width=50,
                               bg=FARBEN["bg_dunkel"], fg=FARBEN["text_dim"],
                               font=("Consolas", 8), relief=tk.FLAT,
                               wrap=tk.WORD, padx=5, pady=5)
         text_widget.insert("1.0", lizenz_text)
-        text_widget.config(state=tk.DISABLED) # Nur lesen
+        text_widget.config(state=tk.DISABLED)
         text_widget.pack(fill=tk.X, pady=5)
 
         # --- BUTTON ---
-        ttk.Button(f, text=tr("dlg.ok"), command=info_win.destroy).pack(pady=10)
+        ttk.Button(f, text=tr("dlg.ok"),
+                   command=info_win.destroy).pack(pady=10)
 
     def neu(self):
         de = SPRACHE["aktuell"] == "de"
