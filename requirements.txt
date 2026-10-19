@@ -1,0 +1,12 @@
+# KatieCAD dependencies
+# Python >= 3.8 required (tkinter is part of the standard library)
+
+# --- Optional dependencies ---
+
+# DXF import/export (File > Import/Export DXF)
+ezdxf>=1.0
+
+# DWG import (File > Import DWG)
+# Note: ezdwg is less common and may be hard to install.
+# Uncomment only if you need DWG support.
+# ezdwg>=0.9
