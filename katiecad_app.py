@@ -9,10 +9,13 @@ NEU (Schritt 7 - EXPLODE):
     Kind-Elemente auf.
   - Kontextmenue bietet "Block aufloesen" an, wenn ein Block
     markiert ist.
+NEU (Schritt 8 - SCHRAFFUR):
+  - Neues Element Schraffur (Solid und Linien).
+  - Menuepunkt "Schraffur auf Auswahl" unter Einfuegen.
 """
 
 import tkinter as tk
-from tkinter import ttk, filedialog, messagebox, colorchooser
+from tkinter import ttk, filedialog, messagebox, colorchooser, simpledialog
 import math, json, re
 import os, sys, tempfile, subprocess
 import tkinter.font as tkfont
@@ -44,7 +47,7 @@ from katiecad_core import (
     TEXT_BREITE, TEXT_ZEILE, CAD_VERSALHOEHE, LW_PX_FAKTOR, BEM_RICHTUNGEN,
     BEFEHLE, PdfSeite, ist_dunkel,
     Layer, Layout, Element, Linie, Kreis, Bogen, Rechteck, Polylinie, Text,
-    Bemassung, Viewport,
+    Bemassung, Viewport, Schraffur,
     BlockDefinition, BlockReferenz, BlockBibliothek,
     bogen_sweep, bogen_punkte, winkel_im_bogen, bogen_aus_3_punkten,
     bogen_mitte_start_ende, abstand_punkt_segment, naechster_punkt_segment,
@@ -747,7 +750,7 @@ class CadApp:
         koord_bar.pack(side=tk.BOTTOM, fill=tk.X)
 
     def _build_menu(self):
-        # Erzwingt die dunkle Farbe für die Menüleiste auf Systemebene
+        # Erzwingt die dunkle Farbe für das Menü
         self.root.option_add('*Menu.background', FARBEN["bg_mittel"])
         self.root.option_add('*Menu.foreground', FARBEN["cyan"])
         self.root.option_add('*Menu.activeBackground', FARBEN["cyan"])
@@ -757,7 +760,6 @@ class CadApp:
                           bg=FARBEN["bg_mittel"], fg=FARBEN["cyan"],
                           activebackground=FARBEN["cyan"],
                           activeforeground=FARBEN["bg_dunkel"], bd=0)
-        # ... der Rest der Funktion bleibt unverändert ...
 
         # Datei
         m_datei = tk.Menu(menubar, tearoff=0,
@@ -818,6 +820,18 @@ class CadApp:
                          activeforeground=FARBEN["bg_dunkel"])
         m_einf.add_command(label=tr("menu.einfuegen.auswahl"),
                            command=lambda: self._werkzeug_aus_menue("auswahl"))
+        m_einf.add_separator()
+        m_einf.add_command(label=tr("menu.einfuegen.linie"),
+                           command=lambda: self._werkzeug_aus_menue("linie"))
+        m_einf.add_command(label=tr("menu.einfuegen.polylinie"),
+                           command=lambda: self._werkzeug_aus_menue("polylinie"))
+        m_einf.add_command(label=tr("menu.einfuegen.kreis"),
+                           command=lambda: self._werkzeug_aus_menue("kreis"))
+        m_einf.add_command(label=tr("menu.einfuegen.bogen"),
+                           command=lambda: self._werkzeug_aus_menue("bogen"))
+        m_einf.add_command(label=tr("menu.einfuegen.rechteck"),
+                           command=lambda: self._werkzeug_aus_menue("rechteck"))
+        m_einf.add_separator()
         m_einf.add_command(label=tr("menu.einfuegen.text"),
                            command=lambda: self._werkzeug_aus_menue("text"))
         m_einf.add_command(label=tr("menu.einfuegen.bemassung"),
@@ -828,19 +842,13 @@ class CadApp:
         m_einf.add_command(label=tr("tb.wz.brechen"),
                            command=lambda: self._werkzeug_aus_menue("brechen"))
         m_einf.add_separator()
-        m_einf.add_command(label=tr("menu.einfuegen.block_erzeugen"),
-                           command=self.block_erzeugen)
-        m_einf.add_command(label=tr("menu.einfuegen.block_einfuegen"),
-                           command=self.block_einfuegen)
-        m_einf.add_command(label=tr("menu.einfuegen.block_liste"),
-                           command=self.block_liste)
-        m_einf.add_command(label=tr("menu.einfuegen.block_aufloesen"),
-                           command=self.block_aufloesen)
-        m_einf.add_separator()
         m_einf.add_command(label=tr("menu.einfuegen.viewport"),
                            command=self.viewport_modus_starten)
         m_einf.add_command(label=tr("menu.einfuegen.rahmen"),
                            command=self.rahmen_einfuegen)
+        m_einf.add_separator()
+        m_einf.add_command(label=tr("menu.einfuegen.schraffur"),
+                           command=self.schraffur_anwenden)
         menubar.add_cascade(label=tr("menu.einfuegen"), menu=m_einf)
 
         # Ansicht
@@ -2661,6 +2669,8 @@ class CadApp:
         if isinstance(el, Viewport):
             return (el.x <= x_mm <= el.x + el.breite and
                     el.y <= y_mm <= el.y + el.hoehe)
+        if isinstance(el, Schraffur):
+            return punkt_in_gedrehtem_rechteck(x_mm, y_mm, (el.bbox()[0]+el.bbox()[2])/2, (el.bbox()[1]+el.bbox()[3])/2, el.bbox()[2]-el.bbox()[0], el.bbox()[3]-el.bbox()[1], 0.0)
         if isinstance(el, Text):
             return el.punkt_im_rahmen(x_mm, y_mm, tol)
         if isinstance(el, Kreis):
@@ -2999,7 +3009,7 @@ class CadApp:
                 continue
             if isinstance(el, Viewport):
                 continue
-            if isinstance(el, (Text, Bemassung)):
+            if isinstance(el, (Text, Bemassung, Schraffur)):
                 continue
             if self._punkt_auf_element(el, x_mm, y_mm, tol_mm):
                 return el
@@ -3183,11 +3193,6 @@ class CadApp:
                 links = sortiert[-1] - 360.0
             if rechts is None:
                 rechts = sortiert[0] + 360.0
-            starts = [rechts]
-            endes = [links + 360.0]
-            for i, w in enumerate(sortiert):
-                if links < w < rechts:
-                    continue
             s = norm360(rechts)
             e = norm360(links)
             if bogen_sweep(s, e) > 1e-6:
@@ -3605,9 +3610,11 @@ class CadApp:
                 self._zeichne_element(kind, tags=tags, tf=tf,
                                       skala=skala, clip=clip, stil=stil)
             return
+            
         tf = tf or self.mm_to_px
         sk = skala if skala is not None else self.view["zoom"]
         clip = clip or self._sicht_rect()
+        
         if stil:
             farbe, w, dash = stil["farbe"], stil["w"], stil.get("dash")
         else:
@@ -3618,6 +3625,21 @@ class CadApp:
             w = self._lw_px(self._effektive_staerke_mm(el), papier)
             if isinstance(el, Bemassung):
                 w = max(1, min(w, 2))
+
+        if isinstance(el, Schraffur):
+            c = self.canvas
+            pts_px = [tf(x, y) for (x, y) in el.punkte]
+            flat = [v for q in pts_px for v in q]
+            
+            if el.typ == "solid":
+                c.create_polygon(*flat, fill=farbe, outline="", tags=tags)
+            else:
+                for (p1, p2) in el.geometrie_linien():
+                    x1, y1 = tf(p1[0], p1[1])
+                    x2, y2 = tf(p2[0], p2[1])
+                    c.create_line(x1, y1, x2, y2, fill=farbe, width=1, tags=tags)
+            return
+
         self._zeichne_prims(self._prims(el, sk), farbe, w, dash, tf, sk, tags, clip)
 
     def _zeichne_layout_element(self, el):
@@ -4006,6 +4028,7 @@ class CadApp:
             if typ == "text":       return Text(**d)
             if typ == "bemassung":  return Bemassung(**d)
             if typ == "viewport":   return Viewport(**d)
+            if typ == "schraffur":  return Schraffur(**d)
             if typ == "block":
                 kinder_dicts = d.pop("elemente", [])
                 kinder = []
@@ -4086,6 +4109,14 @@ class CadApp:
             elif isinstance(el, BlockReferenz):
                 for kind in el.aufgeloest():
                     self._element_zu_dxf(msp, kind)
+            elif isinstance(el, Schraffur):
+                if el.typ == "solid":
+                    msp.add_hatch(color=7, dxfattribs=attribs).set_pattern_fill("SOLID")
+                    # Einfacher Ansatz: Grenze als Polylinie zeichnen
+                    msp.add_lwpolyline(el.punkte, close=True, dxfattribs=attribs)
+                else:
+                    for (p1, p2) in el.geometrie_linien():
+                        msp.add_line(p1, p2, dxfattribs=attribs)
         except Exception as e:
             print(f"Element konnte nicht exportiert werden: {e}")
 
@@ -4675,6 +4706,8 @@ class CadApp:
     def _el_polylinien(self, el, skala):
         if isinstance(el, Text):
             return [(el.rahmen(), True)]
+        if isinstance(el, Schraffur):
+            return [(el.punkte, True)]
         if isinstance(el, BlockReferenz):
             out = []
             for kind in el.aufgeloest():
@@ -5187,7 +5220,7 @@ class CadApp:
 
     def _stil_auf_auswahl(self, event=None):
         ziele = [e for e in self.auswahl
-                 if not isinstance(e, (Viewport, Text, Bemassung, BlockReferenz))]
+                 if not isinstance(e, (Viewport, Text, Bemassung, BlockReferenz, Schraffur))]
         if not ziele:
             return
         self._snapshot()
@@ -6007,6 +6040,59 @@ class CadApp:
                            bloecke=len(bloecke),
                            elemente=anzahl_kinder))
 
+    # --------------------------------------------------------
+    # Schraffur
+    # --------------------------------------------------------
+    def schraffur_anwenden(self):
+        de = SPRACHE["aktuell"] == "de"
+        ziele = [e for e in self.auswahl if isinstance(e, (Polylinie, Rechteck))]
+        if not ziele:
+            self.status.set(("Bitte eine geschlossene Polylinie oder ein "
+                             "Rechteck markieren.") if de
+                            else "Please select a closed polyline or rectangle.")
+            return
+
+        typ = simpledialog.askstring("Schraffur", "Typ (solid oder linien):",
+                                     initialvalue="linien", parent=self.root)
+        if not typ:
+            return
+        typ = typ.lower().strip()
+        if typ not in ("solid", "linien"):
+            return
+
+        abstand = 5.0
+        if typ == "linien":
+            abstand_str = simpledialog.askstring("Schraffur", "Abstand (mm):",
+                                                 initialvalue="5.0",
+                                                 parent=self.root)
+            if not abstand_str:
+                return
+            try:
+                abstand = float(abstand_str.replace(",", "."))
+            except ValueError:
+                return
+
+        self._snapshot()
+        liste = self._aktuelle_elemente_liste()
+        neue_schraffuren = []
+
+        for el in ziele:
+            if isinstance(el, Polylinie) and not el.geschlossen:
+                continue
+            if isinstance(el, Rechteck):
+                pts = [(el.x1, el.y1), (el.x2, el.y1), (el.x2, el.y2), (el.x1, el.y2)]
+            else:
+                pts = el.punkte
+
+            schraffur = Schraffur(pts, typ=typ, abstand=abstand,
+                                  layer=el.layer, farbe=el.farbe,
+                                  eig_farbe=el.eig_farbe)
+            liste.insert(liste.index(el), schraffur)
+            neue_schraffuren.append(schraffur)
+
+        self.auswahl = neue_schraffuren
+        self.redraw()
+
 
 # ============================================================
 def main():
@@ -6017,4 +6103,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
