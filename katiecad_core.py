@@ -87,6 +87,9 @@ LW_PX_FAKTOR = 6.5
 BEM_RICHTUNGEN = ("horizontal", "vertikal", "ausgerichtet",
                   "radius", "durchmesser")
 
+# Toleranz fuer "Punkt liegt auf Objekt" (in Modell-mm)
+TRIM_TOL = 1e-6
+
 
 def ist_dunkel(hexfarbe):
     try:
@@ -331,6 +334,295 @@ def bbox_ueberlappt(a, b):
 
 
 # ============================================================
+# NEU: Stutzen (TRIM) und Brechen (BREAK) - Geometrie-Helfer
+# ============================================================
+def _punkt_auf_segment_param(px, py, x1, y1, x2, y2, tol=TRIM_TOL):
+    """Liefert den Parameter t (0..1) und den Abstand, wenn (px,py) auf dem
+    Segment liegt; sonst None. Fuer das Stutzen/Brechen: Wir muessen wissen,
+    wo genau der Schnittpunkt auf der Linie liegt."""
+    dx, dy = x2 - x1, y2 - y1
+    L2 = dx * dx + dy * dy
+    if L2 < 1e-18:
+        d = math.hypot(px - x1, py - y1)
+        if d <= tol:
+            return 0.0, d
+        return None
+    t = ((px - x1) * dx + (py - y1) * dy) / L2
+    if t < -tol or t > 1.0 + tol:
+        # Punkt liegt ausserhalb des Segments - fuer den Schnittpunkt
+        # aber relevant, wenn er "auf der Verlaengerung" liegt. Nur
+        # Parameter zurueckgeben, der Abstand wird ausserhalb nicht
+        # gebraucht.
+        return None
+    nx, ny = x1 + t * dx, y1 + t * dy
+    d = math.hypot(px - nx, py - ny)
+    if d > tol:
+        return None
+    return t, d
+
+
+def trim_linie(x1, y1, x2, y2, treffer_punkte, klick_punkt):
+    """Stutzt eine Linie anhand einer Liste von Schnittpunkten (treffer_punkte
+    sind (x,y)-Tupel). Der Klickpunkt bestimmt, welches Teilstueck entfernt
+    wird - das Teilstueck zwischen den beiden naechsten Schnittpunkten um
+    den Klickpunkt (bzw. zwischen Schnittpunkt und Linienende).
+
+    Rueckgabe: Liste von (x1,y1,x2,y2)-Tupeln mit den verbleibenden Linien.
+    Ist die Liste leer, war die Linie komplett zu entfernen.
+    """
+    if not treffer_punkte:
+        return [(x1, y1, x2, y2)]
+    dx, dy = x2 - x1, y2 - y1
+    L = math.hypot(dx, dy)
+    if L < TRIM_TOL:
+        return [(x1, y1, x2, y2)]
+    ux, uy = dx / L, dy / L
+
+    # Projektionen der Trefferpunkte auf die Linie in Laufmeter (0..L)
+    werte = []
+    for (px, py) in treffer_punkte:
+        t = ((px - x1) * ux + (py - y1) * uy)
+        if -TRIM_TOL <= t <= L + TRIM_TOL:
+            werte.append(max(0.0, min(L, t)))
+    if not werte:
+        return [(x1, y1, x2, y2)]
+
+    # Klickpunkt auf die Linie projizieren
+    tk = (klick_punkt[0] - x1) * ux + (klick_punkt[1] - y1) * uy
+    tk = max(0.0, min(L, tk))
+
+    werte = sorted(set(werte))
+    # Naechsten linken und rechten Schnittpunkt suchen
+    links = max([w for w in werte if w <= tk] or [0.0])
+    rechts = min([w for w in werte if w >= tk] or [L])
+
+    # Zwischen links und rechts wird entfernt; der Rest bleibt.
+    stuecke = []
+    if links > TRIM_TOL:
+        ex = x1 + ux * links
+        ey = y1 + uy * links
+        stuecke.append((x1, y1, ex, ey))
+    if L - rechts > TRIM_TOL:
+        sx = x1 + ux * rechts
+        sy = y1 + uy * rechts
+        stuecke.append((sx, sy, x2, y2))
+    return stuecke
+
+
+def trim_polylinie(punkte, geschlossen, treffer_punkte, klick_punkt):
+    """Stutzt eine Polylinie anhand einer Liste von Schnittpunkten.
+
+    Vorgehen: Wir zerlegen die Polylinie in ihre Segmente, bestimmen je
+    Segment die Schnittparameter, und entfernen das Segment-Stueck, das
+    den Klickpunkt enthaelt.
+
+    Rueckgabe: Liste von (punkte, geschlossen)-Tupeln.
+    - Bei offenen Polylinien: 0..2 Teilstuecke.
+    - Bei geschlossenen Polylinien: 1 Teilstueck, das ggf. nicht mehr
+      geschlossen ist.
+    """
+    if len(punkte) < 2:
+        return [(punkte, geschlossen)]
+
+    # Alle Segmente der Polylinie (als (p_start, p_ende, index))
+    segs = []
+    n = len(punkte)
+    for i in range(n - 1):
+        segs.append((punkte[i], punkte[i + 1], i, False))
+    if geschlossen and n >= 3:
+        segs.append((punkte[-1], punkte[0], n - 1, True))
+
+    # Fuer jedes Segment: Liste der Schnittparameter (0..1)
+    schnitte = [[] for _ in segs]
+    for (px, py) in treffer_punkte:
+        for idx, (a, b, _i, _cl) in enumerate(segs):
+            erg = _punkt_auf_segment_param(px, py, a[0], a[1], b[0], b[1])
+            if erg is not None:
+                schnitte[idx].append(erg[0])
+
+    # Segment bestimmen, das den Klickpunkt enthaelt
+    klick_seg = None
+    klick_t = None
+    klick_dist = None
+    for idx, (a, b, _i, _cl) in enumerate(segs):
+        L = math.hypot(b[0] - a[0], b[1] - a[1])
+        if L < TRIM_TOL:
+            continue
+        ux, uy = (b[0] - a[0]) / L, (b[1] - a[1]) / L
+        t = ((klick_punkt[0] - a[0]) * ux + (klick_punkt[1] - a[1]) * uy)
+        if -TRIM_TOL <= t <= L + TRIM_TOL:
+            tt = max(0.0, min(1.0, t / L))
+            nx, ny = a[0] + (b[0] - a[0]) * tt, a[1] + (b[1] - a[1]) * tt
+            d = math.hypot(klick_punkt[0] - nx, klick_punkt[1] - ny)
+            if klick_dist is None or d < klick_dist:
+                klick_seg = idx
+                klick_t = tt
+                klick_dist = d
+
+    if klick_seg is None:
+        return [(punkte, geschlossen)]
+
+    # Grenzen innerhalb des Klick-Segments: links und rechts vom Klick
+    ss = sorted(set(schnitte[klick_seg]))
+    links = max([w for w in ss if w <= klick_t] or [0.0])
+    rechts = min([w for w in ss if w >= klick_t] or [1.0])
+
+    # Liste der verbleibenden Stuecke in "Segment-Reihenfolge".
+    # Wir bauen die Polylinie neu zusammen - als Kette von (punkte).
+    if not geschlossen:
+        # Offene Polylinie: Wir schneiden das Klick-Segment zwischen
+        # links und rechts heraus. Die Polylinie zerfaellt in zwei Teile,
+        # wenn das Klick-Segment nicht am Rand liegt.
+        seg_a, seg_b, _i, _cl = segs[klick_seg]
+        # linkes Teil bis zum linken Schnittpunkt
+        links_p = (seg_a[0] + (seg_b[0] - seg_a[0]) * links,
+                   seg_a[1] + (seg_b[1] - seg_a[1]) * links)
+        rechts_p = (seg_a[0] + (seg_b[0] - seg_a[0]) * rechts,
+                    seg_a[1] + (seg_b[1] - seg_a[1]) * rechts)
+
+        teile = []
+        # Stueck 1: von punkte[0] bis links_p (ueber die Segmente 0..klick_seg-1)
+        stueck1 = list(punkte[:klick_seg + 1])
+        if links > TRIM_TOL:
+            stueck1.append(links_p)
+            if len(stueck1) >= 2:
+                teile.append((stueck1, False))
+        else:
+            if len(stueck1) >= 2:
+                teile.append((stueck1, False))
+        # Stueck 2: von rechts_p bis punkte[-1] (ueber die Segmente klick_seg+1..)
+        if rechts < 1.0 - TRIM_TOL:
+            stueck2 = [rechts_p] + list(punkte[klick_seg + 1:])
+            if len(stueck2) >= 2:
+                teile.append((stueck2, False))
+        return teile
+    else:
+        # Geschlossene Polylinie: Wir entfernen das Klick-Segment zwischen
+        # links und rechts. Der Rest bleibt eine (moeglicherweise offene)
+        # Kette.
+        seg_a, seg_b, seg_i, _cl = segs[klick_seg]
+        links_p = (seg_a[0] + (seg_b[0] - seg_a[0]) * links,
+                   seg_a[1] + (seg_b[1] - seg_a[1]) * links)
+        rechts_p = (seg_a[0] + (seg_b[0] - seg_a[0]) * rechts,
+                    seg_a[1] + (seg_b[1] - seg_a[1]) * rechts)
+        # Kette beginnt bei rechts_p, laeuft ueber alle Punkte
+        # (zyklisch ab klick_seg+1) und endet bei links_p.
+        kette = [rechts_p]
+        idx = (seg_i + 1) % n
+        for _ in range(n + 1):
+            kette.append(punkte[idx])
+            if idx == klick_seg % n and len(kette) > 1:
+                break
+            idx = (idx + 1) % n
+        # Kette endet bei links_p (auf dem Segment klick_seg).
+        if len(kette) >= 2:
+            kette.append(links_p)
+        # Doppelte Punkte am Rand entfernen
+        sauber = []
+        for p in kette:
+            if not sauber or (abs(p[0] - sauber[-1][0]) > TRIM_TOL or
+                              abs(p[1] - sauber[-1][1]) > TRIM_TOL):
+                sauber.append(p)
+        if len(sauber) >= 2:
+            return [(sauber, False)]
+        return []
+
+
+def trim_bogen(cx, cy, r, start, ende, treffer_punkte, klick_punkt):
+    """Stutzt einen Bogen anhand von Schnittpunkten (auf dem Bogen).
+
+    Rueckgabe: Liste von (start, ende)-Winkelpaaren fuer die verbleibenden
+    Boegen. Ist die Liste leer, war der Bogen komplett zu entfernen.
+    """
+    if not treffer_punkte:
+        return [(start, ende)]
+    # Winkel der Trefferpunkte relativ zum Zentrum
+    winkel = []
+    for (px, py) in treffer_punkte:
+        d = math.hypot(px - cx, py - cy)
+        if abs(d - r) <= TRIM_TOL * 10:
+            w = norm360(math.degrees(math.atan2(py - cy, px - cx)))
+            if winkel_im_bogen(w, start, ende, 1e-3):
+                winkel.append(w)
+    if not winkel:
+        return [(start, ende)]
+    winkel = sorted(set(round(w, 6) for w in winkel))
+    # Sweep in CW-Richtung (0..360) durchgehen und an den Winkeln zerlegen
+    sweep_start = norm360(start)
+    sweep_end = sweep_start + bogen_sweep(start, ende)
+    # Klickwinkel
+    kd = math.hypot(klick_punkt[0] - cx, klick_punkt[1] - cy)
+    kw = norm360(math.degrees(math.atan2(klick_punkt[1] - cy,
+                                        klick_punkt[0] - cx)))
+    # Alle Winkel in fortlaufender Reihenfolge ab sweep_start
+    rel = []
+    for w in winkel:
+        rel_w = norm360(w - sweep_start)
+        if rel_w <= sweep_end - sweep_start + 1e-6:
+            rel.append((rel_w, w))
+    rel.sort()
+    # Naechste Grenzen links und rechts vom Klickwinkel
+    rel_k = norm360(kw - sweep_start)
+    links_w = 0.0
+    rechts_w = sweep_end - sweep_start
+    for (rw, _w) in rel:
+        if rw <= rel_k + 1e-6:
+            links_w = max(links_w, rw)
+        if rw >= rel_k - 1e-6:
+            rechts_w = min(rechts_w, rw)
+    # Falls Klick genau zwischen zwei Winkeln liegt: links und rechts
+    # sind die beiden Nachbarn.
+    stuecke = []
+    if links_w > 1e-6:
+        stuecke.append((norm360(sweep_start), norm360(sweep_start + links_w)))
+    if (sweep_end - sweep_start) - rechts_w > 1e-6:
+        stuecke.append((norm360(sweep_start + rechts_w), norm360(sweep_end)))
+    return stuecke
+
+
+def kreis_zu_bogen(cx, cy, r, p1, p2):
+    """Wandelt einen Kreis in einen Bogen um, der an p1 beginnt und an p2 endet
+    (in Leserichtung gegen den Uhrzeigersinn - also der uebliche Weg ueber
+    den laengeren Teil, wenn man das kleine Stueck entfernt).
+    Rueckgabe: (cx, cy, r, start, ende) oder None.
+    """
+    a1 = norm360(math.degrees(math.atan2(p1[1] - cy, p1[0] - cx)))
+    a2 = norm360(math.degrees(math.atan2(p2[1] - cy, p2[0] - cx)))
+    if abs(a1 - a2) < 1e-6:
+        return None
+    # Rest-Bogen: von p2 nach p1 (ueber den langen Weg)
+    return (cx, cy, r, a2, a1)
+
+
+def teile_bogen_durch_winkel(start, ende, winkel_liste):
+    """Zerlegt einen Bogen (start..ende, CCW) anhand einer Liste von Winkeln
+    in zusammenhaengende Teilstuecke. Die Liste der Winkel wird sortiert,
+    Duplikate und Winkel ausserhalb des Bogens werden ignoriert.
+
+    Rueckgabe: Liste von (start, ende)-Paaren, die zusammen den Bogen ergeben.
+    """
+    sw = bogen_sweep(start, ende)
+    if not winkel_liste:
+        return [(start, ende)]
+    rel = []
+    for w in winkel_liste:
+        rw = (w - start) % 360.0
+        if rw <= sw + 1e-6 and rw >= -1e-6:
+            rel.append(round(rw, 6))
+    rel = sorted(set(rel))
+    if not rel:
+        return [(start, ende)]
+    rel = [0.0] + [w for w in rel if 1e-6 < w < sw - 1e-6] + [sw]
+    stuecke = []
+    for i in range(len(rel) - 1):
+        a = rel[i]
+        b = rel[i + 1]
+        if b - a > 1e-6:
+            stuecke.append((norm360(start + a), norm360(start + b)))
+    return stuecke
+
+
+# ============================================================
 # Befehlszeile (beide Sprachen immer verfügbar)
 # ============================================================
 BEFEHLE = {
@@ -357,6 +649,9 @@ BEFEHLE = {
     "RECHTECK": "tool:rechteck", "REC": "tool:rechteck", "RECTANG": "tool:rechteck",
     "TEXT": "tool:text", "T": "tool:text",
     "BEMASSUNG": "tool:bemassung", "BEM": "tool:bemassung", "DIM": "tool:bemassung",
+    # --- NEU: Stutzen (TRIM) und Brechen (BREAK) ---
+    "STUTZEN": "tool:stutzen", "TRIM": "tool:stutzen", "TR": "tool:stutzen",
+    "BRECHEN": "tool:brechen", "BREAK": "tool:brechen", "BR": "tool:brechen",
 }
 
 
