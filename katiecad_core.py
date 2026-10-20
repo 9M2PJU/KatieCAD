@@ -577,6 +577,9 @@ BEFEHLE = {
     "I": "block:einfuegen", "BLOCKEINFUEGEN": "block:einfuegen",
     "BLOCKLISTE": "block:liste", "BL": "block:liste",
     "BLOCKVERWALTEN": "block:liste",
+    # --- NEU: Block aufloesen (EXPLODE) ---
+    "EXPLODE": "block:explode", "X": "block:explode",
+    "AUFLOESEN": "block:explode", "BLOCKAUFLOESEN": "block:explode",
 }
 
 
@@ -1563,3 +1566,4 @@ class Layout:
                     el.aktiv = False
                 lay.elemente.append(el)
         return lay
+
