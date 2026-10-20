@@ -3424,7 +3424,8 @@ class CadApp:
                 self.canvas.delete(self._auswahl_rechteck_id)
                 self._auswahl_rechteck_id = None
             self.canvas.delete("auswahlvorschau")
-            self.auswahl = self._elemente_im_auswahlrechteck(bbox, "rechts")
+            # STRETCH waehlt ueberkreuzend aus -> interne Richtung "links"
+            self.auswahl = self._elemente_im_auswahlrechteck(bbox, "links")
             self.redraw()
             self._op_hinweis()
             return
@@ -3433,15 +3434,18 @@ class CadApp:
         else:
             bbox = (min(x0_mm, x1_mm), min(y0_mm, y1_mm),
                     max(x0_mm, x1_mm), max(y0_mm, y1_mm))
-            richtung = "links" if x1_px < x0_px else "rechts"
+            # AutoCAD-Konvention:
+            #   links -> rechts = Fenster (komplett enthalten)
+            #   rechts -> links = Kreuzung (beruehrt)
+            richtung = "rechts" if x1_px >= x0_px else "links"
             treffer = self._elemente_im_auswahlrechteck(bbox, richtung)
             self.auswahl = treffer
             de = SPRACHE["aktuell"] == "de"
             self.status.set(
                 (f"{len(self.auswahl)} Element(e) markiert "
-                 f"({'komplett' if richtung == 'links' else 'berührt'})." if de
+                 f"({'komplett' if richtung == 'rechts' else 'berührt'})." if de
                  else f"{len(self.auswahl)} element(s) selected "
-                 f"({'fully' if richtung == 'links' else 'crossing'})."))
+                 f"({'fully' if richtung == 'rechts' else 'crossing'})."))
         self._auswahl_rechteck_start = None
         self._drag_modus = None
         self._auswahl_richtung = None
