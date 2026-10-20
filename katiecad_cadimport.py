@@ -386,7 +386,7 @@ class DxfImporter:
                 pts.append(q)
         if len(pts) < 3:
             return False
-        return self._add(Schraffur(pts, typ="solid", **self._attr(e)))
+        return self._add(Schraffur(pts, muster="solid", **self._attr(e)))
 
     _c_trace = _c_solid
 
@@ -427,7 +427,7 @@ class DxfImporter:
         except Exception:
             pass
         abstand = max(diag / 25.0, 1e-6)
-        self._add(Schraffur(aussen, typ="solid" if solid else "linien",
+        self._add(Schraffur(aussen, muster="solid" if solid else "linien",
                             winkel=winkel, abstand=abstand, **kw))
         for ins in polys[1:]:                     # Inseln als Kontur
             self._add(Polylinie(ins, geschlossen=True, **self._attr(e)))
