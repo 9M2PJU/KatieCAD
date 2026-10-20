@@ -4,11 +4,11 @@ katiecad_app.py - GUI von KatieCAD (CadApp, main()).
 Enthaelt die Tkinter-UI, Events, Werkzeuge und den App-State.
 Dialoge liegen in katiecad_dialogs.py, PDF-Ausgabe in katiecad_pdf.py.
 
-NEU (Block-Unterstuetzung, Schritt 4 - Verdrahtung):
-  - Menueeintraege "Block erzeugen" / "Block einfuegen"
-  - Befehle BLOCK/B, INSERT/I, BLOCKLISTE/BL
-  - Interaktion: Basispunkt-Klick beim Erzeugen, Einfuegepunkt-Klick
-    beim Einfuegen
+NEU (Schritt 7 - EXPLODE):
+  - Befehl EXPLODE/X/AUFLOESEN loest markierte Bloecke in ihre
+    Kind-Elemente auf.
+  - Kontextmenue bietet "Block aufloesen" an, wenn ein Block
+    markiert ist.
 """
 
 import tkinter as tk
@@ -325,11 +325,10 @@ class CadApp:
 
         self._info_logo = None
 
-        # --- Blockbibliothek + Einfuege-Zustand (Schritt 4) ---
         self.block_bibliothek = BlockBibliothek(self._dict_zu_element)
         self._block_einfuege_name = None
         self._warte_auf_blockpunkt = False
-        self._block_erzeuge_auswahl = None  # Liste der zu ersetzenden Objekte
+        self._block_erzeuge_auswahl = None
 
         self._vp_modus_var = tk.StringVar(value="layout")
         self._vp_massstab_var = tk.StringVar(value="1:1")
@@ -840,6 +839,8 @@ class CadApp:
                            command=self.block_einfuegen)
         m_einf.add_command(label=tr("menu.einfuegen.block_liste"),
                            command=self.block_liste)
+        m_einf.add_command(label=tr("menu.einfuegen.block_aufloesen"),
+                           command=self.block_aufloesen)
         m_einf.add_separator()
         m_einf.add_command(label=tr("menu.einfuegen.viewport"),
                            command=self.viewport_modus_starten)
@@ -2549,7 +2550,6 @@ class CadApp:
             f"Ortho: {'AN' if self.ortho.get() else 'AUS'}" + modus_info)
 
     def _block_vorschau(self, pt):
-        """Zeichnet eine Vorschau des zu einfuegenden Blocks am Mauszeiger."""
         self._clear_temp()
         if not self._block_einfuege_name:
             return
@@ -3860,7 +3860,6 @@ class CadApp:
             "aktives_layout": self.aktives_layout,
             "ansicht": self.ansicht.get(),
             "sprache": SPRACHE["aktuell"],
-            # NEU: zeichnungsspezifische Blockdefinitionen
             "block_definitionen": [
                 d.to_dict() for d in
                 (self.block_bibliothek.get(n) for n in self.block_bibliothek.namen())
@@ -3917,8 +3916,6 @@ class CadApp:
             if el:
                 self.elemente.append(el)
 
-        # NEU: zeichnungsspezifische Blockdefinitionen in die (globale)
-        # Bibliothek mergen
         for bd in daten.get("block_definitionen", []):
             try:
                 d = BlockDefinition.from_dict(bd, self._dict_zu_element)
@@ -4282,7 +4279,6 @@ class CadApp:
         w = self.aktives_werkzeug.get()
         n = len(self._pts)
 
-        # NEU: Block-Zustaende haben Vorrang
         if self._warte_auf_blockpunkt:
             h(text=tr("msg.block.einfuegepunkt"))
             return
@@ -5701,6 +5697,8 @@ class CadApp:
             self.block_einfuegen()
         elif cmd == "block:liste":
             self.block_liste()
+        elif cmd == "block:explode":
+            self.block_aufloesen()
         elif cmd.startswith("tool:"):
             self.aktives_werkzeug.set(cmd[5:])
             self._werkzeug_gewechselt()
@@ -5765,6 +5763,10 @@ class CadApp:
                           command=lambda: self._op_start("array"))
             m.add_command(label=tr("menu.bearbeiten.drehen_basis"),
                           command=lambda: self._op_start("rotate"))
+            # NEU: Block aufloesen, wenn ein Block in der Auswahl ist
+            if any(isinstance(e, BlockReferenz) for e in self.auswahl):
+                m.add_command(label=tr("menu.bearbeiten.block_aufloesen"),
+                              command=self.block_aufloesen)
             m.add_separator()
             m.add_command(label=("Löschen" if de else "Delete"),
                           command=self.auswahl_loeschen)
@@ -5809,11 +5811,9 @@ class CadApp:
                             ("Vorschau geöffnet." if de else "Preview opened."))
 
     # --------------------------------------------------------
-    # NEU (Schritt 4): Block-Befehle
+    # Block-Befehle
     # --------------------------------------------------------
     def block_erzeugen(self):
-        """BLOCK-Befehl: Auswahl in einen benannten Block umwandeln und durch
-        eine Referenz ersetzen."""
         de = SPRACHE["aktuell"] == "de"
         if self._ist_layout():
             self.status.set(("Bitte in die Modell-Ansicht wechseln." if de
@@ -5824,7 +5824,6 @@ class CadApp:
                              if de else
                              "Please select objects first, then press B."))
             return
-        # Zustand: wir warten auf einen Klick fuer den Basispunkt
         self._block_erzeuge_auswahl = list(self.auswahl)
         self.letzter_punkt = None
         self._update_eingabe_hinweis()
@@ -5832,8 +5831,6 @@ class CadApp:
         self.entry_eingabe.focus_set()
 
     def _block_erzeugen_fertig(self, basispunkt):
-        """Wird nach dem Basispunkt-Klick aufgerufen: fragt nach Namen,
-        erzeugt die Definition und ersetzt die Auswahl durch die Referenz."""
         de = SPRACHE["aktuell"] == "de"
         if self._block_erzeuge_auswahl is None:
             return
@@ -5842,7 +5839,6 @@ class CadApp:
         self._clear_temp()
         self.redraw()
 
-        # Blockname erfragen
         vorschlag = self._naechster_block_name()
         name = _BlockNameDialog(self.root, self.block_bibliothek,
                                 vorschlag).result
@@ -5853,7 +5849,6 @@ class CadApp:
             return
 
         bx, by = basispunkt
-        # Kinder relativ zum Basispunkt
         relativ = []
         for el in auswahl:
             k = self._dict_zu_element(el.to_dict())
@@ -5870,7 +5865,6 @@ class CadApp:
         definition = BlockDefinition(name, (0.0, 0.0), relativ)
         self.block_bibliothek.setze(definition)
 
-        # Auswahl aus der Zeichnung entfernen und durch die Referenz ersetzen
         self._snapshot()
         liste = self._aktuelle_elemente_liste()
         for el in auswahl:
@@ -5897,7 +5891,6 @@ class CadApp:
         return f"Block{i}"
 
     def block_einfuegen(self):
-        """INSERT-Befehl: Block aus der Bibliothek auswaehlen und platzieren."""
         de = SPRACHE["aktuell"] == "de"
         if self._ist_layout():
             self.status.set(("Bitte in die Modell-Ansicht wechseln." if de
@@ -5910,9 +5903,6 @@ class CadApp:
                 parent=self.root)
             return
         dlg = _BlockAuswahlDialog(self.root, self.block_bibliothek)
-        # geloeschte Bloecke persistieren (falls der Dialog welche entfernt hat)
-        for _ in dlg.geloescht:
-            pass  # bereits durch bibliothek.loesche() persistiert
         name = dlg.result
         if not name:
             return
@@ -5924,7 +5914,6 @@ class CadApp:
         self.entry_eingabe.focus_set()
 
     def _block_einfuegen_an(self, x, y):
-        """Legt den Block am Einfuegepunkt an."""
         de = SPRACHE["aktuell"] == "de"
         if not self._block_einfuege_name:
             return
@@ -5954,7 +5943,6 @@ class CadApp:
                            y=y / self._einh_faktor()))
 
     def block_liste(self):
-        """BLOCKLISTE: Bibliothek ansehen/verwalten (kein Einfuegen)."""
         de = SPRACHE["aktuell"] == "de"
         if len(self.block_bibliothek) == 0:
             messagebox.showinfo(
@@ -5963,7 +5951,55 @@ class CadApp:
                 parent=self.root)
             return
         _BlockAuswahlDialog(self.root, self.block_bibliothek)
-        # Ergebnis ignorieren - nur Verwaltung
+
+    def block_aufloesen(self):
+        """EXPLODE: markierte Blockreferenzen in ihre Kind-Elemente zerlegen.
+
+        - Andere markierte Elemente bleiben unveraendert (und markiert).
+        - Die aufgeloesten Kinder werden nach dem Aufloesen markiert.
+        - Liegt keine Auswahl vor, wird ein Hinweis ausgegeben.
+        """
+        de = SPRACHE["aktuell"] == "de"
+        if self._ist_layout():
+            self.status.set(("Bitte in die Modell-Ansicht wechseln." if de
+                             else "Please switch to model view."))
+            return
+        if not self.auswahl:
+            self.status.set(tr("msg.explode.keine_auswahl"))
+            return
+
+        bloecke = [e for e in self.auswahl if isinstance(e, BlockReferenz)]
+        if not bloecke:
+            self.status.set(tr("msg.explode.keine_bloecke"))
+            return
+
+        self._snapshot()
+        liste = self._aktuelle_elemente_liste()
+        neue_auswahl = []
+        anzahl_kinder = 0
+
+        # andere markierte Elemente bleiben markiert
+        for el in self.auswahl:
+            if not isinstance(el, BlockReferenz):
+                neue_auswahl.append(el)
+
+        for ref in bloecke:
+            if ref not in liste:
+                continue
+            idx = liste.index(ref)
+            kinder = ref.aufgeloest()
+            liste.pop(idx)
+            for k in kinder:
+                liste.insert(idx, k)
+                idx += 1
+            neue_auswahl.extend(kinder)
+            anzahl_kinder += len(kinder)
+
+        self.auswahl = neue_auswahl
+        self.redraw()
+        self.status.set(tr("msg.explode.fertig",
+                           bloecke=len(bloecke),
+                           elemente=anzahl_kinder))
 
 
 # ============================================================
