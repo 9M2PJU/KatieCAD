@@ -3,6 +3,13 @@
 katiecad_app.py - GUI von KatieCAD (CadApp, main()).
 Enthaelt die Tkinter-UI, Events, Werkzeuge und den App-State.
 Dialoge liegen in katiecad_dialogs.py, PDF-Ausgabe in katiecad_pdf.py.
+
+NEU (Block-Unterstuetzung, Schritt 2):
+  - BlockBibliothek wird in __init__ angelegt
+  - _zeichne_element, _dict_zu_element, _punkt_auf_element und
+    _finde_snap_in_liste kennen BlockReferenz
+  - Debug-Helfer _debug_block_einfuegen / _debug_block_erzeugen
+    (nur zum Testen, wird in Schritt 4 durch echte UI ersetzt)
 """
 
 import tkinter as tk
@@ -39,6 +46,7 @@ from katiecad_core import (
     BEFEHLE, PdfSeite, ist_dunkel,
     Layer, Layout, Element, Linie, Kreis, Bogen, Rechteck, Polylinie, Text,
     Bemassung, Viewport,
+    BlockDefinition, BlockReferenz, BlockBibliothek,
     bogen_sweep, bogen_punkte, winkel_im_bogen, bogen_aus_3_punkten,
     bogen_mitte_start_ende, abstand_punkt_segment, naechster_punkt_segment,
     clip_polyline, gedrehtes_rechteck, punkt_in_gedrehtem_rechteck,
@@ -320,6 +328,13 @@ class CadApp:
         self.sprache_var = tk.StringVar(value=SPRACHE["aktuell"])
 
         self._info_logo = None
+
+        # --- NEU: Blockbibliothek (global, wird beim ersten Zugriff geladen) ---
+        self.block_bibliothek = BlockBibliothek(self._dict_zu_element)
+
+        # --- NEU: Zustand fuer den spaeteren Einfuegen-Befehl (Schritt 4) ---
+        self._block_einfuege_name = None
+        self._warte_auf_blockpunkt = False
 
         # --- Viewport-Leiste: Statusvariablen ---
         self._vp_modus_var = tk.StringVar(value="layout")
@@ -1357,8 +1372,6 @@ class CadApp:
     # --------------------------------------------------------
     def _build_viewport_leiste(self):
         self.viewport_leiste = ttk.Frame(self.root, padding=(6, 3))
-        # Wird NICHT sofort gepackt – die Sichtbarkeit steuert
-        # _viewport_modus_anzeige_aktualisieren() abhängig vom Modus.
 
         ttk.Label(self.viewport_leiste, text=tr("tb.ansicht"),
                   style="Title.TLabel").pack(side=tk.LEFT, padx=(0, 4))
@@ -1416,7 +1429,6 @@ class CadApp:
     def _retranslate_viewport_leiste(self):
         if not hasattr(self, "viewport_leiste"):
             return
-        # Kinder neu beschriften geht am einfachsten über komplettes Neubauen:
         self.viewport_leiste.destroy()
         self._build_viewport_leiste()
         self._viewport_modus_anzeige_aktualisieren()
@@ -1429,8 +1441,6 @@ class CadApp:
                 self.viewport_leiste.pack(side=tk.TOP, fill=tk.X,
                                           before=self.canvas)
         else:
-            # pack_forget() ist idempotent und sicher, auch wenn die Leiste
-            # gerade nicht gemappt ist.
             self.viewport_leiste.pack_forget()
 
     def _viewport_modus_anzeige_aktualisieren(self):
@@ -1828,7 +1838,6 @@ class CadApp:
         self._update_kontext_widgets()
         if self.aktives_werkzeug.get() != "auswahl":
             self.auswahl_leeren()
-        # Beim Wechsel auf Stutzen/Brechen sofort den passenden Status setzen
         wz = self.aktives_werkzeug.get()
         if wz == "stutzen":
             self._trim_status = "grenzen"
@@ -2042,7 +2051,6 @@ class CadApp:
             de = SPRACHE["aktuell"] == "de"
             self.status.set("Abgebrochen." if de else "Cancelled.")
             return
-        # NEU: Stutzen - Rechtsklick bestaetigt die Grenzen
         if self.aktives_werkzeug.get() == "stutzen":
             if self._trim_status == "grenzen":
                 self._trim_grenzen_bestaetigen()
@@ -2050,7 +2058,6 @@ class CadApp:
                 self._trim_abbrechen()
                 self._werkzeug_gewechselt()
             return
-        # NEU: Brechen - Rechtsklick bricht ab
         if self.aktives_werkzeug.get() == "brechen":
             self._break_abbrechen()
             self._werkzeug_gewechselt()
@@ -2264,6 +2271,14 @@ class CadApp:
                 continue
             l = self.layers.get(el.layer)
             if l and not l.sichtbar:
+                continue
+            # NEU: Block - rekursiv die aufgeloesten Kinder durchsuchen
+            if isinstance(el, BlockReferenz):
+                kinder = el.aufgeloest()
+                treffer = self._finde_snap_in_liste(kinder, mx, my, tol, ref)
+                if treffer is not None:
+                    # hoechste Prioritaet, damit der Treffer sicher gewinnt
+                    sammle(treffer[0], treffer[1], treffer[2], 0)
                 continue
             if isinstance(el, Linie):
                 ende(el.x1, el.y1); ende(el.x2, el.y2)
@@ -2549,6 +2564,12 @@ class CadApp:
         return None
 
     def _punkt_auf_element(self, el, x_mm, y_mm, tol):
+        # NEU: Block - pruefe die aufgeloesten Kinder
+        if isinstance(el, BlockReferenz):
+            for kind in el.aufgeloest():
+                if self._punkt_auf_element(kind, x_mm, y_mm, tol):
+                    return True
+            return False
         if isinstance(el, Viewport):
             return (el.x <= x_mm <= el.x + el.breite and
                     el.y <= y_mm <= el.y + el.hoehe)
@@ -2618,17 +2639,14 @@ class CadApp:
         x0_px, y0_px, x0_mm, y0_mm = self._auswahl_rechteck_start
         x1_px, y1_px = event.x, event.y
         x1_mm, y1_mm = self.px_to_mm(x1_px, y1_px)
-        
-        # AutoCAD-Konvention:
-        #   links -> rechts = Fenster  (blau,  nur komplett enthaltene Objekte)
-        #   rechts -> links = Kreuzung (gruen, beruehrte Objekte)
+
         if x1_px >= x0_px:
             farbe = FARBEN["cyan"]
-            self._auswahl_richtung = "links"  # Window -> alles muss drin sein
+            self._auswahl_richtung = "links"
         else:
             farbe = FARBEN["gruen"]
-            self._auswahl_richtung = "rechts" # Crossing -> alles was beruehrt wird
-            
+            self._auswahl_richtung = "rechts"
+
         if self._auswahl_rechteck_id:
             self.canvas.delete(self._auswahl_rechteck_id)
         self._auswahl_rechteck_id = self.canvas.create_rectangle(
@@ -2650,8 +2668,6 @@ class CadApp:
             if l and not l.sichtbar:
                 continue
             el_bbox = el.bbox()
-            # "links" bedeutet in unserer Logik: alles muss im Rechteck liegen (Window).
-            # "rechts" bedeutet: Beruehrung reicht (Crossing).
             if richtung == "links":
                 if bbox_enthalten(bbox, el_bbox):
                     treffer.append(el)
@@ -2858,15 +2874,12 @@ class CadApp:
             self._break_klick(pt)
 
     # --------------------------------------------------------
-    # NEU: Stutzen (TRIM)
+    # Stutzen (TRIM)
     # --------------------------------------------------------
     def _trim_grenzen_bestaetigen(self):
-        """Enter/Rechtsklick im Trim-Modus: Grenzen bestaetigen und in den
-        Ziel-Modus wechseln."""
         de = SPRACHE["aktuell"] == "de"
         n = len(self._trim_grenzen)
         if n == 0:
-            # Keine Grenzen gewaehlt -> alle sichtbaren Objekte als Grenzen
             self._trim_grenzen = [el for el in self._aktuelle_elemente_liste()
                                   if self._element_sichtbar(el)]
             n = len(self._trim_grenzen)
@@ -2884,8 +2897,6 @@ class CadApp:
         return (l is None) or l.sichtbar
 
     def _element_auf_punkt_snap(self, x_mm, y_mm, tol_mm):
-        """Findet das vorderste sichtbare Element, dessen Geometrie den Punkt
-        (x_mm, y_mm) innerhalb tol_mm beruehrt. Fuer Trim/Break."""
         liste = self._aktuelle_elemente_liste()
         for el in reversed(liste):
             if not self._element_sichtbar(el):
@@ -2893,21 +2904,15 @@ class CadApp:
             if isinstance(el, Viewport):
                 continue
             if isinstance(el, (Text, Bemassung)):
-                # Text/Bemassung nehmen wir nicht als Trim-Ziel
                 continue
             if self._punkt_auf_element(el, x_mm, y_mm, tol_mm):
                 return el
         return None
 
     def _schnitte_mit_grenzen(self, el, grenzen, tol_mm):
-        """Berechnet alle Schnittpunkte eines Elements mit den Grenzen.
-
-        Rueckgabe: Liste von (x, y)-Tupeln.
-        """
         schnitte = []
         if el in grenzen:
             return schnitte
-        # Segmente des Ziels bestimmen (auch fuer Kreis/Bogen: naeherungsweise)
         ziel_segs = self._el_segmente(el)
         for g in grenzen:
             if g is el or not self._element_sichtbar(g):
@@ -2921,8 +2926,6 @@ class CadApp:
                                         g_a[0], g_a[1], g_b[0], g_b[1])
                     if sp is not None:
                         schnitte.append(sp)
-            # Kreis/Bogen als Ziel: Schnittpunkte der Grenz-Segmente
-            # mit dem Kreis berechnen (damit Radien-Trim funktioniert)
             if isinstance(el, (Kreis, Bogen)):
                 for (g_a, g_b) in grenz_segs:
                     for (x1, y1, x2, y2) in ((g_a[0], g_a[1], g_b[0], g_b[1]),):
@@ -2935,7 +2938,6 @@ class CadApp:
                                 if not winkel_im_bogen(w, el.start, el.ende):
                                     continue
                             schnitte.append(sp)
-        # Duplikate entfernen
         eindeutig = []
         for (px, py) in schnitte:
             if not any(abs(px - qx) < 1e-6 and abs(py - qy) < 1e-6
@@ -2944,9 +2946,6 @@ class CadApp:
         return eindeutig
 
     def _el_segmente(self, el):
-        """Liefert eine Liste von Segmenten (a, b) fuer ein Element, die
-        fuer den Schnitt-Test verwendet werden koennen. Bei Kreisen/Bogen
-        verwenden wir die Segmente der angenaeherten Polylinie."""
         segs = []
         if isinstance(el, Linie):
             segs.append(((el.x1, el.y1), (el.x2, el.y2)))
@@ -2962,10 +2961,9 @@ class CadApp:
             for i in range(len(pts) - 1):
                 segs.append((pts[i], pts[i + 1]))
         elif isinstance(el, (Kreis, Bogen)):
-            # Naeherung durch feine Polylinie
             skala = max(1.0, self.view["zoom"] * self._ctx_skala() * 0.1)
             sw = 360.0 if isinstance(el, Kreis) else bogen_sweep(el.start, el.ende)
-            n = max(24, int(sw / 5))  # alle 5 Grad
+            n = max(24, int(sw / 5))
             if isinstance(el, Kreis):
                 pts = bogen_punkte(el.cx, el.cy, el.r, 0, 360, n)
             else:
@@ -2975,7 +2973,6 @@ class CadApp:
         return segs
 
     def _segment_kreis_schnitt(self, x1, y1, x2, y2, cx, cy, r):
-        """Schnittpunkte eines Segments mit einem Kreis."""
         dx, dy = x2 - x1, y2 - y1
         fx, fy = x1 - cx, y1 - cy
         a = dx * dx + dy * dy
@@ -2996,7 +2993,6 @@ class CadApp:
     def _trim_klick(self, pt):
         de = SPRACHE["aktuell"] == "de"
         if self._trim_status == "grenzen":
-            # Klick auf Objekt -> zur Grenze hinzufuegen
             tol_mm = 8 / self._ctx_skala()
             el = self._element_auf_punkt_snap(pt[0], pt[1], tol_mm)
             if el is None:
@@ -3018,7 +3014,6 @@ class CadApp:
             return
 
     def _trim_anwenden(self, ziel, klick_pt):
-        """Stutzt das Ziel-Element an allen Grenzen."""
         de = SPRACHE["aktuell"] == "de"
         schnitte = self._schnitte_mit_grenzen(ziel, self._trim_grenzen,
                                              1e-3)
@@ -3073,17 +3068,13 @@ class CadApp:
                                          eig_farbe=ziel.eig_farbe,
                                          staerke=ziel.staerke))
         elif isinstance(ziel, Kreis):
-            # Kreis wird zu einem oder mehreren Boegen
-            # Wir schneiden an jedem Schnittpunkt-Winkel
             winkel = sorted(set(
                 norm360(math.degrees(math.atan2(p[1] - ziel.cy, p[0] - ziel.cx)))
                 for p in schnitte))
             if len(winkel) < 2:
                 return
-            # Klickwinkel bestimmen
             kw = norm360(math.degrees(math.atan2(klick_pt[1] - ziel.cy,
                                                  klick_pt[0] - ziel.cx)))
-            # Naechsten Winkel links und rechts vom Klickwinkel
             sortiert = sorted(winkel)
             links = None
             rechts = None
@@ -3096,17 +3087,11 @@ class CadApp:
                 links = sortiert[-1] - 360.0
             if rechts is None:
                 rechts = sortiert[0] + 360.0
-            # Wir behalten alles ausser (links, rechts)
-            # -> zwei Boegen: von rechts bis links+360
             starts = [rechts]
             endes = [links + 360.0]
             for i, w in enumerate(sortiert):
                 if links < w < rechts:
                     continue
-            # Einfacher: Alle Schnittwinkel sortiert; der Klick liegt zwischen
-            # links und rechts; wir entfernen diesen Teil.
-            # Bogen 1: von rechts bis links+360 (ueber 0)
-            # Bogen 2: entfaellt, da wir nur den Klickteil entfernen.
             s = norm360(rechts)
             e = norm360(links)
             if bogen_sweep(s, e) > 1e-6:
@@ -3126,7 +3111,7 @@ class CadApp:
         self.status.set(tr("msg.stutzen.fertig", n=self._trim_anzahl))
 
     # --------------------------------------------------------
-    # NEU: Brechen (BREAK)
+    # Brechen (BREAK)
     # --------------------------------------------------------
     def _break_klick(self, pt):
         de = SPRACHE["aktuell"] == "de"
@@ -3159,7 +3144,6 @@ class CadApp:
             return
         neue_el = []
         if isinstance(ziel, Linie):
-            # Brich das Stueck zwischen p1 und p2 heraus
             dx, dy = ziel.x2 - ziel.x1, ziel.y2 - ziel.y1
             L = math.hypot(dx, dy)
             if L < 1e-9:
@@ -3213,10 +3197,6 @@ class CadApp:
                                               eig_farbe=ziel.eig_farbe,
                                               staerke=ziel.staerke))
         elif isinstance(ziel, Bogen):
-            mitte_w = None
-            # Winkel von p1 und p2
-            w1 = norm360(math.degrees(math.atan2(p1[1] - ziel.cy, p1[0] - ziel.cx)))
-            w2 = norm360(math.degrees(math.atan2(p2[1] - ziel.cy, p2[0] - ziel.cx)))
             reste = trim_bogen(ziel.cx, ziel.cy, ziel.r, ziel.start, ziel.ende,
                                [p1, p2], ((p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2))
             for (s, e) in reste:
@@ -3227,7 +3207,6 @@ class CadApp:
                                          eig_farbe=ziel.eig_farbe,
                                          staerke=ziel.staerke))
         elif isinstance(ziel, Kreis):
-            # Kreis -> Bogen: das Stueck zwischen p1 und p2 wird entfernt
             erg = kreis_zu_bogen(ziel.cx, ziel.cy, ziel.r, p1, p2)
             if erg is None:
                 return
@@ -3431,7 +3410,6 @@ class CadApp:
                 self.canvas.delete(self._auswahl_rechteck_id)
                 self._auswahl_rechteck_id = None
             self.canvas.delete("auswahlvorschau")
-            # STRETCH waehlt ueberkreuzend aus -> interne Richtung "rechts" (Crossing)
             self.auswahl = self._elemente_im_auswahlrechteck(bbox, "rechts")
             self.redraw()
             self._op_hinweis()
@@ -3441,12 +3419,7 @@ class CadApp:
         else:
             bbox = (min(x0_mm, x1_mm), min(y0_mm, y1_mm),
                     max(x0_mm, x1_mm), max(y0_mm, y1_mm))
-            
-            # AutoCAD-Konvention:
-            #   links -> rechts = Fenster (komplett enthalten)
-            #   rechts -> links = Kreuzung (beruehrt)
             richtung = "links" if x1_px >= x0_px else "rechts"
-            
             treffer = self._elemente_im_auswahlrechteck(bbox, richtung)
             self.auswahl = treffer
             de = SPRACHE["aktuell"] == "de"
@@ -3531,6 +3504,12 @@ class CadApp:
 
     def _zeichne_element(self, el, tags=("element",), tf=None, skala=None,
                          clip=None, stil=None):
+        # NEU: Block aufgeloest zeichnen
+        if isinstance(el, BlockReferenz):
+            for kind in el.aufgeloest():
+                self._zeichne_element(kind, tags=tags, tf=tf,
+                                      skala=skala, clip=clip, stil=stil)
+            return
         tf = tf or self.mm_to_px
         sk = skala if skala is not None else self.view["zoom"]
         clip = clip or self._sicht_rect()
@@ -3674,7 +3653,6 @@ class CadApp:
         if logo_path is not None and PILLOW_VERFUEGBAR:
             try:
                 logo_img = Image.open(logo_path).convert("RGBA")
-                # Etwas groesseres Logo wie bei XZN
                 logo_img = logo_img.resize((96, 96), Image.Resampling.LANCZOS)
                 logo_photo = ImageTk.PhotoImage(logo_img)
                 logo_lbl = tk.Label(title_row, image=logo_photo,
@@ -3689,7 +3667,6 @@ class CadApp:
                  font=("Helvetica", 18, "bold"),
                  bg=FARBEN["bg_mittel"], fg=FARBEN["cyan"]).pack(side="left", anchor="w")
 
-        # Untertitel (Kursiv, etwas groesser)
         tk.Label(frame, text=tr("info.untertitel"),
                  font=("Helvetica", 10, "italic"),
                  wraplength=480, justify="left",
@@ -3697,7 +3674,6 @@ class CadApp:
 
         tk.Frame(frame, bg=FARBEN["rand"], height=1).pack(fill="x", pady=14)
 
-        # Details
         tk.Label(frame, text=tr("info.gebaut_mit"),
                  font=("Helvetica", 9),
                  bg=FARBEN["bg_mittel"], fg=FARBEN["text"]).pack(anchor="w", pady=(0, 16))
@@ -3922,6 +3898,14 @@ class CadApp:
             if typ == "text":       return Text(**d)
             if typ == "bemassung":  return Bemassung(**d)
             if typ == "viewport":   return Viewport(**d)
+            if typ == "block":
+                kinder_dicts = d.pop("elemente", [])
+                kinder = []
+                for kd in kinder_dicts:
+                    kind = self._dict_zu_element(kd)
+                    if kind is not None:
+                        kinder.append(kind)
+                return BlockReferenz(elemente=kinder, **d)
         except Exception as e:
             print(f"Fehler beim Laden: {e} - {d}")
         return None
@@ -3991,6 +3975,9 @@ class CadApp:
                 if g["text"]:
                     s, cx, cy, ang, w, h = g["text"]
                     self._dxf_text(msp, s, cx, cy, h, ang, el.layer, mitte=True)
+            elif isinstance(el, BlockReferenz):
+                for kind in el.aufgeloest():
+                    self._element_zu_dxf(msp, kind)
         except Exception as e:
             print(f"Element konnte nicht exportiert werden: {e}")
 
@@ -4292,7 +4279,6 @@ class CadApp:
                 self.eingabe_var.set("")
                 self._befehl(cmd, tok[1] if len(tok) > 1 else "")
                 return
-            # NEU: Stutzen - Enter bestaetigt die Grenzen
             if w == "stutzen" and self._trim_status == "grenzen":
                 self._trim_grenzen_bestaetigen()
                 self.eingabe_var.set("")
@@ -4919,14 +4905,12 @@ class CadApp:
             elif len(self._pts) >= 2:
                 zeige(self._bem_element(self._pts[:2], pt),
                       {"farbe": FARBEN["gelb"], "w": 1, "dash": None})
-        # NEU: Stutzen-Vorschau (Ziel hervorheben, welches gestutzt wuerde)
         elif w == "stutzen" and self._trim_status == "ziele":
             tol_mm = 8 / self._ctx_skala()
             ziel = self._element_auf_punkt_snap(pt[0], pt[1], tol_mm)
             if ziel is not None:
                 self._zeichne_auswahl_highlight(ziel, farbe=FARBEN["orange"],
                                                 tags=("vorschau",))
-        # NEU: Brechen-Vorschau (Objekt hervorheben, welches gebrochen wird)
         elif w == "brechen" and self._break_status == "objekt":
             tol_mm = 8 / self._ctx_skala()
             ziel = self._element_auf_punkt_snap(pt[0], pt[1], tol_mm)
@@ -5307,6 +5291,12 @@ class CadApp:
             self._stretch_element(el, innen, dx, dy)
 
     def _stretch_element(self, el, innen, dx, dy):
+        if isinstance(el, BlockReferenz):
+            # Block wird als Ganzes verschoben, wenn sein Basispunkt im
+            # Fenster liegt - ansonsten unveraendert.
+            if innen(el.x, el.y):
+                el.x += dx; el.y += dy
+            return
         if isinstance(el, Linie):
             if innen(el.x1, el.y1):
                 el.x1 += dx; el.y1 += dy
@@ -5539,10 +5529,8 @@ class CadApp:
         elif self.aktives_werkzeug.get() == "polylinie" and self.aktuelle_polylinie:
             self._polylinie_abschliessen(geschlossen=False)
             self.letzter_punkt = None
-        # NEU: Enter im Stutzen-Grenzen-Modus bestaetigt die Grenzen
         elif self.aktives_werkzeug.get() == "stutzen" and self._trim_status == "grenzen":
             self._trim_grenzen_bestaetigen()
-        # NEU: Enter im Brechen-Status "objekt" bricht ab
         elif self.aktives_werkzeug.get() == "brechen":
             self._break_abbrechen()
             self._werkzeug_gewechselt()
@@ -5691,6 +5679,50 @@ class CadApp:
             self.status.set(("An den Drucker gesendet." if de
                              else "Sent to printer.") if aktion == "druck" else
                             ("Vorschau geöffnet." if de else "Preview opened."))
+
+    # --------------------------------------------------------
+    # NEU: Debug-Helfer (nur zum Testen, in Schritt 4 durch UI ersetzt)
+    # --------------------------------------------------------
+    def _debug_block_einfuegen(self, name, x, y):
+        """NUR ZUM TESTEN - fuegt einen Block ohne UI ein."""
+        d = self.block_bibliothek.get(name)
+        if d is None:
+            print(f"[Debug] Block '{name}' nicht gefunden.")
+            return
+        self._snapshot()
+        ref = BlockReferenz(x, y, name, d.elemente,
+                            layer=self.aktiver_layer.get(),
+                            farbe=self.zeichenfarbe,
+                            linientyp=self.linientyp.get(),
+                            eig_farbe=self.eigene_farbe.get(),
+                            staerke=self._zahl(self.linienstaerke, 0.35))
+        self._ziel_liste().append(ref)
+        self.redraw()
+        print(f"[Debug] Block '{name}' bei ({x}, {y}) eingefuegt.")
+
+    def _debug_block_erzeugen(self, name):
+        """NUR ZUM TESTEN - erzeugt einen Block aus der aktuellen Auswahl."""
+        if not self.auswahl:
+            print("[Debug] Nichts ausgewaehlt.")
+            return
+        if not name:
+            print("[Debug] Name fehlt.")
+            return
+        xs, ys = [], []
+        for el in self.auswahl:
+            b = el.bbox()
+            xs.extend([b[0], b[2]])
+            ys.extend([b[1], b[3]])
+        bx, by = min(xs), min(ys)
+        relativ = []
+        for el in self.auswahl:
+            k = self._dict_zu_element(el.to_dict())
+            k.verschieben(-bx, -by)
+            relativ.append(k)
+        d = BlockDefinition(name, (0.0, 0.0), relativ)
+        self.block_bibliothek.setze(d)
+        print(f"[Debug] Block '{name}' mit {len(relativ)} Element(en) "
+              f"erzeugt und in Bibliothek gespeichert.")
 
 
 # ============================================================
