@@ -2,9 +2,16 @@
 """
 katiecad_core.py - Datenmodell, Geometrie und PDF-Ausgabe.
 Enthaelt KEIN Tkinter und keine GUI-Logik.
+
+NEU (Block-Unterstuetzung, Schritt 1):
+  - BlockDefinition   Vorlage eines Blocks (Name + Elemente relativ zum Basispunkt)
+  - BlockReferenz     Eingefuegter Block (Position, Skalierung, Winkel + tiefe Kopie)
+  - BlockBibliothek   Globale, zeichnungsuebergreifende Blockbibliothek (blocks.json)
+  - BEFEHLE erweitert: BLOCK/B, INSERT/I, BLOCKLISTE/BL
 """
 
 import math, zlib
+from copy import deepcopy
 
 from katiecad_i18n import tr, SPRACHE
 
@@ -337,9 +344,6 @@ def bbox_ueberlappt(a, b):
 # NEU: Stutzen (TRIM) und Brechen (BREAK) - Geometrie-Helfer
 # ============================================================
 def _punkt_auf_segment_param(px, py, x1, y1, x2, y2, tol=TRIM_TOL):
-    """Liefert den Parameter t (0..1) und den Abstand, wenn (px,py) auf dem
-    Segment liegt; sonst None. Fuer das Stutzen/Brechen: Wir muessen wissen,
-    wo genau der Schnittpunkt auf der Linie liegt."""
     dx, dy = x2 - x1, y2 - y1
     L2 = dx * dx + dy * dy
     if L2 < 1e-18:
@@ -349,10 +353,6 @@ def _punkt_auf_segment_param(px, py, x1, y1, x2, y2, tol=TRIM_TOL):
         return None
     t = ((px - x1) * dx + (py - y1) * dy) / L2
     if t < -tol or t > 1.0 + tol:
-        # Punkt liegt ausserhalb des Segments - fuer den Schnittpunkt
-        # aber relevant, wenn er "auf der Verlaengerung" liegt. Nur
-        # Parameter zurueckgeben, der Abstand wird ausserhalb nicht
-        # gebraucht.
         return None
     nx, ny = x1 + t * dx, y1 + t * dy
     d = math.hypot(px - nx, py - ny)
@@ -362,14 +362,6 @@ def _punkt_auf_segment_param(px, py, x1, y1, x2, y2, tol=TRIM_TOL):
 
 
 def trim_linie(x1, y1, x2, y2, treffer_punkte, klick_punkt):
-    """Stutzt eine Linie anhand einer Liste von Schnittpunkten (treffer_punkte
-    sind (x,y)-Tupel). Der Klickpunkt bestimmt, welches Teilstueck entfernt
-    wird - das Teilstueck zwischen den beiden naechsten Schnittpunkten um
-    den Klickpunkt (bzw. zwischen Schnittpunkt und Linienende).
-
-    Rueckgabe: Liste von (x1,y1,x2,y2)-Tupeln mit den verbleibenden Linien.
-    Ist die Liste leer, war die Linie komplett zu entfernen.
-    """
     if not treffer_punkte:
         return [(x1, y1, x2, y2)]
     dx, dy = x2 - x1, y2 - y1
@@ -377,8 +369,6 @@ def trim_linie(x1, y1, x2, y2, treffer_punkte, klick_punkt):
     if L < TRIM_TOL:
         return [(x1, y1, x2, y2)]
     ux, uy = dx / L, dy / L
-
-    # Projektionen der Trefferpunkte auf die Linie in Laufmeter (0..L)
     werte = []
     for (px, py) in treffer_punkte:
         t = ((px - x1) * ux + (py - y1) * uy)
@@ -386,17 +376,11 @@ def trim_linie(x1, y1, x2, y2, treffer_punkte, klick_punkt):
             werte.append(max(0.0, min(L, t)))
     if not werte:
         return [(x1, y1, x2, y2)]
-
-    # Klickpunkt auf die Linie projizieren
     tk = (klick_punkt[0] - x1) * ux + (klick_punkt[1] - y1) * uy
     tk = max(0.0, min(L, tk))
-
     werte = sorted(set(werte))
-    # Naechsten linken und rechten Schnittpunkt suchen
     links = max([w for w in werte if w <= tk] or [0.0])
     rechts = min([w for w in werte if w >= tk] or [L])
-
-    # Zwischen links und rechts wird entfernt; der Rest bleibt.
     stuecke = []
     if links > TRIM_TOL:
         ex = x1 + ux * links
@@ -410,37 +394,20 @@ def trim_linie(x1, y1, x2, y2, treffer_punkte, klick_punkt):
 
 
 def trim_polylinie(punkte, geschlossen, treffer_punkte, klick_punkt):
-    """Stutzt eine Polylinie anhand einer Liste von Schnittpunkten.
-
-    Vorgehen: Wir zerlegen die Polylinie in ihre Segmente, bestimmen je
-    Segment die Schnittparameter, und entfernen das Segment-Stueck, das
-    den Klickpunkt enthaelt.
-
-    Rueckgabe: Liste von (punkte, geschlossen)-Tupeln.
-    - Bei offenen Polylinien: 0..2 Teilstuecke.
-    - Bei geschlossenen Polylinien: 1 Teilstueck, das ggf. nicht mehr
-      geschlossen ist.
-    """
     if len(punkte) < 2:
         return [(punkte, geschlossen)]
-
-    # Alle Segmente der Polylinie (als (p_start, p_ende, index))
     segs = []
     n = len(punkte)
     for i in range(n - 1):
         segs.append((punkte[i], punkte[i + 1], i, False))
     if geschlossen and n >= 3:
         segs.append((punkte[-1], punkte[0], n - 1, True))
-
-    # Fuer jedes Segment: Liste der Schnittparameter (0..1)
     schnitte = [[] for _ in segs]
     for (px, py) in treffer_punkte:
         for idx, (a, b, _i, _cl) in enumerate(segs):
             erg = _punkt_auf_segment_param(px, py, a[0], a[1], b[0], b[1])
             if erg is not None:
                 schnitte[idx].append(erg[0])
-
-    # Segment bestimmen, das den Klickpunkt enthaelt
     klick_seg = None
     klick_t = None
     klick_dist = None
@@ -458,55 +425,34 @@ def trim_polylinie(punkte, geschlossen, treffer_punkte, klick_punkt):
                 klick_seg = idx
                 klick_t = tt
                 klick_dist = d
-
     if klick_seg is None:
         return [(punkte, geschlossen)]
-
-    # Grenzen innerhalb des Klick-Segments: links und rechts vom Klick
     ss = sorted(set(schnitte[klick_seg]))
     links = max([w for w in ss if w <= klick_t] or [0.0])
     rechts = min([w for w in ss if w >= klick_t] or [1.0])
-
-    # Liste der verbleibenden Stuecke in "Segment-Reihenfolge".
-    # Wir bauen die Polylinie neu zusammen - als Kette von (punkte).
     if not geschlossen:
-        # Offene Polylinie: Wir schneiden das Klick-Segment zwischen
-        # links und rechts heraus. Die Polylinie zerfaellt in zwei Teile,
-        # wenn das Klick-Segment nicht am Rand liegt.
         seg_a, seg_b, _i, _cl = segs[klick_seg]
-        # linkes Teil bis zum linken Schnittpunkt
         links_p = (seg_a[0] + (seg_b[0] - seg_a[0]) * links,
                    seg_a[1] + (seg_b[1] - seg_a[1]) * links)
         rechts_p = (seg_a[0] + (seg_b[0] - seg_a[0]) * rechts,
                     seg_a[1] + (seg_b[1] - seg_a[1]) * rechts)
-
         teile = []
-        # Stueck 1: von punkte[0] bis links_p (ueber die Segmente 0..klick_seg-1)
         stueck1 = list(punkte[:klick_seg + 1])
         if links > TRIM_TOL:
             stueck1.append(links_p)
-            if len(stueck1) >= 2:
-                teile.append((stueck1, False))
-        else:
-            if len(stueck1) >= 2:
-                teile.append((stueck1, False))
-        # Stueck 2: von rechts_p bis punkte[-1] (ueber die Segmente klick_seg+1..)
+        if len(stueck1) >= 2:
+            teile.append((stueck1, False))
         if rechts < 1.0 - TRIM_TOL:
             stueck2 = [rechts_p] + list(punkte[klick_seg + 1:])
             if len(stueck2) >= 2:
                 teile.append((stueck2, False))
         return teile
     else:
-        # Geschlossene Polylinie: Wir entfernen das Klick-Segment zwischen
-        # links und rechts. Der Rest bleibt eine (moeglicherweise offene)
-        # Kette.
         seg_a, seg_b, seg_i, _cl = segs[klick_seg]
         links_p = (seg_a[0] + (seg_b[0] - seg_a[0]) * links,
                    seg_a[1] + (seg_b[1] - seg_a[1]) * links)
         rechts_p = (seg_a[0] + (seg_b[0] - seg_a[0]) * rechts,
                     seg_a[1] + (seg_b[1] - seg_a[1]) * rechts)
-        # Kette beginnt bei rechts_p, laeuft ueber alle Punkte
-        # (zyklisch ab klick_seg+1) und endet bei links_p.
         kette = [rechts_p]
         idx = (seg_i + 1) % n
         for _ in range(n + 1):
@@ -514,10 +460,8 @@ def trim_polylinie(punkte, geschlossen, treffer_punkte, klick_punkt):
             if idx == klick_seg % n and len(kette) > 1:
                 break
             idx = (idx + 1) % n
-        # Kette endet bei links_p (auf dem Segment klick_seg).
         if len(kette) >= 2:
             kette.append(links_p)
-        # Doppelte Punkte am Rand entfernen
         sauber = []
         for p in kette:
             if not sauber or (abs(p[0] - sauber[-1][0]) > TRIM_TOL or
@@ -529,14 +473,8 @@ def trim_polylinie(punkte, geschlossen, treffer_punkte, klick_punkt):
 
 
 def trim_bogen(cx, cy, r, start, ende, treffer_punkte, klick_punkt):
-    """Stutzt einen Bogen anhand von Schnittpunkten (auf dem Bogen).
-
-    Rueckgabe: Liste von (start, ende)-Winkelpaaren fuer die verbleibenden
-    Boegen. Ist die Liste leer, war der Bogen komplett zu entfernen.
-    """
     if not treffer_punkte:
         return [(start, ende)]
-    # Winkel der Trefferpunkte relativ zum Zentrum
     winkel = []
     for (px, py) in treffer_punkte:
         d = math.hypot(px - cx, py - cy)
@@ -547,21 +485,17 @@ def trim_bogen(cx, cy, r, start, ende, treffer_punkte, klick_punkt):
     if not winkel:
         return [(start, ende)]
     winkel = sorted(set(round(w, 6) for w in winkel))
-    # Sweep in CW-Richtung (0..360) durchgehen und an den Winkeln zerlegen
     sweep_start = norm360(start)
     sweep_end = sweep_start + bogen_sweep(start, ende)
-    # Klickwinkel
     kd = math.hypot(klick_punkt[0] - cx, klick_punkt[1] - cy)
     kw = norm360(math.degrees(math.atan2(klick_punkt[1] - cy,
                                         klick_punkt[0] - cx)))
-    # Alle Winkel in fortlaufender Reihenfolge ab sweep_start
     rel = []
     for w in winkel:
         rel_w = norm360(w - sweep_start)
         if rel_w <= sweep_end - sweep_start + 1e-6:
             rel.append((rel_w, w))
     rel.sort()
-    # Naechste Grenzen links und rechts vom Klickwinkel
     rel_k = norm360(kw - sweep_start)
     links_w = 0.0
     rechts_w = sweep_end - sweep_start
@@ -570,8 +504,6 @@ def trim_bogen(cx, cy, r, start, ende, treffer_punkte, klick_punkt):
             links_w = max(links_w, rw)
         if rw >= rel_k - 1e-6:
             rechts_w = min(rechts_w, rw)
-    # Falls Klick genau zwischen zwei Winkeln liegt: links und rechts
-    # sind die beiden Nachbarn.
     stuecke = []
     if links_w > 1e-6:
         stuecke.append((norm360(sweep_start), norm360(sweep_start + links_w)))
@@ -581,26 +513,14 @@ def trim_bogen(cx, cy, r, start, ende, treffer_punkte, klick_punkt):
 
 
 def kreis_zu_bogen(cx, cy, r, p1, p2):
-    """Wandelt einen Kreis in einen Bogen um, der an p1 beginnt und an p2 endet
-    (in Leserichtung gegen den Uhrzeigersinn - also der uebliche Weg ueber
-    den laengeren Teil, wenn man das kleine Stueck entfernt).
-    Rueckgabe: (cx, cy, r, start, ende) oder None.
-    """
     a1 = norm360(math.degrees(math.atan2(p1[1] - cy, p1[0] - cx)))
     a2 = norm360(math.degrees(math.atan2(p2[1] - cy, p2[0] - cx)))
     if abs(a1 - a2) < 1e-6:
         return None
-    # Rest-Bogen: von p2 nach p1 (ueber den langen Weg)
     return (cx, cy, r, a2, a1)
 
 
 def teile_bogen_durch_winkel(start, ende, winkel_liste):
-    """Zerlegt einen Bogen (start..ende, CCW) anhand einer Liste von Winkeln
-    in zusammenhaengende Teilstuecke. Die Liste der Winkel wird sortiert,
-    Duplikate und Winkel ausserhalb des Bogens werden ignoriert.
-
-    Rueckgabe: Liste von (start, ende)-Paaren, die zusammen den Bogen ergeben.
-    """
     sw = bogen_sweep(start, ende)
     if not winkel_liste:
         return [(start, ende)]
@@ -649,9 +569,14 @@ BEFEHLE = {
     "RECHTECK": "tool:rechteck", "REC": "tool:rechteck", "RECTANG": "tool:rechteck",
     "TEXT": "tool:text", "T": "tool:text",
     "BEMASSUNG": "tool:bemassung", "BEM": "tool:bemassung", "DIM": "tool:bemassung",
-    # --- NEU: Stutzen (TRIM) und Brechen (BREAK) ---
     "STUTZEN": "tool:stutzen", "TRIM": "tool:stutzen", "TR": "tool:stutzen",
     "BRECHEN": "tool:brechen", "BREAK": "tool:brechen", "BR": "tool:brechen",
+    # --- NEU: Blockbefehle ---
+    "BLOCK": "block:neu", "B": "block:neu", "BLOCKNEU": "block:neu",
+    "INSERT": "block:einfuegen", "EINFUEGENBLOCK": "block:einfuegen",
+    "I": "block:einfuegen", "BLOCKEINFUEGEN": "block:einfuegen",
+    "BLOCKLISTE": "block:liste", "BL": "block:liste",
+    "BLOCKVERWALTEN": "block:liste",
 }
 
 
@@ -1024,33 +949,23 @@ class Text(Element):
         return w, h
 
     def _versatz_lokal(self, w, h):
-        """Versatz vom Einfügepunkt zur linken unteren Ecke des Textblocks
-        im lokalen (ungedrehten) Koordinatensystem.
-        Rückgabe: (dx, dy) in Modell-mm, wobei dy in Modell-Y-Richtung
-        (nach oben) positiv ist."""
-        # einfuegepunkt ist z.B. "mitte_zentriert" -> vertikal="mitte", horizontal="zentriert"
         vertikal, horizontal = self.einfuegepunkt.split("_")
-        
         if horizontal == "links":
             dx = 0.0
         elif horizontal == "zentriert":
             dx = -w / 2.0
-        else:  # rechts
+        else:
             dx = -w
-            
         unterlaenge = 0.3 * self.hoehe
         if vertikal == "unten":
             dy = unterlaenge
         elif vertikal == "mitte":
             dy = -(h - unterlaenge) / 2.0
-        else:  # oben
+        else:
             dy = -(h - 0.3 * self.hoehe)
         return dx, dy
 
     def ecken_welt(self):
-        """Vier Eckpunkte des (ggf. gedrehten) Textblocks in Modellkoordinaten.
-        Reihenfolge: links-unten, rechts-unten, rechts-oben, links-oben
-        (relativ zur Textleserichtung)."""
         w, h = self.masse()
         dx, dy = self._versatz_lokal(w, h)
         a = math.radians(self.winkel)
@@ -1087,8 +1002,6 @@ class Text(Element):
         self.x += dx; self.y += dy
 
     def griffe(self):
-        """Der Griff MUSS exakt auf dem Einfügepunkt sitzen, den der Nutzer
-        gewählt hat (z.B. Mitte zentriert, Oben rechts, ...)."""
         return [("p", self.x, self.y)]
 
     def griff_bewegen(self, griff_id, x, y):
@@ -1362,20 +1275,259 @@ class Viewport(Element):
 
 
 # ============================================================
+# NEU: Block-Unterstuetzung
+# ============================================================
+class BlockDefinition:
+    """Benannte Vorlage eines Blocks.
+
+    Die Elemente werden in *lokalen* Koordinaten gespeichert, d.h.
+    bereits relativ zum Basispunkt (Basispunkt = (0, 0) im lokalen System).
+    Das erleichtert das spaetere Transformieren beim Einfuegen enorm.
+    """
+
+    def __init__(self, name, basispunkt, elemente):
+        self.name = name
+        self.basispunkt = tuple(basispunkt)
+        self.elemente = list(elemente)
+
+    def to_dict(self):
+        return {
+            "name": self.name,
+            "basispunkt": list(self.basispunkt),
+            "elemente": [e.to_dict() for e in self.elemente],
+        }
+
+    @classmethod
+    def from_dict(cls, d, element_factory):
+        els = []
+        for ed in d.get("elemente", []):
+            el = element_factory(ed)
+            if el is not None:
+                els.append(el)
+        return cls(d.get("name", "Block"),
+                   tuple(d.get("basispunkt", (0.0, 0.0))),
+                   els)
+
+
+class BlockReferenz(Element):
+    """Ein eingefuegter Block.
+
+    Haelt eine *tiefe Kopie* der Definitionselemente (relativ zum
+    Basispunkt). So bleibt die Zeichnung autark und Aenderungen an der
+    Definition wirken sich nicht rueckwirkend auf platzierte Instanzen aus
+    (bewusst einfach gehalten - echtes AutoCAD verhaelt sich anders, aber
+    fuer unsere Zwecke ist diese Semantik klarer und robuster).
+    """
+
+    def __init__(self, x, y, block_name, elemente,
+                 skalierung=1.0, winkel=0.0, **kw):
+        super().__init__("block", **kw)
+        self.x, self.y = x, y
+        self.block_name = block_name
+        # tiefe Kopie, damit die Referenz wirklich eigenstaendig ist
+        self.elemente = [deepcopy(e) for e in elemente]
+        self.skalierung = float(skalierung) if skalierung else 1.0
+        self.winkel = float(winkel) if winkel else 0.0
+
+    # ---- Transformation ----------------------------------------
+    def _welt_pts(self, lx, ly):
+        """Lokale Koordinaten (relativ zum Basispunkt) -> Weltkoordinaten.
+        Beruecksichtigt Skalierung, Drehung (mit Y-Spiegelung wie
+        punkte_drehen) und Translation zum Einfuegepunkt."""
+        s = self.skalierung
+        a = math.radians(self.winkel)
+        ca, sa = math.cos(a), math.sin(a)
+        px, py = lx * s, ly * s
+        return (self.x + px * ca + py * sa,
+                self.y - px * sa + py * ca)
+
+    def _transformiere(self, el):
+        """Transformiert ein Kind-Element *in place* vom lokalen ins
+        Weltkoordinatensystem."""
+        if isinstance(el, Linie):
+            el.x1, el.y1 = self._welt_pts(el.x1, el.y1)
+            el.x2, el.y2 = self._welt_pts(el.x2, el.y2)
+        elif isinstance(el, Kreis):
+            el.cx, el.cy = self._welt_pts(el.cx, el.cy)
+            el.r *= self.skalierung
+        elif isinstance(el, Bogen):
+            el.cx, el.cy = self._welt_pts(el.cx, el.cy)
+            el.r *= self.skalierung
+            el.start = (el.start + self.winkel) % 360.0
+            el.ende = (el.ende + self.winkel) % 360.0
+        elif isinstance(el, Rechteck):
+            # Gedrehtes Rechteck -> Polylinie (achsenparalleles Rechteck
+            # kann nach Drehung nicht mehr als Rechteck dargestellt werden)
+            p1 = self._welt_pts(el.x1, el.y1)
+            p2 = self._welt_pts(el.x2, el.y1)
+            p3 = self._welt_pts(el.x2, el.y2)
+            p4 = self._welt_pts(el.x1, el.y2)
+            neu = Polylinie([p1, p2, p3, p4], geschlossen=True,
+                            layer=el.layer, farbe=el.farbe,
+                            linientyp=el.linientyp,
+                            eig_farbe=el.eig_farbe, staerke=el.staerke)
+            el.__class__ = Polylinie
+            el.__dict__.clear()
+            el.__dict__.update(neu.__dict__)
+        elif isinstance(el, Polylinie):
+            el.punkte = [self._welt_pts(x, y) for (x, y) in el.punkte]
+        elif isinstance(el, Text):
+            el.x, el.y = self._welt_pts(el.x, el.y)
+            el.hoehe *= self.skalierung
+            el.winkel = (el.winkel + self.winkel) % 360.0
+        elif isinstance(el, Bemassung):
+            el.x1, el.y1 = self._welt_pts(el.x1, el.y1)
+            el.x2, el.y2 = self._welt_pts(el.x2, el.y2)
+            el.mx, el.my = self._welt_pts(el.mx, el.my)
+            if el.tx is not None and el.ty is not None:
+                el.tx, el.ty = self._welt_pts(el.tx, el.ty)
+            el.hoehe *= self.skalierung
+            el.pfeil *= self.skalierung
+            # Richtung "horizontal"/"vertikal" wird nach Drehung zu
+            # "ausgerichtet", sonst wuerde sie falsch aussehen.
+            if self.winkel % 360.0 not in (0.0, 180.0):
+                if el.richtung in ("horizontal", "vertikal"):
+                    el.richtung = "ausgerichtet"
+
+    def aufgeloest(self):
+        """Liefert die transformierten Kind-Elemente als flache Liste."""
+        out = []
+        for el in self.elemente:
+            k = deepcopy(el)
+            self._transformiere(k)
+            out.append(k)
+        return out
+
+    # ---- Element-API -------------------------------------------
+    def bbox(self):
+        xs, ys = [], []
+        for el in self.elemente:
+            b = el.bbox()
+            for (lx, ly) in ((b[0], b[1]), (b[2], b[1]),
+                             (b[2], b[3]), (b[0], b[3])):
+                wx, wy = self._welt_pts(lx, ly)
+                xs.append(wx); ys.append(wy)
+        if not xs:
+            return (self.x, self.y, self.x, self.y)
+        return (min(xs), min(ys), max(xs), max(ys))
+
+    def verschieben(self, dx, dy):
+        self.x += dx; self.y += dy
+
+    def drehen(self, cx, cy, winkel_deg):
+        self.x, self.y = punkte_drehen(self.x, self.y, cx, cy, winkel_deg)
+        self.winkel = (self.winkel + winkel_deg) % 360.0
+
+    def griffe(self):
+        return [("p", self.x, self.y)]
+
+    def griff_bewegen(self, griff_id, x, y):
+        self.x, self.y = x, y
+
+    def to_dict(self):
+        d = super().to_dict()
+        # Kinder als dicts ablegen (nicht die Objekte selbst)
+        d["elemente"] = [e.to_dict() for e in self.elemente]
+        return d
+
+
+# ============================================================
+# NEU: Globale Blockbibliothek (blocks.json)
+# ============================================================
+class BlockBibliothek:
+    """Zeichnungsuebergreifende Blockbibliothek.
+
+    Speichert Blockdefinitionen in einer benutzerspezifischen JSON-Datei
+    (analog zu katiecad_config.py). Beim Start werden bestehende Bloecke
+    geladen; bei Aenderungen wird die Datei sofort aktualisiert.
+    """
+
+    DATEI = "blocks.json"
+
+    def __init__(self, element_factory):
+        self._element_factory = element_factory
+        self._definitionen = {}
+        self._laden()
+
+    # ---- Pfad (plattformgerecht, gleiche Logik wie katiecad_config) ----
+    @staticmethod
+    def _verzeichnis():
+        import os, sys
+        if sys.platform.startswith("win"):
+            basis = os.environ.get("APPDATA") or os.path.expanduser("~")
+            return os.path.join(basis, "KatieCAD")
+        if sys.platform == "darwin":
+            return os.path.expanduser("~/Library/Application Support/KatieCAD")
+        basis = os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config")
+        return os.path.join(basis, "KatieCAD")
+
+    @classmethod
+    def pfad(cls):
+        import os
+        return os.path.join(cls._verzeichnis(), cls.DATEI)
+
+    # ---- I/O ---------------------------------------------------
+    def _laden(self):
+        import json, os
+        pfad = self.pfad()
+        try:
+            with open(pfad, "r", encoding="utf-8") as f:
+                daten = json.load(f)
+        except (OSError, ValueError):
+            return
+        if not isinstance(daten, list):
+            return
+        for dd in daten:
+            try:
+                d = BlockDefinition.from_dict(dd, self._element_factory)
+                self._definitionen[d.name] = d
+            except Exception as e:
+                print(f"[KatieCAD] Block konnte nicht geladen werden: {e}")
+
+    def _speichern(self):
+        import json, os
+        pfad = self.pfad()
+        try:
+            os.makedirs(os.path.dirname(pfad), exist_ok=True)
+            daten = [d.to_dict() for d in self._definitionen.values()]
+            tmp = pfad + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(daten, f, indent=2, ensure_ascii=False)
+            os.replace(tmp, pfad)
+        except OSError as e:
+            print(f"[KatieCAD] Blockbibliothek konnte nicht gespeichert werden: {e}")
+
+    # ---- API ---------------------------------------------------
+    def namen(self):
+        return sorted(self._definitionen.keys())
+
+    def __contains__(self, name):
+        return name in self._definitionen
+
+    def __len__(self):
+        return len(self._definitionen)
+
+    def get(self, name):
+        return self._definitionen.get(name)
+
+    def setze(self, definition, persistieren=True):
+        self._definitionen[definition.name] = definition
+        if persistieren:
+            self._speichern()
+
+    def loesche(self, name):
+        if name in self._definitionen:
+            del self._definitionen[name]
+            self._speichern()
+            return True
+        return False
+
+
+# ============================================================
 # Layout (ein Zeichnungsblatt mit eigenem Format, Hintergrund
 # und eigenen Layout-Elementen — analog zu AutoCAD-Layouts)
 # ============================================================
 class Layout:
-    """Ein einzelnes Zeichnungsblatt.
-
-    Kapselt:
-      - name         Anzeigename (z.B. "A0 gross", "A2 Detail")
-      - format       Key aus ZEICHNUNGSFORMATE (z.B. "A3 (420x297)")
-      - bg           Hintergrundfarbe des Blatts
-      - elemente     Layout-Elemente (Rahmen, Schriftfeld, Viewports, ...)
-      - view         Ansichts-Zustand (zoom, ox, oy) fuer dieses Blatt
-    """
-
     STANDARD_FORMAT = "A3 (420x297)"
     STANDARD_BG = "#1c132d"
 
@@ -1398,9 +1550,6 @@ class Layout:
 
     @classmethod
     def from_dict(cls, d, element_factory):
-        """Baut ein Layout aus einem dict. element_factory(d) muss ein
-        Element (oder None) zurueckliefern und wird fuer jedes Element
-        in d['elemente'] aufgerufen."""
         lay = cls(
             name=d.get("name", "Layout1"),
             format=d.get("format", cls.STANDARD_FORMAT),
