@@ -4271,38 +4271,68 @@ class CadApp:
 
     def _dwg_zu_element(self, e):
         try:
-            typ = e.dxftype()
-            layer = e.dxf.get("layer", "0")
+            typ = e.dxftype()  # Manchmal ist dxftype eine Methode, manchmal ein Attribut
+            if callable(typ):
+                typ = typ()
+            
+            # Layer sicher auslesen
+            layer = "0"
+            if hasattr(e, "dxf"):
+                if isinstance(e.dxf, dict):
+                    layer = e.dxf.get("layer", "0")
+                else:
+                    layer = getattr(e.dxf, "layer", "0")
+            
             if layer not in self.layers:
                 self.layers[layer] = Layer(layer, FARBEN["cyan"], 0.35)
                 self.layer_cb.config(values=list(self.layers.keys()))
+
             if typ == "LINE":
-                s = e.dxf.start; en = e.dxf.end
-                self.elemente.append(Linie(s.x, s.y, en.x, en.y, layer=layer,
-                                           farbe=FARBEN["cyan"],
-                                           linientyp="Volllinie (schmal)"))
-                return True
-            if typ == "CIRCLE":
-                c = e.dxf.center; r = e.dxf.radius
-                self.elemente.append(Kreis(c.x, c.y, r, layer=layer,
-                                           farbe=FARBEN["cyan"],
-                                           linientyp="Volllinie (schmal)"))
-                return True
-            if typ == "ARC":
-                c = e.dxf.center; r = e.dxf.radius
-                s = e.dxf.start_angle; en = e.dxf.end_angle
-                self.elemente.append(Bogen(c.x, c.y, r, s, en, layer=layer,
-                                           farbe=FARBEN["cyan"],
-                                           linientyp="Volllinie (schmal)"))
-                return True
-            if typ == "LWPOLYLINE":
-                pts = [(p[0], p[1]) for p in e.get_points()]
-                self.elemente.append(Polylinie(pts, geschlossen=bool(e.closed),
-                                               layer=layer, farbe=FARBEN["cyan"],
+                # Sicherer Zugriff auf die Punkte
+                if hasattr(e.dxf, "start") and hasattr(e.dxf, "end"):
+                    s = e.dxf.start
+                    en = e.dxf.end
+                    # Manchmal sind die Koordinaten Vec3-Objekte, manchmal Tupel
+                    self.elemente.append(Linie(s.x, s.y, en.x, en.y, layer=layer,
+                                               farbe=FARBEN["cyan"],
                                                linientyp="Volllinie (schmal)"))
-                return True
+                    return True
+            elif typ == "CIRCLE":
+                if hasattr(e.dxf, "center") and hasattr(e.dxf, "radius"):
+                    c = e.dxf.center
+                    r = e.dxf.radius
+                    self.elemente.append(Kreis(c.x, c.y, r, layer=layer,
+                                               farbe=FARBEN["cyan"],
+                                               linientyp="Volllinie (schmal)"))
+                    return True
+            elif typ == "ARC":
+                if hasattr(e.dxf, "center") and hasattr(e.dxf, "radius"):
+                    c = e.dxf.center
+                    r = e.dxf.radius
+                    s = e.dxf.start_angle
+                    en = e.dxf.end_angle
+                    self.elemente.append(Bogen(c.x, c.y, r, s, en, layer=layer,
+                                               farbe=FARBEN["cyan"],
+                                               linientyp="Volllinie (schmal)"))
+                    return True
+            elif typ == "LWPOLYLINE":
+                # Bei ezdwg kann get_points() eine Methode sein, die aufgerufen werden muss
+                if hasattr(e, "get_points"):
+                    pts_raw = e.get_points()  # <-- Hier war oft der Fehler (fehlende Klammern)
+                    pts = [(p[0], p[1]) for p in pts_raw]
+                    geschlossen = False
+                    if hasattr(e, "closed"):
+                        geschlossen = bool(e.closed)
+                    elif hasattr(e.dxf, "flags"):
+                        geschlossen = bool(e.dxf.flags & 1) # Bit 1 = closed
+                    
+                    self.elemente.append(Polylinie(pts, geschlossen=geschlossen,
+                                                   layer=layer, farbe=FARBEN["cyan"],
+                                                   linientyp="Volllinie (schmal)"))
+                    return True
+                    
         except Exception as ex:
-            print(f"DWG-Element nicht importiert: {ex}")
+            print(f"DWG-Element Fehler ({type(ex).__name__}): {ex}")
         return False
 
     def _update_eingabe_hinweis(self):
