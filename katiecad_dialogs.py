@@ -3,6 +3,8 @@
 katiecad_dialogs.py - Alle Dialog-Klassen und das Lizenz-Fenster.
 Wird von CadApp genutzt; kennt CadApp, aber CadApp importiert dieses
 Modul nur fuer die Dialog-Klassen.
+
+NEU (Schritt 3): _BlockNameDialog, _BlockAuswahlDialog
 """
 
 import tkinter as tk
@@ -856,3 +858,219 @@ class DruckDialog(tk.Toplevel):
         self.result = (aktion, self.quelle.get(),
                        bool(self.farbig.get()), bool(self.rahmen.get()), idx)
         self.destroy()
+
+
+# ============================================================
+# NEU (Schritt 3): Block-Dialoge
+# ============================================================
+class _BlockNameDialog(tk.Toplevel):
+    """Fragt nach dem Namen fuer einen neu zu erzeugenden Block.
+
+    Attribute:
+        result: der eingegebene Name (oder None bei Abbruch)
+
+    Parameter:
+        parent          Elternfenster
+        bibliothek      BlockBibliothek (fuer Existenz-Pruefung)
+        startname       Vorschlag (z.B. "Block1")
+    """
+
+    def __init__(self, parent, bibliothek, startname="Block1"):
+        super().__init__(parent)
+        self.bibliothek = bibliothek
+        self.result = None
+        self.title(tr("dlg.block.name.titel"))
+        self.geometry("420x190")
+        self.transient(parent)
+        self.grab_set()
+        self.configure(bg=FARBEN["bg_mittel"])
+
+        f = ttk.Frame(self, padding=14)
+        f.pack(fill=tk.BOTH, expand=True)
+
+        ttk.Label(f, text=tr("dlg.block.name")).pack(anchor=tk.W)
+        self.name_var = tk.StringVar(value=startname)
+        self.entry = ttk.Entry(f, textvariable=self.name_var, width=36)
+        self.entry.pack(fill=tk.X, pady=(4, 8))
+        self.entry.focus_set()
+        self.entry.select_range(0, tk.END)
+
+        self.hinweis = ttk.Label(f, text="", style="Hint.TLabel",
+                                 wraplength=380, justify=tk.LEFT)
+        self.hinweis.pack(anchor=tk.W, pady=(0, 6))
+
+        bf = ttk.Frame(f)
+        bf.pack(pady=(6, 0))
+        self.btn_ok = ttk.Button(bf, text=tr("dlg.ok"), command=self._ok)
+        self.btn_ok.pack(side=tk.LEFT, padx=4)
+        ttk.Button(bf, text=tr("dlg.abbrechen"),
+                   command=self.destroy).pack(side=tk.LEFT, padx=4)
+
+        self.name_var.trace_add("write", lambda *_: self._pruefen())
+        self._pruefen()
+
+        self.bind("<Return>", lambda e: self._ok())
+        self.bind("<Escape>", lambda e: self.destroy())
+
+        self.update_idletasks()
+        mx = parent.winfo_rootx() + parent.winfo_width() // 2
+        my = parent.winfo_rooty() + parent.winfo_height() // 2
+        w = self.winfo_width()
+        h = self.winfo_height()
+        self.geometry(f"+{mx - w // 2}+{my - h // 2}")
+        self.wait_window(self)
+
+    def _pruefen(self):
+        name = self.name_var.get().strip()
+        if not name:
+            self.hinweis.config(
+                text=tr("dlg.block.name_leer"),
+                foreground=FARBEN["rot"])
+            self.btn_ok.state(["disabled"])
+            return
+        if name in self.bibliothek:
+            self.hinweis.config(
+                text=tr("dlg.block.name_existiert", name=name),
+                foreground=FARBEN["rot"])
+            self.btn_ok.state(["disabled"])
+            return
+        self.hinweis.config(
+            text=tr("dlg.block.name_ok", name=name),
+            foreground=FARBEN["gruen"])
+        self.btn_ok.state(["!disabled"])
+
+    def _ok(self):
+        name = self.name_var.get().strip()
+        if not name or name in self.bibliothek:
+            return
+        self.result = name
+        self.destroy()
+
+
+class _BlockAuswahlDialog(tk.Toplevel):
+    """Auswahl eines Blocks aus der Bibliothek zum Einfuegen.
+
+    Attribute:
+        result: der gewaehlte Blockname (oder None bei Abbruch)
+        geloescht: Liste der Namen, die der Nutzer ueber den
+                   Loeschen-Button entfernt hat (CadApp persistiert das).
+    """
+
+    def __init__(self, parent, bibliothek):
+        super().__init__(parent)
+        self.bibliothek = bibliothek
+        self.result = None
+        self.geloescht = []
+        self.title(tr("dlg.block.auswahl.titel"))
+        self.geometry("520x460")
+        self.transient(parent)
+        self.grab_set()
+        self.configure(bg=FARBEN["bg_mittel"])
+
+        f = ttk.Frame(self, padding=12)
+        f.pack(fill=tk.BOTH, expand=True)
+
+        kopf = ttk.Frame(f)
+        kopf.pack(fill=tk.X)
+        ttk.Label(kopf, text=tr("dlg.block.auswahl.kopf"),
+                  style="Title.TLabel").pack(side=tk.LEFT)
+        self._anzahl_lbl = ttk.Label(kopf, text="", style="Hint.TLabel")
+        self._anzahl_lbl.pack(side=tk.RIGHT)
+
+        ttk.Separator(f, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=(6, 8))
+
+        listen_frame = ttk.Frame(f)
+        listen_frame.pack(fill=tk.BOTH, expand=True)
+
+        spalten = ("name", "anzahl")
+        self.tree = ttk.Treeview(listen_frame, columns=spalten,
+                                 show="headings", height=12,
+                                 selectmode="browse")
+        self.tree.heading("name", text=tr("dlg.block.auswahl.name"))
+        self.tree.heading("anzahl", text=tr("dlg.block.auswahl.anzahl"))
+        self.tree.column("name", width=360, anchor=tk.W)
+        self.tree.column("anzahl", width=90, anchor=tk.CENTER)
+        self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.tree.bind("<<TreeviewSelect>>", lambda e: self._update_buttons())
+        self.tree.bind("<Double-Button-1>", lambda e: self._einfuegen())
+
+        sb = ttk.Scrollbar(listen_frame, orient=tk.VERTICAL,
+                           command=self.tree.yview)
+        sb.pack(side=tk.RIGHT, fill=tk.Y)
+        self.tree.configure(yscrollcommand=sb.set)
+
+        info = ttk.Label(f, text=tr("dlg.block.auswahl.hinweis"),
+                         style="Hint.TLabel", wraplength=480, justify=tk.LEFT)
+        info.pack(anchor=tk.W, pady=(8, 4))
+
+        bf = ttk.Frame(f)
+        bf.pack(fill=tk.X, pady=(6, 0))
+        self.btn_einfuegen = ttk.Button(bf, text=tr("dlg.block.auswahl.einfuegen"),
+                                        command=self._einfuegen)
+        self.btn_einfuegen.pack(side=tk.LEFT, padx=4)
+        self.btn_loeschen = ttk.Button(bf, text=tr("dlg.block.auswahl.loeschen"),
+                                       command=self._loeschen)
+        self.btn_loeschen.pack(side=tk.LEFT, padx=4)
+        ttk.Button(bf, text=tr("dlg.abbrechen"),
+                   command=self.destroy).pack(side=tk.RIGHT, padx=4)
+
+        self._aktualisiere()
+        self._update_buttons()
+
+        self.bind("<Return>", lambda e: self._einfuegen())
+        self.bind("<Escape>", lambda e: self.destroy())
+
+        self.update_idletasks()
+        mx = parent.winfo_rootx() + parent.winfo_width() // 2
+        my = parent.winfo_rooty() + parent.winfo_height() // 2
+        w = self.winfo_width()
+        h = self.winfo_height()
+        self.geometry(f"+{mx - w // 2}+{my - h // 2}")
+        self.wait_window(self)
+
+    def _aktualisiere(self):
+        for item in self.tree.get_children():
+            self.tree.delete(item)
+        namen = self.bibliothek.namen()
+        for name in namen:
+            d = self.bibliothek.get(name)
+            if d is None:
+                continue
+            self.tree.insert("", "end", iid=name,
+                             values=(name, len(d.elemente)))
+        if namen:
+            self.tree.selection_set(namen[0])
+            self.tree.focus(namen[0])
+        self._anzahl_lbl.config(text=tr("dlg.block.auswahl.anzahl_bloecke",
+                                        n=len(namen)))
+
+    def _selektiert(self):
+        sel = self.tree.selection()
+        return sel[0] if sel else None
+
+    def _update_buttons(self):
+        hat = bool(self._selektiert())
+        state = ["!disabled"] if hat else ["disabled"]
+        self.btn_einfuegen.state(state)
+        self.btn_loeschen.state(state)
+
+    def _einfuegen(self):
+        name = self._selektiert()
+        if not name:
+            return
+        self.result = name
+        self.destroy()
+
+    def _loeschen(self):
+        name = self._selektiert()
+        if not name:
+            return
+        if not messagebox.askyesno(
+                tr("dlg.block.auswahl.loeschen"),
+                tr("dlg.block.auswahl.loeschen_frage", name=name),
+                parent=self):
+            return
+        if self.bibliothek.loesche(name):
+            self.geloescht.append(name)
+            self._aktualisiere()
+            self._update_buttons()
