@@ -45,6 +45,8 @@ from katiecad_core import (
     bem_zahl, parse_massstab, massstab_text, normmassstab_unter,
     lot_fuss, linien_schnitt, bbox_enthalten, bbox_ueberlappt,
     punkte_drehen,
+    trim_linie, trim_polylinie, trim_bogen, kreis_zu_bogen,
+    teile_bogen_durch_winkel,
 )
 from katiecad_dialogs import (
     MIT_LICENSE_TEXT, zeige_lizenz_fenster,
@@ -307,6 +309,14 @@ class CadApp:
 
         self._warte_auf_basispunkt = False
 
+        # --- NEU: Werkzeug-States fuer Stutzen und Brechen ---
+        self._trim_status = "none"       # "grenzen" | "ziele" | "none"
+        self._trim_grenzen = []          # Liste von Elementen
+        self._trim_anzahl = 0            # gezaehlte gestutzte Objekte
+        self._break_status = "none"      # "objekt" | "p1" | "p2" | "none"
+        self._break_el = None
+        self._break_p1 = None
+
         self.sprache_var = tk.StringVar(value=SPRACHE["aktuell"])
 
         self._info_logo = None
@@ -492,6 +502,8 @@ class CadApp:
             self._paste_abbrechen()
             self._bem_abbrechen()
             self._bogen_abbrechen()
+            self._trim_abbrechen()
+            self._break_abbrechen()
             self._layout_switcher_neu_aufbauen()
             self._viewport_modus_anzeige_aktualisieren()
             self._mark_dirty()
@@ -679,6 +691,19 @@ class CadApp:
         self._pts = []
         self._clear_temp()
 
+    # --- NEU: Stutzen und Brechen ---
+    def _trim_abbrechen(self):
+        self._trim_status = "none"
+        self._trim_grenzen = []
+        self._trim_anzahl = 0
+        self._clear_temp()
+
+    def _break_abbrechen(self):
+        self._break_status = "none"
+        self._break_el = None
+        self._break_p1 = None
+        self._clear_temp()
+
     # --------------------------------------------------------
     # UI-Aufbau
     # --------------------------------------------------------
@@ -797,6 +822,11 @@ class CadApp:
         m_einf.add_command(label=tr("menu.einfuegen.bemassung"),
                            command=lambda: self._werkzeug_aus_menue("bemassung"))
         m_einf.add_separator()
+        m_einf.add_command(label=tr("tb.wz.stutzen"),
+                           command=lambda: self._werkzeug_aus_menue("stutzen"))
+        m_einf.add_command(label=tr("tb.wz.brechen"),
+                           command=lambda: self._werkzeug_aus_menue("brechen"))
+        m_einf.add_separator()
         m_einf.add_command(label=tr("menu.einfuegen.viewport"),
                            command=self.viewport_modus_starten)
         m_einf.add_command(label=tr("menu.einfuegen.rahmen"),
@@ -871,7 +901,8 @@ class CadApp:
         tb = self.tb1
         ttk.Label(tb, text=tr("tb.werkzeug"), style="Title.TLabel").pack(side=tk.LEFT, padx=(0, 4))
         for key in ("auswahl", "linie", "polylinie", "kreis", "bogen",
-                    "rechteck", "text", "bemassung"):
+                    "rechteck", "text", "bemassung",
+                    "stutzen", "brechen"):
             ttk.Radiobutton(tb, text=tr(f"tb.wz.{key}"), value=key,
                             variable=self.aktives_werkzeug,
                             command=self._werkzeug_gewechselt
@@ -1399,8 +1430,7 @@ class CadApp:
                                           before=self.canvas)
         else:
             # pack_forget() ist idempotent und sicher, auch wenn die Leiste
-            # gerade nicht gemappt ist. So ist sie garantiert weg, egal wie
-            # die Pack-Reihenfolge beim Start aussieht.
+            # gerade nicht gemappt ist.
             self.viewport_leiste.pack_forget()
 
     def _viewport_modus_anzeige_aktualisieren(self):
@@ -1589,6 +1619,8 @@ class CadApp:
         self._paste_abbrechen()
         self._bem_abbrechen()
         self._bogen_abbrechen()
+        self._trim_abbrechen()
+        self._break_abbrechen()
         self._update_kontext_widgets()
         bg = self.bg_modell if not self._ist_layout() else self.bg_layout
         self.canvas.config(bg=bg)
@@ -1751,6 +1783,8 @@ class CadApp:
             self._griff_drag_id = None
         self._bem_abbrechen()
         self._bogen_abbrechen()
+        self._trim_abbrechen()
+        self._break_abbrechen()
         self._warte_auf_basispunkt = False
         self._clipboard_mit_basis = False
         if self._vp_aktion != "none":
@@ -1786,12 +1820,25 @@ class CadApp:
         self._cmd_pending = None
         self._vp_fenster = None
         self._viewport_modus = False
+        self._trim_abbrechen()
+        self._break_abbrechen()
         self._clear_temp()
         self._eingabe_zuruecksetzen()
         self._update_eingabe_hinweis()
         self._update_kontext_widgets()
         if self.aktives_werkzeug.get() != "auswahl":
             self.auswahl_leeren()
+        # Beim Wechsel auf Stutzen/Brechen sofort den passenden Status setzen
+        wz = self.aktives_werkzeug.get()
+        if wz == "stutzen":
+            self._trim_status = "grenzen"
+            self._trim_grenzen = []
+            self._trim_anzahl = 0
+        elif wz == "brechen":
+            self._break_status = "objekt"
+            self._break_el = None
+            self._break_p1 = None
+        self._update_eingabe_hinweis()
         de = SPRACHE["aktuell"] == "de"
         self.status.set(("Werkzeug: " if de else "Tool: ")
                         + self.aktives_werkzeug.get())
@@ -1994,6 +2041,19 @@ class CadApp:
             self._update_eingabe_hinweis()
             de = SPRACHE["aktuell"] == "de"
             self.status.set("Abgebrochen." if de else "Cancelled.")
+            return
+        # NEU: Stutzen - Rechtsklick bestaetigt die Grenzen
+        if self.aktives_werkzeug.get() == "stutzen":
+            if self._trim_status == "grenzen":
+                self._trim_grenzen_bestaetigen()
+            else:
+                self._trim_abbrechen()
+                self._werkzeug_gewechselt()
+            return
+        # NEU: Brechen - Rechtsklick bricht ab
+        if self.aktives_werkzeug.get() == "brechen":
+            self._break_abbrechen()
+            self._werkzeug_gewechselt()
             return
         if self._op is not None:
             self._op_rechtsklick()
@@ -2785,7 +2845,405 @@ class CadApp:
             self._bem_klick(pt)
         elif werkzeug == "text":
             self._text_einfuegen(x_mm, y_mm)
+        elif werkzeug == "stutzen":
+            self._trim_klick(pt)
+        elif werkzeug == "brechen":
+            self._break_klick(pt)
 
+    # --------------------------------------------------------
+    # NEU: Stutzen (TRIM)
+    # --------------------------------------------------------
+    def _trim_grenzen_bestaetigen(self):
+        """Enter/Rechtsklick im Trim-Modus: Grenzen bestaetigen und in den
+        Ziel-Modus wechseln."""
+        de = SPRACHE["aktuell"] == "de"
+        n = len(self._trim_grenzen)
+        if n == 0:
+            # Keine Grenzen gewaehlt -> alle sichtbaren Objekte als Grenzen
+            self._trim_grenzen = [el for el in self._aktuelle_elemente_liste()
+                                  if self._element_sichtbar(el)]
+            n = len(self._trim_grenzen)
+            if n == 0:
+                self.status.set(tr("msg.stutzen.keine_grenze"))
+                self._trim_abbrechen()
+                return
+        self._trim_status = "ziele"
+        self._trim_anzahl = 0
+        self.status.set(tr("msg.stutzen.grenzen_gewaehlt", n=n))
+        self._update_eingabe_hinweis()
+
+    def _element_sichtbar(self, el):
+        l = self.layers.get(el.layer)
+        return (l is None) or l.sichtbar
+
+    def _element_auf_punkt_snap(self, x_mm, y_mm, tol_mm):
+        """Findet das vorderste sichtbare Element, dessen Geometrie den Punkt
+        (x_mm, y_mm) innerhalb tol_mm beruehrt. Fuer Trim/Break."""
+        liste = self._aktuelle_elemente_liste()
+        for el in reversed(liste):
+            if not self._element_sichtbar(el):
+                continue
+            if isinstance(el, Viewport):
+                continue
+            if isinstance(el, (Text, Bemassung)):
+                # Text/Bemassung nehmen wir nicht als Trim-Ziel
+                continue
+            if self._punkt_auf_element(el, x_mm, y_mm, tol_mm):
+                return el
+        return None
+
+    def _schnitte_mit_grenzen(self, el, grenzen, tol_mm):
+        """Berechnet alle Schnittpunkte eines Elements mit den Grenzen.
+
+        Rueckgabe: Liste von (x, y)-Tupeln.
+        """
+        schnitte = []
+        if el in grenzen:
+            return schnitte
+        # Segmente des Ziels bestimmen (auch fuer Kreis/Bogen: naeherungsweise)
+        ziel_segs = self._el_segmente(el)
+        for g in grenzen:
+            if g is el or not self._element_sichtbar(g):
+                continue
+            if isinstance(g, Viewport):
+                continue
+            grenz_segs = self._el_segmente(g)
+            for (z_a, z_b) in ziel_segs:
+                for (g_a, g_b) in grenz_segs:
+                    sp = linien_schnitt(z_a[0], z_a[1], z_b[0], z_b[1],
+                                        g_a[0], g_a[1], g_b[0], g_b[1])
+                    if sp is not None:
+                        schnitte.append(sp)
+            # Kreis/Bogen als Ziel: Schnittpunkte der Grenz-Segmente
+            # mit dem Kreis berechnen (damit Radien-Trim funktioniert)
+            if isinstance(el, (Kreis, Bogen)):
+                for (g_a, g_b) in grenz_segs:
+                    for (x1, y1, x2, y2) in ((g_a[0], g_a[1], g_b[0], g_b[1]),):
+                        sps = self._segment_kreis_schnitt(
+                            x1, y1, x2, y2, el.cx, el.cy, el.r)
+                        for sp in sps:
+                            if isinstance(el, Bogen):
+                                w = math.degrees(math.atan2(sp[1] - el.cy,
+                                                            sp[0] - el.cx))
+                                if not winkel_im_bogen(w, el.start, el.ende):
+                                    continue
+                            schnitte.append(sp)
+        # Duplikate entfernen
+        eindeutig = []
+        for (px, py) in schnitte:
+            if not any(abs(px - qx) < 1e-6 and abs(py - qy) < 1e-6
+                       for (qx, qy) in eindeutig):
+                eindeutig.append((px, py))
+        return eindeutig
+
+    def _el_segmente(self, el):
+        """Liefert eine Liste von Segmenten (a, b) fuer ein Element, die
+        fuer den Schnitt-Test verwendet werden koennen. Bei Kreisen/Bogen
+        verwenden wir die Segmente der angenaeherten Polylinie."""
+        segs = []
+        if isinstance(el, Linie):
+            segs.append(((el.x1, el.y1), (el.x2, el.y2)))
+        elif isinstance(el, Rechteck):
+            pts = [(el.x1, el.y1), (el.x2, el.y1),
+                   (el.x2, el.y2), (el.x1, el.y2)]
+            for i in range(4):
+                segs.append((pts[i], pts[(i + 1) % 4]))
+        elif isinstance(el, Polylinie):
+            pts = list(el.punkte)
+            if el.geschlossen and len(pts) >= 3:
+                pts.append(pts[0])
+            for i in range(len(pts) - 1):
+                segs.append((pts[i], pts[i + 1]))
+        elif isinstance(el, (Kreis, Bogen)):
+            # Naeherung durch feine Polylinie
+            skala = max(1.0, self.view["zoom"] * self._ctx_skala() * 0.1)
+            sw = 360.0 if isinstance(el, Kreis) else bogen_sweep(el.start, el.ende)
+            n = max(24, int(sw / 5))  # alle 5 Grad
+            if isinstance(el, Kreis):
+                pts = bogen_punkte(el.cx, el.cy, el.r, 0, 360, n)
+            else:
+                pts = bogen_punkte(el.cx, el.cy, el.r, el.start, el.ende, n)
+            for i in range(len(pts) - 1):
+                segs.append((pts[i], pts[i + 1]))
+        return segs
+
+    def _segment_kreis_schnitt(self, x1, y1, x2, y2, cx, cy, r):
+        """Schnittpunkte eines Segments mit einem Kreis."""
+        dx, dy = x2 - x1, y2 - y1
+        fx, fy = x1 - cx, y1 - cy
+        a = dx * dx + dy * dy
+        if a < 1e-18:
+            return []
+        b = 2 * (fx * dx + fy * dy)
+        c = fx * fx + fy * fy - r * r
+        disk = b * b - 4 * a * c
+        if disk < 0:
+            return []
+        sq = math.sqrt(disk)
+        ergebnis = []
+        for t in ((-b - sq) / (2 * a), (-b + sq) / (2 * a)):
+            if -1e-9 <= t <= 1 + 1e-9:
+                ergebnis.append((x1 + t * dx, y1 + t * dy))
+        return ergebnis
+
+    def _trim_klick(self, pt):
+        de = SPRACHE["aktuell"] == "de"
+        if self._trim_status == "grenzen":
+            # Klick auf Objekt -> zur Grenze hinzufuegen
+            tol_mm = 8 / self._ctx_skala()
+            el = self._element_auf_punkt_snap(pt[0], pt[1], tol_mm)
+            if el is None:
+                self.status.set(tr("msg.stutzen.keine_grenze"))
+                return
+            if el in self._trim_grenzen:
+                self._trim_grenzen.remove(el)
+            else:
+                self._trim_grenzen.append(el)
+            self.status.set(tr("msg.stutzen.start"))
+            self.redraw()
+            return
+        if self._trim_status == "ziele":
+            tol_mm = 8 / self._ctx_skala()
+            ziel = self._element_auf_punkt_snap(pt[0], pt[1], tol_mm)
+            if ziel is None:
+                return
+            self._trim_anwenden(ziel, pt)
+            return
+
+    def _trim_anwenden(self, ziel, klick_pt):
+        """Stutzt das Ziel-Element an allen Grenzen."""
+        de = SPRACHE["aktuell"] == "de"
+        schnitte = self._schnitte_mit_grenzen(ziel, self._trim_grenzen,
+                                             1e-3)
+        if not schnitte:
+            return
+        liste = self._aktuelle_elemente_liste()
+        if ziel not in liste:
+            return
+        neue_el = []
+        if isinstance(ziel, Linie):
+            reste = trim_linie(ziel.x1, ziel.y1, ziel.x2, ziel.y2,
+                               schnitte, klick_pt)
+            if not reste:
+                neue_el = []
+            else:
+                for (x1, y1, x2, y2) in reste:
+                    nl = Linie(x1, y1, x2, y2, layer=ziel.layer,
+                               farbe=ziel.farbe, linientyp=ziel.linientyp,
+                               eig_farbe=ziel.eig_farbe, staerke=ziel.staerke)
+                    neue_el.append(nl)
+        elif isinstance(ziel, Rechteck):
+            pts = [(ziel.x1, ziel.y1), (ziel.x2, ziel.y1),
+                   (ziel.x2, ziel.y2), (ziel.x1, ziel.y2)]
+            teile = trim_polylinie(pts, True, schnitte, klick_pt)
+            for (teil_pts, geschlossen) in teile:
+                if len(teil_pts) >= 2:
+                    neue_el.append(Polylinie(teil_pts, geschlossen=geschlossen,
+                                              layer=ziel.layer,
+                                              farbe=ziel.farbe,
+                                              linientyp=ziel.linientyp,
+                                              eig_farbe=ziel.eig_farbe,
+                                              staerke=ziel.staerke))
+        elif isinstance(ziel, Polylinie):
+            teile = trim_polylinie(list(ziel.punkte), ziel.geschlossen,
+                                   schnitte, klick_pt)
+            for (teil_pts, geschlossen) in teile:
+                if len(teil_pts) >= 2:
+                    neue_el.append(Polylinie(teil_pts, geschlossen=geschlossen,
+                                              layer=ziel.layer,
+                                              farbe=ziel.farbe,
+                                              linientyp=ziel.linientyp,
+                                              eig_farbe=ziel.eig_farbe,
+                                              staerke=ziel.staerke))
+        elif isinstance(ziel, Bogen):
+            reste = trim_bogen(ziel.cx, ziel.cy, ziel.r, ziel.start, ziel.ende,
+                               schnitte, klick_pt)
+            for (s, e) in reste:
+                if bogen_sweep(s, e) > 1e-6:
+                    neue_el.append(Bogen(ziel.cx, ziel.cy, ziel.r, s, e,
+                                         layer=ziel.layer, farbe=ziel.farbe,
+                                         linientyp=ziel.linientyp,
+                                         eig_farbe=ziel.eig_farbe,
+                                         staerke=ziel.staerke))
+        elif isinstance(ziel, Kreis):
+            # Kreis wird zu einem oder mehreren Boegen
+            # Wir schneiden an jedem Schnittpunkt-Winkel
+            winkel = sorted(set(
+                norm360(math.degrees(math.atan2(p[1] - ziel.cy, p[0] - ziel.cx)))
+                for p in schnitte))
+            if len(winkel) < 2:
+                return
+            # Klickwinkel bestimmen
+            kw = norm360(math.degrees(math.atan2(klick_pt[1] - ziel.cy,
+                                                 klick_pt[0] - ziel.cx)))
+            # Naechsten Winkel links und rechts vom Klickwinkel
+            sortiert = sorted(winkel)
+            links = None
+            rechts = None
+            for w in sortiert:
+                if w <= kw:
+                    links = w
+                if w > kw and rechts is None:
+                    rechts = w
+            if links is None:
+                links = sortiert[-1] - 360.0
+            if rechts is None:
+                rechts = sortiert[0] + 360.0
+            # Wir behalten alles ausser (links, rechts)
+            # -> zwei Boegen: von rechts bis links+360
+            starts = [rechts]
+            endes = [links + 360.0]
+            for i, w in enumerate(sortiert):
+                if links < w < rechts:
+                    continue
+            # Einfacher: Alle Schnittwinkel sortiert; der Klick liegt zwischen
+            # links und rechts; wir entfernen diesen Teil.
+            # Bogen 1: von rechts bis links+360 (ueber 0)
+            # Bogen 2: entfaellt, da wir nur den Klickteil entfernen.
+            s = norm360(rechts)
+            e = norm360(links)
+            if bogen_sweep(s, e) > 1e-6:
+                neue_el.append(Bogen(ziel.cx, ziel.cy, ziel.r, s, e,
+                                     layer=ziel.layer, farbe=ziel.farbe,
+                                     linientyp=ziel.linientyp,
+                                     eig_farbe=ziel.eig_farbe,
+                                     staerke=ziel.staerke))
+        else:
+            return
+        self._snapshot()
+        liste.remove(ziel)
+        for el in neue_el:
+            liste.append(el)
+        self._trim_anzahl += 1
+        self.redraw()
+        self.status.set(tr("msg.stutzen.fertig", n=self._trim_anzahl))
+
+    # --------------------------------------------------------
+    # NEU: Brechen (BREAK)
+    # --------------------------------------------------------
+    def _break_klick(self, pt):
+        de = SPRACHE["aktuell"] == "de"
+        if self._break_status == "objekt":
+            tol_mm = 8 / self._ctx_skala()
+            el = self._element_auf_punkt_snap(pt[0], pt[1], tol_mm)
+            if el is None:
+                return
+            self._break_el = el
+            self._break_status = "p1"
+            self._break_p1 = pt
+            self._break_status = "p2"
+            self.status.set(tr("msg.brechen.punkt2"))
+            self.redraw()
+            return
+        if self._break_status == "p1":
+            self._break_p1 = pt
+            self._break_status = "p2"
+            self.status.set(tr("msg.brechen.punkt2"))
+            return
+        if self._break_status == "p2":
+            self._break_anwenden(self._break_el, self._break_p1, pt)
+            return
+
+    def _break_anwenden(self, ziel, p1, p2):
+        de = SPRACHE["aktuell"] == "de"
+        liste = self._aktuelle_elemente_liste()
+        if ziel not in liste:
+            self._break_abbrechen()
+            return
+        neue_el = []
+        if isinstance(ziel, Linie):
+            # Brich das Stueck zwischen p1 und p2 heraus
+            dx, dy = ziel.x2 - ziel.x1, ziel.y2 - ziel.y1
+            L = math.hypot(dx, dy)
+            if L < 1e-9:
+                return
+            ux, uy = dx / L, dy / L
+            t1 = ((p1[0] - ziel.x1) * ux + (p1[1] - ziel.y1) * uy)
+            t2 = ((p2[0] - ziel.x1) * ux + (p2[1] - ziel.y1) * uy)
+            if t1 > t2:
+                t1, t2 = t2, t1
+            t1 = max(0.0, min(L, t1))
+            t2 = max(0.0, min(L, t2))
+            if t1 > 1e-9:
+                neue_el.append(Linie(ziel.x1, ziel.y1,
+                                     ziel.x1 + ux * t1, ziel.y1 + uy * t1,
+                                     layer=ziel.layer, farbe=ziel.farbe,
+                                     linientyp=ziel.linientyp,
+                                     eig_farbe=ziel.eig_farbe,
+                                     staerke=ziel.staerke))
+            if t2 < L - 1e-9:
+                neue_el.append(Linie(ziel.x1 + ux * t2, ziel.y1 + uy * t2,
+                                     ziel.x2, ziel.y2,
+                                     layer=ziel.layer, farbe=ziel.farbe,
+                                     linientyp=ziel.linientyp,
+                                     eig_farbe=ziel.eig_farbe,
+                                     staerke=ziel.staerke))
+        elif isinstance(ziel, Rechteck):
+            pts = [(ziel.x1, ziel.y1), (ziel.x2, ziel.y1),
+                   (ziel.x2, ziel.y2), (ziel.x1, ziel.y2)]
+            mitte = ((p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2)
+            schnitte = [p1, p2]
+            teile = trim_polylinie(pts, True, schnitte, mitte)
+            for (teil_pts, geschlossen) in teile:
+                if len(teil_pts) >= 2:
+                    neue_el.append(Polylinie(teil_pts, geschlossen=geschlossen,
+                                              layer=ziel.layer,
+                                              farbe=ziel.farbe,
+                                              linientyp=ziel.linientyp,
+                                              eig_farbe=ziel.eig_farbe,
+                                              staerke=ziel.staerke))
+        elif isinstance(ziel, Polylinie):
+            mitte = ((p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2)
+            schnitte = [p1, p2]
+            teile = trim_polylinie(list(ziel.punkte), ziel.geschlossen,
+                                   schnitte, mitte)
+            for (teil_pts, geschlossen) in teile:
+                if len(teil_pts) >= 2:
+                    neue_el.append(Polylinie(teil_pts, geschlossen=geschlossen,
+                                              layer=ziel.layer,
+                                              farbe=ziel.farbe,
+                                              linientyp=ziel.linientyp,
+                                              eig_farbe=ziel.eig_farbe,
+                                              staerke=ziel.staerke))
+        elif isinstance(ziel, Bogen):
+            mitte_w = None
+            # Winkel von p1 und p2
+            w1 = norm360(math.degrees(math.atan2(p1[1] - ziel.cy, p1[0] - ziel.cx)))
+            w2 = norm360(math.degrees(math.atan2(p2[1] - ziel.cy, p2[0] - ziel.cx)))
+            reste = trim_bogen(ziel.cx, ziel.cy, ziel.r, ziel.start, ziel.ende,
+                               [p1, p2], ((p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2))
+            for (s, e) in reste:
+                if bogen_sweep(s, e) > 1e-6:
+                    neue_el.append(Bogen(ziel.cx, ziel.cy, ziel.r, s, e,
+                                         layer=ziel.layer, farbe=ziel.farbe,
+                                         linientyp=ziel.linientyp,
+                                         eig_farbe=ziel.eig_farbe,
+                                         staerke=ziel.staerke))
+        elif isinstance(ziel, Kreis):
+            # Kreis -> Bogen: das Stueck zwischen p1 und p2 wird entfernt
+            erg = kreis_zu_bogen(ziel.cx, ziel.cy, ziel.r, p1, p2)
+            if erg is None:
+                return
+            cx, cy, r, s, e = erg
+            if bogen_sweep(s, e) > 1e-6:
+                neue_el.append(Bogen(cx, cy, r, s, e,
+                                     layer=ziel.layer, farbe=ziel.farbe,
+                                     linientyp=ziel.linientyp,
+                                     eig_farbe=ziel.eig_farbe,
+                                     staerke=ziel.staerke))
+        else:
+            return
+        self._snapshot()
+        liste.remove(ziel)
+        for el in neue_el:
+            liste.append(el)
+        self._break_abbrechen()
+        self.aktives_werkzeug.set("auswahl")
+        self._werkzeug_gewechselt()
+        self.redraw()
+        self.status.set(tr("msg.brechen.fertig"))
+
+    # --------------------------------------------------------
     def _click_viewport_aufziehen(self, x_mm, y_mm):
         if self.letzter_punkt is None:
             self.letzter_punkt = (x_mm, y_mm)
@@ -3288,6 +3746,8 @@ class CadApp:
         self._paste_abbrechen()
         self._bem_abbrechen()
         self._bogen_abbrechen()
+        self._trim_abbrechen()
+        self._break_abbrechen()
         self._undo_stack = []
         self._layout_switcher_neu_aufbauen()
         self._update_kontext_widgets()
@@ -3414,6 +3874,8 @@ class CadApp:
         self._paste_abbrechen()
         self._bem_abbrechen()
         self._bogen_abbrechen()
+        self._trim_abbrechen()
+        self._break_abbrechen()
         bg = self.bg_modell if not self._ist_layout() else self.bg_layout
         self.canvas.config(bg=bg)
         self.bg_btn.config(bg=bg)
@@ -3764,6 +4226,18 @@ class CadApp:
         elif w == "text":
             h(text=("Einfügepunkt klicken, dann Text eingeben" if de
                     else "Click insertion point, then enter text"))
+        elif w == "stutzen":
+            if self._trim_status == "grenzen":
+                h(text=tr("msg.stutzen.start"))
+            else:
+                h(text=tr("msg.stutzen.ziel"))
+        elif w == "brechen":
+            if self._break_status == "objekt":
+                h(text=tr("msg.brechen.objekt"))
+            elif self._break_status == "p1":
+                h(text=tr("msg.brechen.punkt1"))
+            else:
+                h(text=tr("msg.brechen.punkt2"))
         else:
             h(text="")
 
@@ -3801,6 +4275,11 @@ class CadApp:
             if cmd:
                 self.eingabe_var.set("")
                 self._befehl(cmd, tok[1] if len(tok) > 1 else "")
+                return
+            # NEU: Stutzen - Enter bestaetigt die Grenzen
+            if w == "stutzen" and self._trim_status == "grenzen":
+                self._trim_grenzen_bestaetigen()
+                self.eingabe_var.set("")
                 return
             if self._op is not None and self._op["stufe"] in ("basis", "ziel"):
                 self._eingabe_op(text, einh)
@@ -4424,6 +4903,20 @@ class CadApp:
             elif len(self._pts) >= 2:
                 zeige(self._bem_element(self._pts[:2], pt),
                       {"farbe": FARBEN["gelb"], "w": 1, "dash": None})
+        # NEU: Stutzen-Vorschau (Ziel hervorheben, welches gestutzt wuerde)
+        elif w == "stutzen" and self._trim_status == "ziele":
+            tol_mm = 8 / self._ctx_skala()
+            ziel = self._element_auf_punkt_snap(pt[0], pt[1], tol_mm)
+            if ziel is not None:
+                self._zeichne_auswahl_highlight(ziel, farbe=FARBEN["orange"],
+                                                tags=("vorschau",))
+        # NEU: Brechen-Vorschau (Objekt hervorheben, welches gebrochen wird)
+        elif w == "brechen" and self._break_status == "objekt":
+            tol_mm = 8 / self._ctx_skala()
+            ziel = self._element_auf_punkt_snap(pt[0], pt[1], tol_mm)
+            if ziel is not None:
+                self._zeichne_auswahl_highlight(ziel, farbe=FARBEN["orange"],
+                                                tags=("vorschau",))
 
     def _griff_bewegen_zu(self, event):
         pt = self._eingabepunkt(event)
@@ -5030,6 +5523,13 @@ class CadApp:
         elif self.aktives_werkzeug.get() == "polylinie" and self.aktuelle_polylinie:
             self._polylinie_abschliessen(geschlossen=False)
             self.letzter_punkt = None
+        # NEU: Enter im Stutzen-Grenzen-Modus bestaetigt die Grenzen
+        elif self.aktives_werkzeug.get() == "stutzen" and self._trim_status == "grenzen":
+            self._trim_grenzen_bestaetigen()
+        # NEU: Enter im Brechen-Status "objekt" bricht ab
+        elif self.aktives_werkzeug.get() == "brechen":
+            self._break_abbrechen()
+            self._werkzeug_gewechselt()
 
     def _eingabe_polylinie(self, text, einh):
         if self.letzter_punkt is None:
