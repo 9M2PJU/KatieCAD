@@ -8,6 +8,7 @@ NEU (Block-Unterstuetzung, Schritt 1):
   - BlockReferenz     Eingefuegter Block (Position, Skalierung, Winkel + tiefe Kopie)
   - BlockBibliothek   Globale, zeichnungsuebergreifende Blockbibliothek (blocks.json)
   - BEFEHLE erweitert: BLOCK/B, INSERT/I, BLOCKLISTE/BL
+NEU: Radius- und Durchmesser-Bemaßung (DIMRADIUS/DIMDIAMETER).
 """
 
 import math, zlib
@@ -569,6 +570,11 @@ BEFEHLE = {
     "RECHTECK": "tool:rechteck", "REC": "tool:rechteck", "RECTANG": "tool:rechteck",
     "TEXT": "tool:text", "T": "tool:text",
     "BEMASSUNG": "tool:bemassung", "BEM": "tool:bemassung", "DIM": "tool:bemassung",
+    # NEU: Spezial-Bemaßung Radius / Durchmesser
+    "DIMRADIUS":   "bem:radius", "DR": "bem:radius",
+    "RADIUS":      "bem:radius", "RBEM": "bem:radius",
+    "DIMDIAMETER": "bem:durchmesser", "DD": "bem:durchmesser",
+    "DURCHMESSER": "bem:durchmesser", "DIA": "bem:durchmesser",
     "STUTZEN": "tool:stutzen", "TRIM": "tool:stutzen", "TR": "tool:stutzen",
     "BRECHEN": "tool:brechen", "BREAK": "tool:brechen", "BR": "tool:brechen",
     # --- NEU: Blockbefehle ---
@@ -1053,16 +1059,16 @@ class Bemassung(Element):
     @staticmethod
     def linear_richtung(p1, p2, m):
         dx, dy = abs(p2[0] - p1[0]), abs(p2[1] - p1[1])
-        
+
         # NEU: Wenn die Linie schräg ist, nehmen wir automatisch den Winkel der Linie
         if dx > 1e-6 and dy > 1e-6:
             return "ausgerichtet"
-            
+
         cx, cy = (p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2
         ex = abs(m[0] - cx) - dx / 2
         ey = abs(m[1] - cy) - dy / 2
         r = "horizontal" if ey >= ex else "vertikal"
-        
+
         if r == "horizontal" and dx < 1e-9 < dy:
             r = "vertikal"
         elif r == "vertikal" and dy < 1e-9 < dx:
@@ -1165,39 +1171,82 @@ class Bemassung(Element):
             res["text"] = (txt, c[0], c[1], a_deg, tw, h)
             return res
 
+        # ---------- Radius / Durchmesser ----------
         C, P = (self.x1, self.y1), (self.x2, self.y2)
         rad = math.hypot(P[0] - C[0], P[1] - C[1])
         if rad < 1e-9:
             return res
         u = ((P[0] - C[0]) / rad, (P[1] - C[1]) / rad)
+
         if r == "radius":
-            k = 2.0 * s
+            # Kleines Mittelkreuz (proportional, aber nicht größer als der Kreis)
+            k = min(0.5 * h, rad * 0.4)
             res["linien"].append((C[0] - k, C[1], C[0] + k, C[1]))
             res["linien"].append((C[0], C[1] - k, C[0], C[1] + k))
-            sd = max((self.mx - C[0]) * u[0] + (self.my - C[1]) * u[1], rad)
-            E = (C[0] + u[0] * sd, C[1] + u[1] * sd)
-            res["linien"].append((C[0], C[1], E[0], E[1]))
+
+            # Messlinie vom Zentrum zum Bogenpunkt
+            res["linien"].append((C[0], C[1], P[0], P[1]))
+
+            # Pfeil am Bogen, zeigt nach außen (zur Messstelle)
             res["pfeile"].append((P[0], P[1], math.atan2(u[1], u[0]), pf))
-            res["mitte"] = ((C[0] + E[0]) / 2, (C[1] + E[1]) / 2)
-            d = tw / 2 * abs(u[0]) + h / 2 * abs(u[1]) + 2 * tgap
-            c = (self.tx, self.ty) if manuell else (E[0] + u[0] * d, E[1] + u[1] * d)
+
+            # Textposition: manuell (tx/ty) oder aus mx/my
+            if manuell:
+                c = (self.tx, self.ty)
+            else:
+                c = (self.mx, self.my)
+                d_center = math.hypot(c[0] - C[0], c[1] - C[1])
+                if d_center < h:
+                    c = (P[0] + u[0] * (tgap + h),
+                         P[1] + u[1] * (tgap + h))
+
+            # Führungslinie, wenn der Text außerhalb des Bogens steht
+            d_p = math.hypot(c[0] - P[0], c[1] - P[1])
+            if d_p > h * 0.8:
+                res["linien"].append((P[0], P[1], c[0], c[1]))
+
             res["text"] = (txt, c[0], c[1], 0.0, tw, h)
-        else:
+            res["mitte"] = ((C[0] + P[0]) / 2, (C[1] + P[1]) / 2)
+
+        else:  # durchmesser
             Q = (2 * C[0] - P[0], 2 * C[1] - P[1])
+
+            # Linie durch den ganzen Kreis, Pfeile an beiden Enden
             res["linien"].append((P[0], P[1], Q[0], Q[1]))
             res["pfeile"].append((P[0], P[1], math.atan2(u[1], u[0]), pf))
             res["pfeile"].append((Q[0], Q[1], math.atan2(-u[1], -u[0]), pf))
-            res["mitte"] = C
+
+            # Textschräge an die Messlinie anpassen (in [-90, +90])
             a_deg = math.degrees(math.atan2(u[1], u[0]))
             if a_deg > 90.0 + 1e-9:
                 a_deg -= 180.0
             elif a_deg <= -90.0 + 1e-9:
                 a_deg += 180.0
             ar = math.radians(a_deg)
-            up = (-math.sin(ar), math.cos(ar))
-            c = (self.tx, self.ty) if manuell else \
-                (C[0] + up[0] * (tgap + h / 2), C[1] + up[1] * (tgap + h / 2))
+            up = (-math.sin(ar), math.cos(ar))   # senkrecht zur Messlinie
+
+            # Textposition: bei manuell tx/ty, sonst mittig über/unter Zentrum
+            if manuell:
+                c = (self.tx, self.ty)
+            else:
+                # Seite anhand der Maus-Klickposition bestimmen
+                seite = 1.0 if ((self.mx - C[0]) * up[0] +
+                                (self.my - C[1]) * up[1]) >= 0 else -1.0
+                c = (C[0] + up[0] * (tgap + h / 2) * seite,
+                     C[1] + up[1] * (tgap + h / 2) * seite)
+
+            # Führungslinie vom nächstgelegenen Pfeil zum Text,
+            # wenn der Text außerhalb des Kreises liegt
+            d_center = math.hypot(c[0] - C[0], c[1] - C[1])
+            if d_center > rad + h * 0.3:
+                d_p = math.hypot(c[0] - P[0], c[1] - P[1])
+                d_q = math.hypot(c[0] - Q[0], c[1] - Q[1])
+                arrow = P if d_p < d_q else Q
+                res["linien"].append((arrow[0], arrow[1], c[0], c[1]))
+
             res["text"] = (txt, c[0], c[1], a_deg, tw, h)
+            res["mitte"] = C
+
         return res
 
     def bbox(self):
@@ -1532,6 +1581,7 @@ class BlockBibliothek:
             return True
         return False
 
+
 class Schraffur(Element):
     def __init__(self, punkte, typ="solid", winkel=45.0, abstand=5.0, **kw):
         super().__init__("schraffur", **kw)
@@ -1575,11 +1625,11 @@ class Schraffur(Element):
         rad = math.radians(-self.winkel)
         ca, sa = math.cos(rad), math.sin(rad)
         rot_pts = [(x * ca + y * sa, -x * sa + y * ca) for (x, y) in self.punkte]
-        
+
         # 2. Bounding Box im gedrehten System bestimmen
         min_y = min(p[1] for p in rot_pts)
         max_y = max(p[1] for p in rot_pts)
-        
+
         # 3. Horizontale Linien im Abstand "abstand" ziehen
         linien = []
         y = min_y
@@ -1593,7 +1643,7 @@ class Schraffur(Element):
                     x = p1[0] + t * (p2[0] - p1[0])
                     schnitte.append(x)
             schnitte.sort()
-            
+
             # 4. Paare bilden und zurückdrehen
             for i in range(0, len(schnitte) - 1, 2):
                 x1, x2 = schnitte[i], schnitte[i+1]
