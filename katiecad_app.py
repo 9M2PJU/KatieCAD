@@ -169,7 +169,6 @@ def zeige_lizenz_fenster(parent):
     win.transient(parent)
     win.configure(bg=FARBEN["bg_mittel"])
 
-    # Footer zuerst packen, damit er immer sichtbar bleibt
     footer = tk.Frame(win, bg=FARBEN["bg_mittel"], padx=20, pady=14)
     footer.pack(side="bottom", fill="x")
 
@@ -180,7 +179,6 @@ def zeige_lizenz_fenster(parent):
               relief="raised", bd=1, font=("Helvetica", 9, "bold"),
               padx=14, pady=4, cursor="hand2").pack(side="right")
 
-    # Header
     header = tk.Frame(win, bg=FARBEN["bg_mittel"], padx=20, pady=14)
     header.pack(side="top", fill="x")
     tk.Label(header, text="MIT LICENSE",
@@ -189,7 +187,6 @@ def zeige_lizenz_fenster(parent):
 
     tk.Frame(win, bg=FARBEN["rand"], height=1).pack(side="top", fill="x", padx=20)
 
-    # Body mit Text + Scrollbar
     body = tk.Frame(win, bg=FARBEN["bg_mittel"], padx=20, pady=14)
     body.pack(side="top", fill="both", expand=True)
 
@@ -217,7 +214,6 @@ def zeige_lizenz_fenster(parent):
 
     win.bind("<Escape>", lambda e: win.destroy())
 
-    # Zentrieren
     win.update_idletasks()
     mx = parent.winfo_rootx() + parent.winfo_width() // 2
     my = parent.winfo_rooty() + parent.winfo_height() // 2
@@ -249,11 +245,10 @@ class CadApp:
 
         self.elemente = []
 
-        # ---- Layouts: Liste von Layout-Objekten (analog AutoCAD) ----
         self.layouts = [Layout("Layout1", Layout.STANDARD_FORMAT,
                                "#1c132d")]
         self.aktives_layout = 0
-        self.ansicht = tk.StringVar(value="modell")  # "modell" oder "layout:N"
+        self.ansicht = tk.StringVar(value="modell")
 
         self.aktives_werkzeug = tk.StringVar(value="auswahl")
         self.einheit = tk.StringVar(value="mm")
@@ -302,7 +297,6 @@ class CadApp:
         self.eingabe_var = tk.StringVar()
         self.status = tk.StringVar()
 
-        # layout_format wird zur Property (siehe unten) -> kein eigenes Var mehr
         self._layout_buttons = {}
 
         self.auswahl = []
@@ -372,7 +366,6 @@ class CadApp:
         self._rc_start = None
         self._rc_bewegt = False
 
-        # Strecken
         self._stretch_rechteck_start = None
         self._stretch_rechteck_id = None
 
@@ -380,8 +373,13 @@ class CadApp:
 
         self.sprache_var = tk.StringVar(value=SPRACHE["aktuell"])
 
-        # Referenz für Logo im Info-Fenster (verhindert GC)
         self._info_logo = None
+
+        # --- Viewport-Leiste: Statusvariablen ---
+        self._vp_modus_var = tk.StringVar(value="layout")
+        self._vp_massstab_var = tk.StringVar(value="1:1")
+        self._vp_sperre_var = tk.BooleanVar(value=False)
+        self._vp_status_var = tk.StringVar(value="")
 
         self._build_ui()
         self._bind_events()
@@ -392,8 +390,7 @@ class CadApp:
         self.root.protocol("WM_DELETE_WINDOW", self.beenden)
 
     # --------------------------------------------------------
-    # Layout-Properties (machen den Umbau auf mehrere Layouts
-    # transparent für den restlichen Code)
+    # Properties
     # --------------------------------------------------------
     @property
     def layout(self):
@@ -490,6 +487,7 @@ class CadApp:
         self._update_kontext_widgets()
         self._update_eingabe_hinweis()
         self._layout_switcher_neu_aufbauen()
+        self._viewport_modus_anzeige_aktualisieren()
         self.redraw()
 
     # --------------------------------------------------------
@@ -515,7 +513,6 @@ class CadApp:
                 el = self._dict_zu_element(d)
                 if el:
                     self.elemente.append(el)
-            # Layouts wiederherstellen
             layouts_daten = snap.get("layouts")
             if layouts_daten is not None:
                 neue = []
@@ -536,7 +533,6 @@ class CadApp:
                         self.aktives_layout = idx
                         self.ansicht.set(f"layout:{idx}")
             else:
-                # Alter Snapshot ohne layouts -> auf altes Schema zurückfallen
                 self.layouts = [Layout("Layout1", Layout.STANDARD_FORMAT,
                                        "#1c132d")]
                 self.aktives_layout = 0
@@ -558,6 +554,7 @@ class CadApp:
             self._bem_abbrechen()
             self._bogen_abbrechen()
             self._layout_switcher_neu_aufbauen()
+            self._viewport_modus_anzeige_aktualisieren()
             self._mark_dirty()
             self.redraw()
             self.status.set("Rueckgaengig gemacht.")
@@ -766,6 +763,7 @@ class CadApp:
         self.canvas.pack(fill=tk.BOTH, expand=True)
 
         self._update_kontext_widgets()
+        self._viewport_modus_anzeige_aktualisieren()
 
     def _build_koord_bar(self):
         koord_bar = tk.Label(self.root, textvariable=self.status,
@@ -923,8 +921,6 @@ class CadApp:
                 child.destroy()
 
         # --- Toolbar 1 ---
-        # Hinweis: Ansicht (Modell/Layout) ist NICHT mehr hier oben,
-        # sondern im unteren Layout-Switcher.
         tb = self.tb1
         ttk.Label(tb, text=tr("tb.werkzeug"), style="Title.TLabel").pack(side=tk.LEFT, padx=(0, 4))
         for key in ("auswahl", "linie", "polylinie", "kreis", "bogen",
@@ -1002,7 +998,6 @@ class CadApp:
                              self.lbl_hoehe, self.sp_hoehe,
                              self.lbl_winkel, self.sp_winkel]
 
-        # Blattformat: Combobox zeigt/ändert das aktive Layout-Format
         self.lbl_fmt = ttk.Label(tb3, text=tr("tb.blattformat"), style="Title.TLabel")
         self._fmt_var = tk.StringVar(value=self.layout_format)
         self.cb_fmt = ttk.Combobox(tb3, textvariable=self._fmt_var,
@@ -1106,7 +1101,7 @@ class CadApp:
             self.lbl_eingabe.config(text=tr("eingabe.label"))
 
     # --------------------------------------------------------
-    # Layout-Switcher (unten, statt oben links)
+    # Layout-Switcher (unten)
     # --------------------------------------------------------
     def _build_layout_switcher(self):
         self.layout_switcher_frame = ttk.Frame(self.root, padding=(6, 3))
@@ -1380,8 +1375,242 @@ class CadApp:
             zeige(self.bem_widgets)
 
     # --------------------------------------------------------
+    # Viewport-Leiste (nur im Layout sichtbar)
+    # --------------------------------------------------------
+    def _build_viewport_leiste(self):
+        self.viewport_leiste = ttk.Frame(self.root, padding=(6, 3))
+        # vor dem Canvas packen (der ist zu diesem Zeitpunkt noch nicht da)
+        self.viewport_leiste.pack(side=tk.TOP, fill=tk.X, before=self.canvas) \
+            if hasattr(self, "canvas") else self.viewport_leiste.pack(side=tk.TOP, fill=tk.X)
+
+        ttk.Label(self.viewport_leiste, text=tr("tb.ansicht"),
+                  style="Title.TLabel").pack(side=tk.LEFT, padx=(0, 4))
+        ttk.Radiobutton(self.viewport_leiste, text=tr("vp.leiste.layout"),
+                        value="layout", variable=self._vp_modus_var,
+                        command=self._vp_modus_gewaehlt
+                        ).pack(side=tk.LEFT)
+        ttk.Radiobutton(self.viewport_leiste, text=tr("vp.leiste.viewport"),
+                        value="viewport", variable=self._vp_modus_var,
+                        command=self._vp_modus_gewaehlt
+                        ).pack(side=tk.LEFT, padx=(0, 8))
+
+        ttk.Separator(self.viewport_leiste, orient=tk.VERTICAL).pack(
+            side=tk.LEFT, fill=tk.Y, padx=6)
+
+        # Zoom-Steuerung
+        ttk.Label(self.viewport_leiste, text=tr("vp.leiste.zoom") + ":",
+                  style="Title.TLabel").pack(side=tk.LEFT)
+        self._vp_btn_plus = ttk.Button(self.viewport_leiste, text="+", width=3,
+                                       command=lambda: self._vp_zoom_faktor(1.25))
+        self._vp_btn_plus.pack(side=tk.LEFT, padx=1)
+        self._vp_btn_minus = ttk.Button(self.viewport_leiste, text="−", width=3,
+                                        command=lambda: self._vp_zoom_faktor(0.8))
+        self._vp_btn_minus.pack(side=tk.LEFT, padx=1)
+        self._vp_btn_fit = ttk.Button(self.viewport_leiste,
+                                      text=tr("vp.leiste.fit"),
+                                      command=self._vp_fit_aktueller)
+        self._vp_btn_fit.pack(side=tk.LEFT, padx=1)
+
+        ttk.Label(self.viewport_leiste, text="  " + tr("vp.leiste.massstab"),
+                  style="Title.TLabel").pack(side=tk.LEFT, padx=(8, 0))
+        self._vp_cb_massstab = ttk.Combobox(self.viewport_leiste,
+                                            textvariable=self._vp_massstab_var,
+                                            values=MASSSTAEBE, width=8,
+                                            state="readonly")
+        self._vp_cb_massstab.pack(side=tk.LEFT, padx=2)
+        self._vp_cb_massstab.bind("<<ComboboxSelected>>",
+                                  self._vp_massstab_gewaehlt)
+
+        ttk.Separator(self.viewport_leiste, orient=tk.VERTICAL).pack(
+            side=tk.LEFT, fill=tk.Y, padx=6)
+
+        self._vp_chk_sperre = ttk.Checkbutton(self.viewport_leiste,
+                                              text=tr("vp.leiste.sperren"),
+                                              variable=self._vp_sperre_var,
+                                              command=self._vp_sperre_toggle)
+        self._vp_chk_sperre.pack(side=tk.LEFT)
+
+        ttk.Label(self.viewport_leiste, textvariable=self._vp_status_var,
+                  style="Hint.TLabel").pack(side=tk.LEFT, padx=8)
+
+    def _viewport_leiste_sichtbar(self, sichtbar):
+        if not hasattr(self, "viewport_leiste"):
+            return
+        if sichtbar:
+            if not self.viewport_leiste.winfo_ismapped():
+                self.viewport_leiste.pack(side=tk.TOP, fill=tk.X,
+                                          before=self.canvas)
+        else:
+            if self.viewport_leiste.winfo_ismapped():
+                self.viewport_leiste.pack_forget()
+
+    def _viewport_modus_anzeige_aktualisieren(self):
+        if not hasattr(self, "viewport_leiste"):
+            return
+        # Sichtbarkeit: nur im Layout
+        self._viewport_leiste_sichtbar(self._ist_layout())
+        vp = self._aktiver_viewport
+        # Modus
+        if self._ist_layout() and vp is not None:
+            self._vp_modus_var.set("viewport")
+        else:
+            self._vp_modus_var.set("layout")
+        # Status
+        if vp is None:
+            self._vp_status_var.set(tr("vp.leiste.kein_vp"))
+            self._vp_massstab_var.set("1:1")
+            self._vp_sperre_var.set(False)
+            state = "disabled"
+        else:
+            name = self._viewport_name(vp)
+            zustand = (tr("vp.leiste.status_gesperrt") if vp.gesperrt
+                       else tr("vp.leiste.status_frei"))
+            self._vp_status_var.set(
+                tr("vp.leiste.aktiv", name=name) + "  –  " + zustand)
+            self._vp_massstab_var.set(massstab_text(vp.zoom))
+            self._vp_sperre_var.set(vp.gesperrt)
+            state = "normal"
+        for w in (getattr(self, "_vp_btn_plus", None),
+                  getattr(self, "_vp_btn_minus", None),
+                  getattr(self, "_vp_btn_fit", None),
+                  getattr(self, "_vp_cb_massstab", None),
+                  getattr(self, "_vp_chk_sperre", None)):
+            if w is not None:
+                try:
+                    w.configure(state=state)
+                except Exception:
+                    pass
+
+    def _viewport_name(self, vp):
+        try:
+            idx = self.layout_elemente.index(vp)
+        except ValueError:
+            return "Viewport"
+        # Anzahl Viewports davor zählen
+        n = sum(1 for i in range(idx + 1)
+                if isinstance(self.layout_elemente[i], Viewport))
+        return f"Viewport {n}"
+
+    def _vp_modus_gewaehlt(self):
+        if not self._ist_layout():
+            self._vp_modus_var.set("layout")
+            messagebox.showinfo(tr("vp.leiste.viewport"),
+                                tr("vp.leiste.kein_layout_hinweis"))
+            return
+        if self._vp_modus_var.get() == "viewport":
+            # Viewport aktivieren: zuletzt aktiven, oder ersten sichtbaren
+            vp = self._aktiver_viewport
+            if vp is None:
+                vp = self._erster_viewport()
+            if vp is None:
+                self._vp_modus_var.set("layout")
+                messagebox.showinfo(tr("vp.leiste.viewport"),
+                                    tr("vp.leiste.viewport_waehlen"))
+                return
+            self._vp_aktivieren(vp)
+        else:
+            self._vp_deaktivieren()
+
+    def _erster_viewport(self):
+        for el in self.layout_elemente:
+            if isinstance(el, Viewport):
+                return el
+        return None
+
+    def _vp_deaktivieren(self):
+        if self._aktiver_viewport is not None:
+            self._aktiver_viewport.aktiv = False
+            self._aktiver_viewport = None
+        self._vp_modus_var.set("layout")
+        self.redraw()
+        self._viewport_modus_anzeige_aktualisieren()
+        de = SPRACHE["aktuell"] == "de"
+        self.status.set("Layout-Ansicht." if de else "Layout view.")
+
+    def _vp_zoom_faktor(self, faktor):
+        vp = self._aktiver_viewport
+        if vp is None:
+            return
+        if vp.gesperrt:
+            de = SPRACHE["aktuell"] == "de"
+            self.status.set("Viewport-Maßstab ist gesperrt." if de
+                            else "Viewport scale is locked.")
+            return
+        self._vp_zoom_um_punkt(vp, faktor, self._vp_mittelpunkt_mm(vp))
+        self._viewport_modus_anzeige_aktualisieren()
+
+    def _vp_mittelpunkt_mm(self, vp):
+        return (vp.x + vp.breite / 2, vp.y + vp.hoehe / 2)
+
+    def _vp_zoom_um_punkt(self, vp, faktor, punkt_mm):
+        """Zoomt vp.zoom um faktor, hält den Modellpunkt unter punkt_mm
+        (in Layout-mm) fest."""
+        mx_mm, my_mm = punkt_mm
+        mod_x, mod_y = self._papier_zu_modell(vp, mx_mm, my_mm)
+        self._snapshot()
+        vp.zoom *= faktor
+        vcx = vp.x + vp.breite / 2
+        vcy = vp.y + vp.hoehe / 2
+        vp.modell_zentrum_x = mod_x - (mx_mm - vcx) / vp.zoom
+        vp.modell_zentrum_y = mod_y - (my_mm - vcy) / vp.zoom
+        self.redraw()
+
+    def _vp_massstab_gewaehlt(self, event=None):
+        vp = self._aktiver_viewport
+        if vp is None:
+            return
+        if vp.gesperrt:
+            de = SPRACHE["aktuell"] == "de"
+            self.status.set("Viewport-Maßstab ist gesperrt." if de
+                            else "Viewport scale is locked.")
+            self._viewport_modus_anzeige_aktualisieren()
+            return
+        text = self._vp_massstab_var.get()
+        try:
+            neuer_zoom = parse_massstab(text)
+        except Exception:
+            return
+        cx_mm, cy_mm = self._vp_mittelpunkt_mm(vp)
+        mod_x, mod_y = self._papier_zu_modell(vp, cx_mm, cy_mm)
+        self._snapshot()
+        vp.zoom = neuer_zoom
+        # Zentrum so anpassen, dass der alte Modellmittelpunkt in der Mitte bleibt
+        vcx = vp.x + vp.breite / 2
+        vcy = vp.y + vp.hoehe / 2
+        vp.modell_zentrum_x = mod_x - (cx_mm - vcx) / vp.zoom
+        vp.modell_zentrum_y = mod_y - (cy_mm - vcy) / vp.zoom
+        self.redraw()
+        self._viewport_modus_anzeige_aktualisieren()
+        de = SPRACHE["aktuell"] == "de"
+        self.status.set((f"Viewport-Maßstab {text}" if de
+                         else f"Viewport scale {text}"))
+
+    def _vp_fit_aktueller(self):
+        vp = self._aktiver_viewport
+        if vp is None:
+            return
+        if vp.gesperrt:
+            de = SPRACHE["aktuell"] == "de"
+            self.status.set("Viewport-Maßstab ist gesperrt." if de
+                            else "Viewport scale is locked.")
+            return
+        self._vp_auto_fit(vp)
+        self._viewport_modus_anzeige_aktualisieren()
+
+    def _vp_sperre_toggle(self):
+        vp = self._aktiver_viewport
+        if vp is None:
+            return
+        vp.gesperrt = bool(self._vp_sperre_var.get())
+        self._viewport_modus_anzeige_aktualisieren()
+        de = SPRACHE["aktuell"] == "de"
+        self.status.set(("Viewport-Maßstab " + (
+            "gesperrt." if vp.gesperrt else "entsperrt.") if de else
+            "Viewport scale " + (
+            "locked." if vp.gesperrt else "unlocked.")))
+
+    # --------------------------------------------------------
     def ansicht_wechseln(self):
-        # Neuen Layout-Index übernehmen (falls "layout:N")
         if self._ist_layout():
             idx = self._layout_index()
             if 0 <= idx < len(self.layouts):
@@ -1404,6 +1633,7 @@ class CadApp:
         self.bg_btn.config(bg=bg)
         self._zeichne_raster()
         self.redraw()
+        self._viewport_modus_anzeige_aktualisieren()
         de = SPRACHE["aktuell"] == "de"
         if self._ist_layout():
             self.status.set(("Ansicht: Layout '" if de else "View: layout '")
@@ -1580,6 +1810,7 @@ class CadApp:
             self.aktives_werkzeug.set("auswahl")
         self._update_kontext_widgets()
         self._update_eingabe_hinweis()
+        self._viewport_modus_anzeige_aktualisieren()
         self.auswahl = []
         self.redraw()
         de = SPRACHE["aktuell"] == "de"
@@ -1700,8 +1931,13 @@ class CadApp:
                 self.status.set("Viewport-Maßstab ist gesperrt." if de
                                 else "Viewport scale is locked.")
                 return
-            vp.zoom *= faktor
-            self.redraw()
+            mx_mm, my_mm = self.px_to_mm(event.x, event.y)
+            # nur zoomen, wenn Maus innerhalb des Viewports
+            if not (vp.x <= mx_mm <= vp.x + vp.breite and
+                    vp.y <= my_mm <= vp.y + vp.hoehe):
+                return
+            self._vp_zoom_um_punkt(vp, faktor, (mx_mm, my_mm))
+            self._viewport_modus_anzeige_aktualisieren()
             return
         v = self.view
         mx, my = event.x, event.y
@@ -1744,12 +1980,18 @@ class CadApp:
     def on_pan_start(self, event):
         v = self.view
         self.pan_start = (event.x, event.y, v["ox"], v["oy"])
+        if self._ist_layout() and self._aktiver_viewport is not None:
+            vp = self._aktiver_viewport
+            self._vp_pan_start = (event.x, event.y,
+                                  vp.modell_zentrum_x, vp.modell_zentrum_y)
 
     def on_pan(self, event):
         if self._rc_start and (abs(event.x - self._rc_start[0]) > 3 or abs(event.y - self._rc_start[1]) > 3):
             self._rc_bewegt = True
         if self._ist_layout() and self._aktiver_viewport is not None:
             vp = self._aktiver_viewport
+            if vp.gesperrt:
+                return
             if self._vp_pan_start is None:
                 self._vp_pan_start = (event.x, event.y,
                                       vp.modell_zentrum_x, vp.modell_zentrum_y)
@@ -1804,6 +2046,11 @@ class CadApp:
             return
         if self._vp_aktion != "none":
             return
+        # Aktiver Viewport: rechte Taste = Pan
+        if self._ist_layout() and self._aktiver_viewport is not None:
+            self.on_pan_start(event)
+            return
+        # Kein aktiver Viewport im Layout: Viewport-Kontextmenü
         if self._ist_layout() and self._aktiver_viewport is None:
             vp = self._viewport_unter_maus(event)
             if vp is not None and self.aktives_werkzeug.get() == "auswahl":
@@ -1815,9 +2062,12 @@ class CadApp:
     def on_rechtsklick_end(self, event):
         if self.pan_start:
             self.pan_start = None
+            self._vp_pan_start = None
             if (not self._rc_bewegt and self.aktives_werkzeug.get() == "auswahl"
                     and self._op is None and not self._pts
-                    and self._ctx()[0] != "vp"):
+                    and self._ctx()[0] != "vp"
+                    and not (self._ist_layout()
+                             and self._aktiver_viewport is not None)):
                 self._kontextmenue(event)
         else:
             if self.aktuelle_polylinie:
@@ -1874,10 +2124,13 @@ class CadApp:
             self._aktiver_viewport.aktiv = False
         vp.aktiv = True
         self._aktiver_viewport = vp
+        self._vp_modus_var.set("viewport")
         self.redraw()
+        self._viewport_modus_anzeige_aktualisieren()
         de = SPRACHE["aktuell"] == "de"
-        self.status.set(("Viewport aktiviert. ESC zum Verlassen." if de
-                         else "Viewport activated. ESC to leave."))
+        self.status.set(("Viewport aktiviert. ESC oder Layout-Ansicht zum "
+                         "Verlassen." if de else
+                         "Viewport activated. ESC or Layout view to leave."))
 
     def _vp_eigenschaften(self, vp):
         vorher = self._zustand()
@@ -1886,6 +2139,7 @@ class CadApp:
             self._undo_stack.append(vorher)
             self._mark_dirty()
             self.redraw()
+            self._viewport_modus_anzeige_aktualisieren()
 
     def _vp_loeschen(self, vp):
         de = SPRACHE["aktuell"] == "de"
@@ -1898,6 +2152,7 @@ class CadApp:
             if self._aktiver_viewport is vp:
                 self._aktiver_viewport = None
             self.redraw()
+            self._viewport_modus_anzeige_aktualisieren()
 
     def _vp_auto_fit(self, vp):
         de = SPRACHE["aktuell"] == "de"
@@ -2954,9 +3209,10 @@ class CadApp:
             self.layouts[self.aktives_layout].elemente = []
             self._aktiver_viewport = None
             self.redraw()
+            self._viewport_modus_anzeige_aktualisieren()
 
     # --------------------------------------------------------
-    # Info-Fenster (XZN-Stil, mit separatem Lizenz-Fenster)
+    # Info-Fenster
     # --------------------------------------------------------
     def zeige_info_fenster(self):
         info_win = tk.Toplevel(self.root)
@@ -2969,11 +3225,9 @@ class CadApp:
         frame = tk.Frame(info_win, bg=FARBEN["bg_mittel"], padx=26, pady=22)
         frame.pack(fill=tk.BOTH, expand=True)
 
-        # --- Logo + Titel (Horizontal) ---
         title_row = tk.Frame(frame, bg=FARBEN["bg_mittel"])
         title_row.pack(anchor="w", fill="x")
 
-        # --- Logo suchen (mehrere mögliche Orte) ---
         logo_path = None
         kandidaten = [
             "KatieCAD.png",
@@ -3001,7 +3255,7 @@ class CadApp:
                 logo_lbl = tk.Label(title_row, image=logo_photo,
                                     bg=FARBEN["bg_mittel"], bd=0,
                                     highlightthickness=0)
-                logo_lbl.image = logo_photo  # Referenz speichern!
+                logo_lbl.image = logo_photo
                 logo_lbl.pack(side="left", padx=(0, 14))
                 print(f"[KatieCAD] Logo geladen: {logo_path}")
             except Exception as e:
@@ -3011,10 +3265,8 @@ class CadApp:
                  font=("Helvetica", 15, "bold"),
                  bg=FARBEN["bg_mittel"], fg=FARBEN["cyan"]).pack(side="left", anchor="w")
 
-        # Trennlinie
         tk.Frame(frame, bg=FARBEN["rand"], height=1).pack(fill="x", pady=(8, 14))
 
-        # --- Info Texte ---
         tk.Label(frame, text=tr("info.version"),
                  font=("Helvetica", 9),
                  bg=FARBEN["bg_mittel"], fg=FARBEN["text"]).pack(anchor="w", pady=(0, 6))
@@ -3027,10 +3279,8 @@ class CadApp:
                  font=("Helvetica", 9),
                  bg=FARBEN["bg_mittel"], fg=FARBEN["text_dim"]).pack(anchor="w", pady=(0, 16))
 
-        # Trennlinie
         tk.Frame(frame, bg=FARBEN["rand"], height=1).pack(fill="x", pady=(0, 14))
 
-        # --- Button-Reihe: License (links) + Close (rechts) ---
         btn_row = tk.Frame(frame, bg=FARBEN["bg_mittel"])
         btn_row.pack(fill="x", side="bottom")
 
@@ -3046,7 +3296,6 @@ class CadApp:
         make_btn("License", lambda: zeige_lizenz_fenster(info_win)).pack(side="left")
         make_btn(tr("dlg.schliessen"), info_win.destroy).pack(side="right")
 
-        # Fenster zentrieren
         info_win.update_idletasks()
         mx = self.root.winfo_rootx() + self.root.winfo_width() // 2
         my = self.root.winfo_rooty() + self.root.winfo_height() // 2
@@ -3089,6 +3338,7 @@ class CadApp:
         self._mark_clean()
         self.redraw()
         self._zeichne_raster()
+        self._viewport_modus_anzeige_aktualisieren()
 
     def speichern(self):
         de = SPRACHE["aktuell"] == "de"
@@ -3102,8 +3352,8 @@ class CadApp:
             "einheit": self.einheit.get(),
             "massstab": self.massstab.get(),
             "bg_modell": self.bg_modell,
-            "layout_format": self.layout_format,   # Rückwärtskompatibilität
-            "bg_layout": self.layouts[0].bg,       # Rückwärtskompatibilität
+            "layout_format": self.layout_format,
+            "bg_layout": self.layouts[0].bg,
             "raster_mm": self._zahl(self.raster_mm, 5.0),
             "fang_mm": self._zahl(self.fang_mm, 5.0),
             "layers": [l.to_dict() for l in self.layers.values()],
@@ -3163,7 +3413,6 @@ class CadApp:
             if el:
                 self.elemente.append(el)
 
-        # Layouts laden
         if "layouts" in daten and daten["layouts"]:
             self.layouts = []
             for ld in daten["layouts"]:
@@ -3171,7 +3420,6 @@ class CadApp:
             if not self.layouts:
                 self.layouts = [Layout("Layout1", Layout.STANDARD_FORMAT, "#1c132d")]
         else:
-            # Alte Datei: ein einziges Layout aus layout_elemente/layout_format
             alt = Layout(daten.get("layout_format", Layout.STANDARD_FORMAT),
                          daten.get("layout_format", Layout.STANDARD_FORMAT),
                          daten.get("bg_layout", "#1c132d"))
@@ -3216,6 +3464,7 @@ class CadApp:
         self._mark_clean()
         self.redraw()
         self._zeichne_raster()
+        self._viewport_modus_anzeige_aktualisieren()
         self.status.set((f"Geöffnet: {pfad}" if de else f"Opened: {pfad}"))
 
     def _dict_zu_element(self, d):
@@ -3918,7 +4167,6 @@ class CadApp:
                 self._zeichne_text_prim(p, farbe, tf, skala, tags, clip)
 
     def _zeichne_text_prim(self, p, farbe, tf, skala, tags, clip):
-        # Tupel: (art, x, y, inhalt, hoehe, winkel, schriftart, einfuegepunkt)
         if len(p) == 8:
             art, x, y, inhalt, hoehe, winkel, fam, einfuegepunkt = p
         else:
@@ -4319,6 +4567,7 @@ class CadApp:
         self.letzter_punkt = None
         self._clear_temp()
         self.redraw()
+        self._viewport_modus_anzeige_aktualisieren()
         self.status.set((f"Ausschnitt gesetzt, Maßstab {massstab_text(vp.zoom)}."
                          if de else
                          f"View set, scale {massstab_text(vp.zoom)}."))
@@ -4327,12 +4576,16 @@ class CadApp:
         self._snapshot()
         vp.zoom = parse_massstab(text)
         self.redraw()
+        if self._aktiver_viewport is vp:
+            self._viewport_modus_anzeige_aktualisieren()
         de = SPRACHE["aktuell"] == "de"
         self.status.set((f"Viewport-Maßstab {text}" if de
                          else f"Viewport scale {text}"))
 
     def _vp_sperre_umschalten(self, vp):
         vp.gesperrt = not vp.gesperrt
+        if self._aktiver_viewport is vp:
+            self._viewport_modus_anzeige_aktualisieren()
         de = SPRACHE["aktuell"] == "de"
         self.status.set(("Viewport-Maßstab " + (
             "gesperrt." if vp.gesperrt else "entsperrt.") if de else
@@ -5037,7 +5290,6 @@ class CadApp:
                     self._pdf_element(seite, el, lambda x, y: (x, y), 1.0, farbig)
             return seite.to_bytes()
 
-        # Modell
         b, h = ZEICHNUNGSFORMATE[self.layouts[self.aktives_layout].format]
         sichtbar = [e for e in self.elemente
                     if not (self.layers.get(e.layer) and not self.layers[e.layer].sichtbar)]
@@ -5116,7 +5368,7 @@ class CadApp:
 
 
 # ============================================================
-# Layout-Name-Dialog (für Umbenennen)
+# Layout-Name-Dialog
 # ============================================================
 class _LayoutNameDialog(tk.Toplevel):
     def __init__(self, parent, titel, startname=""):
@@ -5800,7 +6052,6 @@ class DruckDialog(tk.Toplevel):
                         value="modell", variable=self.quelle,
                         command=self._refresh_layout_auswahl).pack(anchor=tk.W, padx=10)
 
-        # Layout-Auswahl
         self.layout_auswahl_frame = ttk.Frame(f)
         self.layout_auswahl_frame.pack(anchor=tk.W, fill=tk.X, pady=(4, 0))
         ttk.Label(self.layout_auswahl_frame,
@@ -5858,7 +6109,6 @@ class DruckDialog(tk.Toplevel):
                 idx = self.layout_names.index(self.layout_var.get())
             except ValueError:
                 idx = self.app.aktives_layout
-        # Format ggf. aktualisieren, falls Layout gedruckt wird
         if self.quelle.get() == "layout" and 0 <= idx < len(self.app.layouts):
             self.app.layouts[idx].format = self.format_var.get()
         self.result = (aktion, self.quelle.get(),
