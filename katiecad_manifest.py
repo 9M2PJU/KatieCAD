@@ -13,6 +13,7 @@ MODULE = {
     "katiecad_i18n.py":      "UI-Texte DE/EN",
     "katiecad_dialogs.py":   "Alle Dialoge + Lizenzfenster",
     "katiecad_pdf.py":       "PDF-Ausgabe aus Modell/Layout",
+    "katiecad_config.py":    "Persistente Anwender-Einstellungen (Sprache)",
 }
 
 
