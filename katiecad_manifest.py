@@ -4,7 +4,7 @@ katiecad_manifest.py - Zentrale Liste aller Module + Version.
 Dient als Anker fuer neue Chats: pruefen, ob alle Dateien da sind.
 """
 
-VERSION = "0.2.1"
+VERSION = "0.2.2"
 
 MODULE = {
     # "katiecad.py" ist nur ein Einstiegspunkt und kein importierbares Modul.
