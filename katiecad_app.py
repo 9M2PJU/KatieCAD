@@ -2620,10 +2620,10 @@ class CadApp:
         x1_mm, y1_mm = self.px_to_mm(x1_px, y1_px)
         if x1_px < x0_px:
             farbe = FARBEN["cyan"]
-            self._auswahl_richtung = "links"
+            self._auswahl_richtung = "rechts"
         else:
             farbe = FARBEN["gruen"]
-            self._auswahl_richtung = "rechts"
+            self._auswahl_richtung = "links"
         if self._auswahl_rechteck_id:
             self.canvas.delete(self._auswahl_rechteck_id)
         self._auswahl_rechteck_id = self.canvas.create_rectangle(
@@ -5686,3 +5686,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
