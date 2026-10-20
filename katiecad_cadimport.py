@@ -630,23 +630,15 @@ def importiere_datei(pfad, layers):
         try:
             doc, erg.quelle = dwg_zu_dxf_doc(pfad)
         except RuntimeError as konv_fehler:
-            # Notnagel: ezdwg
-            try:
-                import ezdwg  # noqa: F401
-            except ImportError:
-                raise RuntimeError(
-                    "DWG kann nicht gelesen werden.\n\n"
-                    "Installiere den kostenlosen 'ODA File Converter' "
-                    "(opendesign.com/guestfiles/oda_file_converter) – "
-                    "KatieCAD findet ihn dann automatisch.\n"
-                    "Alternativ: Datei in AutoCAD/LibreCAD/DraftSight als "
-                    "DXF speichern.\n\nDetails: " + str(konv_fehler))
-            els, fehler = ezdwg_lesen(pfad, layers)
-            erg.elemente, erg.fehler, erg.quelle = els, fehler, "ezdwg"
-            erg.hinweise.append(
-                "ezdwg liest nur LINE/CIRCLE/ARC/LWPOLYLINE/TEXT - "
-                "für vollständige Darstellung ODA File Converter installieren.")
-            return erg
+            raise RuntimeError(
+                "DWG kann nicht zuverlässig gelesen werden, weil kein "
+                "Konverter gefunden wurde.\n\n"
+                "Installiere den kostenlosen 'ODA File Converter' "
+                "(opendesign.com/guestfiles/oda_file_converter) und starte "
+                "KatieCAD neu - er wird dann automatisch gefunden.\n"
+                "Alternativ: Datei in AutoCAD/LibreCAD/DraftSight als DXF "
+                "speichern und den DXF-Import verwenden.\n\n"
+                "Details: " + str(konv_fehler))
     else:
         if not EZDXF_OK:
             raise RuntimeError("ezdxf ist nicht installiert (pip install ezdxf).")
