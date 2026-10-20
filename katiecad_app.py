@@ -4,12 +4,11 @@ katiecad_app.py - GUI von KatieCAD (CadApp, main()).
 Enthaelt die Tkinter-UI, Events, Werkzeuge und den App-State.
 Dialoge liegen in katiecad_dialogs.py, PDF-Ausgabe in katiecad_pdf.py.
 
-NEU (Block-Unterstuetzung, Schritt 2):
-  - BlockBibliothek wird in __init__ angelegt
-  - _zeichne_element, _dict_zu_element, _punkt_auf_element und
-    _finde_snap_in_liste kennen BlockReferenz
-  - Debug-Helfer _debug_block_einfuegen / _debug_block_erzeugen
-    (nur zum Testen, wird in Schritt 4 durch echte UI ersetzt)
+NEU (Block-Unterstuetzung, Schritt 4 - Verdrahtung):
+  - Menueeintraege "Block erzeugen" / "Block einfuegen"
+  - Befehle BLOCK/B, INSERT/I, BLOCKLISTE/BL
+  - Interaktion: Basispunkt-Klick beim Erzeugen, Einfuegepunkt-Klick
+    beim Einfuegen
 """
 
 import tkinter as tk
@@ -60,6 +59,7 @@ from katiecad_dialogs import (
     MIT_LICENSE_TEXT, zeige_lizenz_fenster,
     _LayoutNameDialog, PropertiesDialog, ViewportDialog,
     LayerDialog, LayerEditDialog, TextDialog, ArrayDialog, DruckDialog,
+    _BlockNameDialog, _BlockAuswahlDialog,
 )
 from katiecad_pdf import pdf_erzeugen, pdf_senden
 
@@ -162,11 +162,9 @@ class CadApp:
         self.root.geometry("1500x950")
         self.root.configure(bg=FARBEN["bg_dunkel"])
 
-        # --- Sprache aus persistenter Konfiguration laden (vor UI-Aufbau!) ---
         _cfg = lade_konfiguration()
         setze_sprache(_cfg.get("sprache", "en"))
 
-        # Selbstcheck: sind alle im Manifest gelisteten Module da?
         try:
             from katiecad_manifest import fehlende_module, VERSION
             fehlend = fehlende_module()
@@ -298,7 +296,6 @@ class CadApp:
         self.bem_hoehe = tk.DoubleVar(value=2.5)
         self.bem_pfeil = tk.DoubleVar(value=2.5)
         self.bem_dez = tk.IntVar(value=2)
-        # Dezimalkomma passend zur geladenen Sprache initialisieren
         self.dezimalkomma = tk.BooleanVar(value=(SPRACHE["aktuell"] == "de"))
         self._pts = []
         self._bem_kreis = None
@@ -317,11 +314,10 @@ class CadApp:
 
         self._warte_auf_basispunkt = False
 
-        # --- NEU: Werkzeug-States fuer Stutzen und Brechen ---
-        self._trim_status = "none"       # "grenzen" | "ziele" | "none"
-        self._trim_grenzen = []          # Liste von Elementen
-        self._trim_anzahl = 0            # gezaehlte gestutzte Objekte
-        self._break_status = "none"      # "objekt" | "p1" | "p2" | "none"
+        self._trim_status = "none"
+        self._trim_grenzen = []
+        self._trim_anzahl = 0
+        self._break_status = "none"
         self._break_el = None
         self._break_p1 = None
 
@@ -329,14 +325,12 @@ class CadApp:
 
         self._info_logo = None
 
-        # --- NEU: Blockbibliothek (global, wird beim ersten Zugriff geladen) ---
+        # --- Blockbibliothek + Einfuege-Zustand (Schritt 4) ---
         self.block_bibliothek = BlockBibliothek(self._dict_zu_element)
-
-        # --- NEU: Zustand fuer den spaeteren Einfuegen-Befehl (Schritt 4) ---
         self._block_einfuege_name = None
         self._warte_auf_blockpunkt = False
+        self._block_erzeuge_auswahl = None  # Liste der zu ersetzenden Objekte
 
-        # --- Viewport-Leiste: Statusvariablen ---
         self._vp_modus_var = tk.StringVar(value="layout")
         self._vp_massstab_var = tk.StringVar(value="1:1")
         self._vp_sperre_var = tk.BooleanVar(value=False)
@@ -706,7 +700,6 @@ class CadApp:
         self._pts = []
         self._clear_temp()
 
-    # --- NEU: Stutzen und Brechen ---
     def _trim_abbrechen(self):
         self._trim_status = "none"
         self._trim_grenzen = []
@@ -741,7 +734,6 @@ class CadApp:
                                 cursor="crosshair")
         self.canvas.pack(fill=tk.BOTH, expand=True)
 
-        # Viewport-Leiste bauen (nach dem Canvas, damit before=self.canvas klappt)
         self._build_viewport_leiste()
 
         self._update_kontext_widgets()
@@ -841,6 +833,13 @@ class CadApp:
                            command=lambda: self._werkzeug_aus_menue("stutzen"))
         m_einf.add_command(label=tr("tb.wz.brechen"),
                            command=lambda: self._werkzeug_aus_menue("brechen"))
+        m_einf.add_separator()
+        m_einf.add_command(label=tr("menu.einfuegen.block_erzeugen"),
+                           command=self.block_erzeugen)
+        m_einf.add_command(label=tr("menu.einfuegen.block_einfuegen"),
+                           command=self.block_einfuegen)
+        m_einf.add_command(label=tr("menu.einfuegen.block_liste"),
+                           command=self.block_liste)
         m_einf.add_separator()
         m_einf.add_command(label=tr("menu.einfuegen.viewport"),
                            command=self.viewport_modus_starten)
@@ -1368,7 +1367,7 @@ class CadApp:
             zeige(self.bem_widgets)
 
     # --------------------------------------------------------
-    # Viewport-Leiste (nur im Layout sichtbar)
+    # Viewport-Leiste
     # --------------------------------------------------------
     def _build_viewport_leiste(self):
         self.viewport_leiste = ttk.Frame(self.root, padding=(6, 3))
@@ -1631,6 +1630,9 @@ class CadApp:
         self._bogen_abbrechen()
         self._trim_abbrechen()
         self._break_abbrechen()
+        self._warte_auf_blockpunkt = False
+        self._block_einfuege_name = None
+        self._block_erzeuge_auswahl = None
         self._update_kontext_widgets()
         bg = self.bg_modell if not self._ist_layout() else self.bg_layout
         self.canvas.config(bg=bg)
@@ -1788,6 +1790,24 @@ class CadApp:
     def _escape(self, event=None):
         if self._paste_aktiv:
             self._paste_abbrechen()
+        if self._warte_auf_blockpunkt:
+            self._warte_auf_blockpunkt = False
+            self._block_einfuege_name = None
+            self._clear_temp()
+            self._update_eingabe_hinweis()
+            de = SPRACHE["aktuell"] == "de"
+            self.status.set("Einfügen abgebrochen." if de else "Paste cancelled.")
+            self.redraw()
+            return
+        if self._block_erzeuge_auswahl is not None:
+            self._block_erzeuge_auswahl = None
+            self._clear_temp()
+            self._update_eingabe_hinweis()
+            de = SPRACHE["aktuell"] == "de"
+            self.status.set("Block-Erzeugen abgebrochen." if de
+                            else "Block creation cancelled.")
+            self.redraw()
+            return
         if self._griff_drag_el is not None:
             self._griff_drag_el = None
             self._griff_drag_id = None
@@ -2045,6 +2065,15 @@ class CadApp:
             de = SPRACHE["aktuell"] == "de"
             self.status.set("Einfügen abgebrochen." if de else "Paste cancelled.")
             return
+        if self._warte_auf_blockpunkt:
+            self._warte_auf_blockpunkt = False
+            self._block_einfuege_name = None
+            self._clear_temp()
+            self.redraw()
+            self._update_eingabe_hinweis()
+            de = SPRACHE["aktuell"] == "de"
+            self.status.set("Einfügen abgebrochen." if de else "Paste cancelled.")
+            return
         if self._cmd_pending is not None:
             self._cmd_pending = None
             self._update_eingabe_hinweis()
@@ -2272,12 +2301,10 @@ class CadApp:
             l = self.layers.get(el.layer)
             if l and not l.sichtbar:
                 continue
-            # NEU: Block - rekursiv die aufgeloesten Kinder durchsuchen
             if isinstance(el, BlockReferenz):
                 kinder = el.aufgeloest()
                 treffer = self._finde_snap_in_liste(kinder, mx, my, tol, ref)
                 if treffer is not None:
-                    # hoechste Prioritaet, damit der Treffer sicher gewinnt
                     sammle(treffer[0], treffer[1], treffer[2], 0)
                 continue
             if isinstance(el, Linie):
@@ -2447,6 +2474,29 @@ class CadApp:
                  f"Y = {ziel[1] / einh:8.2f} {unit}   |   "
                  f"Click = place, ESC = cancel"))
             return
+        if self._warte_auf_blockpunkt:
+            pt = self._eingabepunkt(event)
+            self._block_vorschau(pt)
+            de = SPRACHE["aktuell"] == "de"
+            self.status.set(
+                (f"Block-Einfügepunkt: X = {pt[0] / einh:.2f}  "
+                 f"Y = {pt[1] / einh:.2f}  |  Klick = platzieren, "
+                 "ESC = abbrechen" if de else
+                 f"Block insertion point: X = {pt[0] / einh:.2f}  "
+                 f"Y = {pt[1] / einh:.2f}  |  Click = place, ESC = cancel"))
+            self._fadenkreuz(event.x, event.y)
+            return
+        if self._block_erzeuge_auswahl is not None:
+            pt = self._eingabepunkt(event)
+            de = SPRACHE["aktuell"] == "de"
+            self.status.set(
+                (f"Block-Basispunkt: X = {pt[0] / einh:.2f}  "
+                 f"Y = {pt[1] / einh:.2f}  |  Klick = bestätigen, "
+                 "ESC = abbrechen" if de else
+                 f"Block base point: X = {pt[0] / einh:.2f}  "
+                 f"Y = {pt[1] / einh:.2f}  |  Click = confirm, ESC = cancel"))
+            self._fadenkreuz(event.x, event.y)
+            return
         if self._warte_auf_basispunkt:
             x, y = self._eingabepunkt(event)
             de = SPRACHE["aktuell"] == "de"
@@ -2497,6 +2547,34 @@ class CadApp:
             f"{'Fang' if de else 'Snap'}: {'AN' if self.grid_snap.get() else 'AUS'} "
             f"({self._zahl(self.fang_mm, 5):g})   "
             f"Ortho: {'AN' if self.ortho.get() else 'AUS'}" + modus_info)
+
+    def _block_vorschau(self, pt):
+        """Zeichnet eine Vorschau des zu einfuegenden Blocks am Mauszeiger."""
+        self._clear_temp()
+        if not self._block_einfuege_name:
+            return
+        d = self.block_bibliothek.get(self._block_einfuege_name)
+        if d is None:
+            return
+        ref = BlockReferenz(pt[0], pt[1], d.name, d.elemente,
+                            layer=self.aktiver_layer.get(),
+                            farbe=self.zeichenfarbe,
+                            linientyp=self.linientyp.get(),
+                            eig_farbe=self.eigene_farbe.get(),
+                            staerke=self._zahl(self.linienstaerke, 0.35))
+        stil = {"farbe": FARBEN["gruen"], "w": 2, "dash": (5, 3)}
+        tf, sk = self._ctx_zu_px, self._ctx_skala()
+        for kind in ref.aufgeloest():
+            self._zeichne_element(kind, tags=("vorschau",), tf=tf,
+                                  skala=sk, stil=stil)
+        px, py = self._ctx_zu_px(pt[0], pt[1])
+        self.canvas.create_oval(px - 5, py - 5, px + 5, py + 5,
+                                outline=FARBEN["orange"], width=2,
+                                tags="vorschau")
+        self.canvas.create_line(px - 10, py, px + 10, py,
+                                fill=FARBEN["orange"], tags="vorschau")
+        self.canvas.create_line(px, py - 10, px, py + 10,
+                                fill=FARBEN["orange"], tags="vorschau")
 
     def _vp_drag_bestaetigen(self):
         vp = self._vp_el
@@ -2564,7 +2642,6 @@ class CadApp:
         return None
 
     def _punkt_auf_element(self, el, x_mm, y_mm, tol):
-        # NEU: Block - pruefe die aufgeloesten Kinder
         if isinstance(el, BlockReferenz):
             for kind in el.aufgeloest():
                 if self._punkt_auf_element(kind, x_mm, y_mm, tol):
@@ -2739,6 +2816,14 @@ class CadApp:
 
     def on_click(self, event):
         if self._vp_aktion != "none":
+            return
+        if self._warte_auf_blockpunkt:
+            x, y = self._eingabepunkt(event)
+            self._block_einfuegen_an(x, y)
+            return
+        if self._block_erzeuge_auswahl is not None:
+            x, y = self._eingabepunkt(event)
+            self._block_erzeugen_fertig((x, y))
             return
         if self._warte_auf_basispunkt:
             x, y = self._eingabepunkt(event)
@@ -3504,7 +3589,6 @@ class CadApp:
 
     def _zeichne_element(self, el, tags=("element",), tf=None, skala=None,
                          clip=None, stil=None):
-        # NEU: Block aufgeloest zeichnen
         if isinstance(el, BlockReferenz):
             for kind in el.aufgeloest():
                 self._zeichne_element(kind, tags=tags, tf=tf,
@@ -3740,6 +3824,9 @@ class CadApp:
         self._bogen_abbrechen()
         self._trim_abbrechen()
         self._break_abbrechen()
+        self._warte_auf_blockpunkt = False
+        self._block_einfuege_name = None
+        self._block_erzeuge_auswahl = None
         self._undo_stack = []
         self._layout_switcher_neu_aufbauen()
         self._update_kontext_widgets()
@@ -3773,6 +3860,12 @@ class CadApp:
             "aktives_layout": self.aktives_layout,
             "ansicht": self.ansicht.get(),
             "sprache": SPRACHE["aktuell"],
+            # NEU: zeichnungsspezifische Blockdefinitionen
+            "block_definitionen": [
+                d.to_dict() for d in
+                (self.block_bibliothek.get(n) for n in self.block_bibliothek.namen())
+                if d is not None
+            ],
         }
         try:
             with open(pfad, "w", encoding="utf-8") as f:
@@ -3824,6 +3917,15 @@ class CadApp:
             if el:
                 self.elemente.append(el)
 
+        # NEU: zeichnungsspezifische Blockdefinitionen in die (globale)
+        # Bibliothek mergen
+        for bd in daten.get("block_definitionen", []):
+            try:
+                d = BlockDefinition.from_dict(bd, self._dict_zu_element)
+                self.block_bibliothek.setze(d)
+            except Exception as ex:
+                print(f"[KatieCAD] Block konnte nicht geladen werden: {ex}")
+
         if "layouts" in daten and daten["layouts"]:
             self.layouts = []
             for ld in daten["layouts"]:
@@ -3868,6 +3970,9 @@ class CadApp:
         self._bogen_abbrechen()
         self._trim_abbrechen()
         self._break_abbrechen()
+        self._warte_auf_blockpunkt = False
+        self._block_einfuege_name = None
+        self._block_erzeuge_auswahl = None
         bg = self.bg_modell if not self._ist_layout() else self.bg_layout
         self.canvas.config(bg=bg)
         self.bg_btn.config(bg=bg)
@@ -4176,6 +4281,15 @@ class CadApp:
         de = SPRACHE["aktuell"] == "de"
         w = self.aktives_werkzeug.get()
         n = len(self._pts)
+
+        # NEU: Block-Zustaende haben Vorrang
+        if self._warte_auf_blockpunkt:
+            h(text=tr("msg.block.einfuegepunkt"))
+            return
+        if self._block_erzeuge_auswahl is not None:
+            h(text=tr("msg.block.basispunkt"))
+            return
+
         if w == "auswahl":
             if self._ist_layout():
                 h(text=("Viewport: Klick markiert | Ecke ziehen = skalieren | "
@@ -4559,6 +4673,11 @@ class CadApp:
     def _el_polylinien(self, el, skala):
         if isinstance(el, Text):
             return [(el.rahmen(), True)]
+        if isinstance(el, BlockReferenz):
+            out = []
+            for kind in el.aufgeloest():
+                out.extend(self._el_polylinien(kind, skala))
+            return out
         out = [(p[1], p[2]) for p in self._prims(el, skala) if p[0] == "l"]
         if isinstance(el, Bemassung):
             g = el.geometrie(self._einh_faktor(), self.dezimalkomma.get())
@@ -4805,6 +4924,11 @@ class CadApp:
         if self._paste_aktiv:
             self._paste_vorschau_ids = []
             self._paste_vorschau_aktualisieren(self._maus_px[0], self._maus_px[1])
+            return
+        if self._warte_auf_blockpunkt:
+            pt = self._eingabepunkt_px(self._maus_px[0], self._maus_px[1],
+                                       None, marker=False)
+            self._block_vorschau(pt)
             return
         werkzeug_aktiv = (self.aktives_werkzeug.get() != "auswahl"
                           or self._viewport_modus or self._vp_fenster is not None
@@ -5061,7 +5185,7 @@ class CadApp:
 
     def _stil_auf_auswahl(self, event=None):
         ziele = [e for e in self.auswahl
-                 if not isinstance(e, (Viewport, Text, Bemassung))]
+                 if not isinstance(e, (Viewport, Text, Bemassung, BlockReferenz))]
         if not ziele:
             return
         self._snapshot()
@@ -5292,8 +5416,6 @@ class CadApp:
 
     def _stretch_element(self, el, innen, dx, dy):
         if isinstance(el, BlockReferenz):
-            # Block wird als Ganzes verschoben, wenn sein Basispunkt im
-            # Fenster liegt - ansonsten unveraendert.
             if innen(el.x, el.y):
                 el.x += dx; el.y += dy
             return
@@ -5573,6 +5695,12 @@ class CadApp:
             self.auswahl_loeschen()
         elif cmd == "zg":
             self.zoom_grenzen()
+        elif cmd == "block:neu":
+            self.block_erzeugen()
+        elif cmd == "block:einfuegen":
+            self.block_einfuegen()
+        elif cmd == "block:liste":
+            self.block_liste()
         elif cmd.startswith("tool:"):
             self.aktives_werkzeug.set(cmd[5:])
             self._werkzeug_gewechselt()
@@ -5681,48 +5809,161 @@ class CadApp:
                             ("Vorschau geöffnet." if de else "Preview opened."))
 
     # --------------------------------------------------------
-    # NEU: Debug-Helfer (nur zum Testen, in Schritt 4 durch UI ersetzt)
+    # NEU (Schritt 4): Block-Befehle
     # --------------------------------------------------------
-    def _debug_block_einfuegen(self, name, x, y):
-        """NUR ZUM TESTEN - fuegt einen Block ohne UI ein."""
-        d = self.block_bibliothek.get(name)
+    def block_erzeugen(self):
+        """BLOCK-Befehl: Auswahl in einen benannten Block umwandeln und durch
+        eine Referenz ersetzen."""
+        de = SPRACHE["aktuell"] == "de"
+        if self._ist_layout():
+            self.status.set(("Bitte in die Modell-Ansicht wechseln." if de
+                             else "Please switch to model view."))
+            return
+        if not self.auswahl:
+            self.status.set(("Bitte zuerst Objekte markieren, dann B drücken."
+                             if de else
+                             "Please select objects first, then press B."))
+            return
+        # Zustand: wir warten auf einen Klick fuer den Basispunkt
+        self._block_erzeuge_auswahl = list(self.auswahl)
+        self.letzter_punkt = None
+        self._update_eingabe_hinweis()
+        self.status.set(tr("msg.block.basispunkt"))
+        self.entry_eingabe.focus_set()
+
+    def _block_erzeugen_fertig(self, basispunkt):
+        """Wird nach dem Basispunkt-Klick aufgerufen: fragt nach Namen,
+        erzeugt die Definition und ersetzt die Auswahl durch die Referenz."""
+        de = SPRACHE["aktuell"] == "de"
+        if self._block_erzeuge_auswahl is None:
+            return
+        auswahl = self._block_erzeuge_auswahl
+        self._block_erzeuge_auswahl = None
+        self._clear_temp()
+        self.redraw()
+
+        # Blockname erfragen
+        vorschlag = self._naechster_block_name()
+        name = _BlockNameDialog(self.root, self.block_bibliothek,
+                                vorschlag).result
+        if not name:
+            self.status.set(("Block-Erzeugen abgebrochen." if de
+                             else "Block creation cancelled."))
+            self._update_eingabe_hinweis()
+            return
+
+        bx, by = basispunkt
+        # Kinder relativ zum Basispunkt
+        relativ = []
+        for el in auswahl:
+            k = self._dict_zu_element(el.to_dict())
+            if k is None:
+                continue
+            k.verschieben(-bx, -by)
+            relativ.append(k)
+        if not relativ:
+            self.status.set(("Block ist leer - abgebrochen." if de
+                             else "Block is empty - cancelled."))
+            self._update_eingabe_hinweis()
+            return
+
+        definition = BlockDefinition(name, (0.0, 0.0), relativ)
+        self.block_bibliothek.setze(definition)
+
+        # Auswahl aus der Zeichnung entfernen und durch die Referenz ersetzen
+        self._snapshot()
+        liste = self._aktuelle_elemente_liste()
+        for el in auswahl:
+            if el in liste:
+                liste.remove(el)
+
+        ref = BlockReferenz(bx, by, name, definition.elemente,
+                            layer=self.aktiver_layer.get(),
+                            farbe=self.zeichenfarbe,
+                            linientyp=self.linientyp.get(),
+                            eig_farbe=self.eigene_farbe.get(),
+                            staerke=self._zahl(self.linienstaerke, 0.35))
+        liste.append(ref)
+        self.auswahl = [ref]
+        self.redraw()
+        self._update_eingabe_hinweis()
+        self.status.set(tr("msg.block.erzeugt", name=name,
+                           n=len(definition.elemente)))
+
+    def _naechster_block_name(self):
+        i = 1
+        while f"Block{i}" in self.block_bibliothek:
+            i += 1
+        return f"Block{i}"
+
+    def block_einfuegen(self):
+        """INSERT-Befehl: Block aus der Bibliothek auswaehlen und platzieren."""
+        de = SPRACHE["aktuell"] == "de"
+        if self._ist_layout():
+            self.status.set(("Bitte in die Modell-Ansicht wechseln." if de
+                             else "Please switch to model view."))
+            return
+        if len(self.block_bibliothek) == 0:
+            messagebox.showinfo(
+                tr("dlg.block.auswahl.titel"),
+                tr("dlg.block.auswahl.leer"),
+                parent=self.root)
+            return
+        dlg = _BlockAuswahlDialog(self.root, self.block_bibliothek)
+        # geloeschte Bloecke persistieren (falls der Dialog welche entfernt hat)
+        for _ in dlg.geloescht:
+            pass  # bereits durch bibliothek.loesche() persistiert
+        name = dlg.result
+        if not name:
+            return
+        self._block_einfuege_name = name
+        self._warte_auf_blockpunkt = True
+        self.letzter_punkt = None
+        self._update_eingabe_hinweis()
+        self.status.set(tr("msg.block.einfuegepunkt"))
+        self.entry_eingabe.focus_set()
+
+    def _block_einfuegen_an(self, x, y):
+        """Legt den Block am Einfuegepunkt an."""
+        de = SPRACHE["aktuell"] == "de"
+        if not self._block_einfuege_name:
+            return
+        d = self.block_bibliothek.get(self._block_einfuege_name)
         if d is None:
-            print(f"[Debug] Block '{name}' nicht gefunden.")
+            self._warte_auf_blockpunkt = False
+            self._block_einfuege_name = None
+            self._update_eingabe_hinweis()
             return
         self._snapshot()
-        ref = BlockReferenz(x, y, name, d.elemente,
+        ref = BlockReferenz(x, y, d.name, d.elemente,
                             layer=self.aktiver_layer.get(),
                             farbe=self.zeichenfarbe,
                             linientyp=self.linientyp.get(),
                             eig_farbe=self.eigene_farbe.get(),
                             staerke=self._zahl(self.linienstaerke, 0.35))
         self._ziel_liste().append(ref)
+        self.auswahl = [ref]
+        self._warte_auf_blockpunkt = False
+        name = self._block_einfuege_name
+        self._block_einfuege_name = None
+        self._clear_temp()
         self.redraw()
-        print(f"[Debug] Block '{name}' bei ({x}, {y}) eingefuegt.")
+        self._update_eingabe_hinweis()
+        self.status.set(tr("msg.block.eingefuegt", name=name,
+                           x=x / self._einh_faktor(),
+                           y=y / self._einh_faktor()))
 
-    def _debug_block_erzeugen(self, name):
-        """NUR ZUM TESTEN - erzeugt einen Block aus der aktuellen Auswahl."""
-        if not self.auswahl:
-            print("[Debug] Nichts ausgewaehlt.")
+    def block_liste(self):
+        """BLOCKLISTE: Bibliothek ansehen/verwalten (kein Einfuegen)."""
+        de = SPRACHE["aktuell"] == "de"
+        if len(self.block_bibliothek) == 0:
+            messagebox.showinfo(
+                tr("dlg.block.auswahl.titel"),
+                tr("dlg.block.auswahl.leer"),
+                parent=self.root)
             return
-        if not name:
-            print("[Debug] Name fehlt.")
-            return
-        xs, ys = [], []
-        for el in self.auswahl:
-            b = el.bbox()
-            xs.extend([b[0], b[2]])
-            ys.extend([b[1], b[3]])
-        bx, by = min(xs), min(ys)
-        relativ = []
-        for el in self.auswahl:
-            k = self._dict_zu_element(el.to_dict())
-            k.verschieben(-bx, -by)
-            relativ.append(k)
-        d = BlockDefinition(name, (0.0, 0.0), relativ)
-        self.block_bibliothek.setze(d)
-        print(f"[Debug] Block '{name}' mit {len(relativ)} Element(en) "
-              f"erzeugt und in Bibliothek gespeichert.")
+        _BlockAuswahlDialog(self.root, self.block_bibliothek)
+        # Ergebnis ignorieren - nur Verwaltung
 
 
 # ============================================================
