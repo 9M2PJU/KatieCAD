@@ -4,7 +4,7 @@ katiecad_manifest.py - Zentrale Liste aller Module + Version.
 Dient als Anker fuer neue Chats: pruefen, ob alle Dateien da sind.
 """
 
-VERSION = "0.2.0"
+VERSION = "0.2.1"
 
 MODULE = {
     # "katiecad.py" ist nur ein Einstiegspunkt und kein importierbares Modul.
@@ -15,6 +15,7 @@ MODULE = {
     "katiecad_dialogs.py":   "Alle Dialoge + Lizenzfenster",
     "katiecad_pdf.py":       "PDF-Ausgabe aus Modell/Layout",
     "katiecad_config.py":    "Persistente Anwender-Einstellungen (Sprache)",
+    "katiecad_cadimport.py": "DXF/DWG-Import (ezdxf, ODA File Converter)",
 }
 
 
