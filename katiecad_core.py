@@ -1583,10 +1583,23 @@ class BlockBibliothek:
 
 
 class Schraffur(Element):
-    def __init__(self, punkte, typ="solid", winkel=45.0, abstand=5.0, **kw):
+    """Schraffur ueber einer geschlossenen Kontur.
+
+    WICHTIG: Der Elementtyp (self.typ) bleibt "schraffur", damit
+    Speichern/Laden/Kopieren/Undo (_dict_zu_element) das Element
+    erkennen. Das Fuellmuster steht in self.muster ("solid"/"linien").
+    Der Parameter `typ="solid"|"linien"` wird aus Kompatibilitaetsgruenden
+    (alter Import-Code, alte Dateien) weiterhin als Alias akzeptiert.
+    """
+    MUSTER = ("solid", "linien")
+
+    def __init__(self, punkte, muster="solid", winkel=45.0, abstand=5.0,
+                 typ=None, **kw):
         super().__init__("schraffur", **kw)
+        if typ in self.MUSTER:          # Alias / Altformat
+            muster = typ
         self.punkte = [tuple(p) for p in punkte]
-        self.typ = typ  # "solid" oder "linien"
+        self.muster = muster if muster in self.MUSTER else "solid"
         self.winkel = winkel
         self.abstand = abstand
 
@@ -1617,22 +1630,24 @@ class Schraffur(Element):
             pass
 
     def geometrie_linien(self):
-        """Berechnet die Schnittpunkte für die Linien-Schraffur (Scanline)."""
-        if self.typ != "linien" or len(self.punkte) < 3:
+        """Berechnet die Schnittpunkte fuer die Linien-Schraffur (Scanline)."""
+        if self.muster != "linien" or len(self.punkte) < 3:
             return []
+        abstand = max(float(self.abstand or 0), 0.05)   # Endlosschleife vermeiden
 
-        # 1. Polygon in ein lokales Koordinatensystem drehen (damit die Linien horizontal sind)
         rad = math.radians(-self.winkel)
         ca, sa = math.cos(rad), math.sin(rad)
         rot_pts = [(x * ca + y * sa, -x * sa + y * ca) for (x, y) in self.punkte]
-
-        # 2. Bounding Box im gedrehten System bestimmen
         min_y = min(p[1] for p in rot_pts)
         max_y = max(p[1] for p in rot_pts)
+        if (max_y - min_y) / abstand > 20000:           # absurd dichte Schraffur
+            return []
 
-        # 3. Horizontale Linien im Abstand "abstand" ziehen
+        rad_back = math.radians(self.winkel)
+        cb, sb = math.cos(rad_back), math.sin(rad_back)
         linien = []
-        y = min_y
+        # halber Abstand als Start: Linien liegen nicht exakt auf Eckpunkten
+        y = min_y + abstand / 2.0 if (max_y - min_y) > abstand else min_y
         while y <= max_y:
             schnitte = []
             for i in range(len(rot_pts)):
@@ -1640,22 +1655,86 @@ class Schraffur(Element):
                 p2 = rot_pts[(i + 1) % len(rot_pts)]
                 if (p1[1] <= y < p2[1]) or (p2[1] <= y < p1[1]):
                     t = (y - p1[1]) / (p2[1] - p1[1])
-                    x = p1[0] + t * (p2[0] - p1[0])
-                    schnitte.append(x)
+                    schnitte.append(p1[0] + t * (p2[0] - p1[0]))
             schnitte.sort()
-
-            # 4. Paare bilden und zurückdrehen
             for i in range(0, len(schnitte) - 1, 2):
-                x1, x2 = schnitte[i], schnitte[i+1]
-                rad_back = math.radians(self.winkel)
-                cb, sb = math.cos(rad_back), math.sin(rad_back)
-                wx1 = x1 * cb + y * sb
-                wy1 = -x1 * sb + y * cb
-                wx2 = x2 * cb + y * sb
-                wy2 = -x2 * sb + y * cb
-                linien.append(((wx1, wy1), (wx2, wy2)))
-            y += self.abstand
+                x1, x2 = schnitte[i], schnitte[i + 1]
+                linien.append(((x1 * cb + y * sb, -x1 * sb + y * cb),
+                               (x2 * cb + y * sb, -x2 * sb + y * cb)))
+            y += abstand
         return linien
+
+
+# ------------------------------------------------------------
+# Konturerkennung fuer Schraffuren
+# ------------------------------------------------------------
+def _kreis_polygon(cx, cy, r, n=None):
+    if n is None:
+        n = int(max(48, min(360, r * 4)))
+    return [(cx + r * math.cos(2 * math.pi * i / n),
+             cy + r * math.sin(2 * math.pi * i / n)) for i in range(n)]
+
+
+def konturen_aus_elementen(elemente, tol=0.05):
+    """Findet geschlossene Konturen in einer Elementliste.
+
+    Rueckgabe: Liste von (punkte, quell_elemente).
+      - Kreis, Rechteck, geschlossene Polylinie -> je eine eigene Kontur
+      - Linie, Bogen, offene Polylinie          -> werden an ihren
+        Endpunkten (Abstand <= tol) zu Ketten verbunden; nur Ketten,
+        die sich schliessen, ergeben eine Kontur.
+    """
+    ergebnis = []
+    offene = []                                   # (punkte, quelle)
+    for el in elemente:
+        if isinstance(el, Kreis):
+            ergebnis.append((_kreis_polygon(el.cx, el.cy, el.r), [el]))
+        elif isinstance(el, Rechteck):
+            ergebnis.append(([(el.x1, el.y1), (el.x2, el.y1),
+                              (el.x2, el.y2), (el.x1, el.y2)], [el]))
+        elif isinstance(el, Polylinie):
+            if el.geschlossen and len(el.punkte) >= 3:
+                ergebnis.append((list(el.punkte), [el]))
+            elif len(el.punkte) >= 2:
+                offene.append((list(el.punkte), el))
+        elif isinstance(el, Linie):
+            offene.append(([(el.x1, el.y1), (el.x2, el.y2)], el))
+        elif isinstance(el, Bogen):
+            sw = bogen_sweep(el.start, el.ende)
+            n = int(max(8, min(360, sw / 3.0)))
+            offene.append((bogen_punkte(el.cx, el.cy, el.r, el.start, el.ende, n), el))
+
+    def nah(a, b):
+        return math.hypot(a[0] - b[0], a[1] - b[1]) <= tol
+
+    rest = list(offene)
+    while rest:
+        pts, quelle = rest.pop(0)
+        pts = list(pts)
+        quellen = [quelle]
+        erweitert = True
+        while erweitert:
+            erweitert = False
+            if len(pts) > 2 and nah(pts[0], pts[-1]):
+                break
+            for i, (p2, q2) in enumerate(rest):
+                if nah(pts[-1], p2[0]):
+                    pts += p2[1:]
+                elif nah(pts[-1], p2[-1]):
+                    pts += list(reversed(p2))[1:]
+                elif nah(pts[0], p2[-1]):
+                    pts = p2[:-1] + pts
+                elif nah(pts[0], p2[0]):
+                    pts = list(reversed(p2))[:-1] + pts
+                else:
+                    continue
+                quellen.append(q2)
+                rest.pop(i)
+                erweitert = True
+                break
+        if len(pts) > 3 and nah(pts[0], pts[-1]):
+            ergebnis.append((pts[:-1], quellen))
+    return ergebnis
 
 
 # ============================================================
