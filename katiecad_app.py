@@ -747,10 +747,17 @@ class CadApp:
         koord_bar.pack(side=tk.BOTTOM, fill=tk.X)
 
     def _build_menu(self):
+        # Erzwingt die dunkle Farbe für die Menüleiste auf Systemebene
+        self.root.option_add('*Menu.background', FARBEN["bg_mittel"])
+        self.root.option_add('*Menu.foreground', FARBEN["cyan"])
+        self.root.option_add('*Menu.activeBackground', FARBEN["cyan"])
+        self.root.option_add('*Menu.activeForeground', FARBEN["bg_dunkel"])
+
         menubar = tk.Menu(self.root,
                           bg=FARBEN["bg_mittel"], fg=FARBEN["cyan"],
                           activebackground=FARBEN["cyan"],
                           activeforeground=FARBEN["bg_dunkel"], bd=0)
+        # ... der Rest der Funktion bleibt unverändert ...
 
         # Datei
         m_datei = tk.Menu(menubar, tearoff=0,
@@ -811,18 +818,6 @@ class CadApp:
                          activeforeground=FARBEN["bg_dunkel"])
         m_einf.add_command(label=tr("menu.einfuegen.auswahl"),
                            command=lambda: self._werkzeug_aus_menue("auswahl"))
-        m_einf.add_separator()
-        m_einf.add_command(label=tr("menu.einfuegen.linie"),
-                           command=lambda: self._werkzeug_aus_menue("linie"))
-        m_einf.add_command(label=tr("menu.einfuegen.polylinie"),
-                           command=lambda: self._werkzeug_aus_menue("polylinie"))
-        m_einf.add_command(label=tr("menu.einfuegen.kreis"),
-                           command=lambda: self._werkzeug_aus_menue("kreis"))
-        m_einf.add_command(label=tr("menu.einfuegen.bogen"),
-                           command=lambda: self._werkzeug_aus_menue("bogen"))
-        m_einf.add_command(label=tr("menu.einfuegen.rechteck"),
-                           command=lambda: self._werkzeug_aus_menue("rechteck"))
-        m_einf.add_separator()
         m_einf.add_command(label=tr("menu.einfuegen.text"),
                            command=lambda: self._werkzeug_aus_menue("text"))
         m_einf.add_command(label=tr("menu.einfuegen.bemassung"),
@@ -874,6 +869,22 @@ class CadApp:
         m_ansicht.add_command(label=tr("menu.ansicht.reset"),
                               command=self._reset_view)
         menubar.add_cascade(label=tr("menu.ansicht"), menu=m_ansicht)
+
+        # Blöcke
+        m_bloecke = tk.Menu(menubar, tearoff=0,
+                            bg=FARBEN["bg_mittel"], fg=FARBEN["cyan"],
+                            activebackground=FARBEN["cyan"],
+                            activeforeground=FARBEN["bg_dunkel"])
+        m_bloecke.add_command(label=tr("menu.einfuegen.block_erzeugen"),
+                              command=self.block_erzeugen)
+        m_bloecke.add_command(label=tr("menu.einfuegen.block_einfuegen"),
+                              command=self.block_einfuegen)
+        m_bloecke.add_command(label=tr("menu.einfuegen.block_liste"),
+                              command=self.block_liste)
+        m_bloecke.add_separator()
+        m_bloecke.add_command(label=tr("menu.einfuegen.block_aufloesen"),
+                              command=self.block_aufloesen)
+        menubar.add_cascade(label=tr("menu.bloecke"), menu=m_bloecke)
 
         # Sprache
         m_sprache = tk.Menu(menubar, tearoff=0,
@@ -3778,16 +3789,11 @@ class CadApp:
         btn_row.pack(fill="x", side="bottom", pady=(10, 0))
 
         def make_btn(text, cmd):
-            b = tk.Button(btn_row, text=text, command=cmd,
-                          bg=FARBEN["bg_hell"], fg=FARBEN["text"],
-                          activebackground=FARBEN["bg_hover"],
-                          activeforeground=FARBEN["cyan"],
-                          relief="raised", bd=1, font=("Helvetica", 9, "bold"),
-                          padx=16, pady=6, cursor="hand2")
+            b = ttk.Button(btn_row, text=text, command=cmd)
             return b
 
-        make_btn("License", lambda: zeige_lizenz_fenster(info_win)).pack(side="left")
-        make_btn(tr("dlg.schliessen"), info_win.destroy).pack(side="right")
+        make_btn(tr("info.btn_lizenz"), lambda: zeige_lizenz_fenster(info_win)).pack(side="left", padx=4)
+        make_btn(tr("dlg.schliessen"), info_win.destroy).pack(side="right", padx=4)
 
         info_win.update_idletasks()
         mx = self.root.winfo_rootx() + self.root.winfo_width() // 2
@@ -6011,3 +6017,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
