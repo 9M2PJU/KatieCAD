@@ -30,6 +30,7 @@ except ImportError:
     PILLOW_VERFUEGBAR = False
 
 from katiecad_i18n import tr, SPRACHE, setze_sprache, TEXTE
+from katiecad_config import lade_konfiguration, speichere_sprache
 from katiecad_core import (
     FARBEN, EINHEITEN, ZEICHNUNGSFORMATE, MASSSTAEBE, LINIENTYPEN,
     RASTER_GROESSEN, BG_PRESETS, SCHRIFTARTEN, LINIENSTAERKEN,
@@ -150,6 +151,10 @@ class CadApp:
         self.root.title("KatieCAD")
         self.root.geometry("1500x950")
         self.root.configure(bg=FARBEN["bg_dunkel"])
+
+        # --- Sprache aus persistenter Konfiguration laden (vor UI-Aufbau!) ---
+        _cfg = lade_konfiguration()
+        setze_sprache(_cfg.get("sprache", "en"))
 
         # Selbstcheck: sind alle im Manifest gelisteten Module da?
         try:
@@ -283,7 +288,8 @@ class CadApp:
         self.bem_hoehe = tk.DoubleVar(value=2.5)
         self.bem_pfeil = tk.DoubleVar(value=2.5)
         self.bem_dez = tk.IntVar(value=2)
-        self.dezimalkomma = tk.BooleanVar(value=True)
+        # Dezimalkomma passend zur geladenen Sprache initialisieren
+        self.dezimalkomma = tk.BooleanVar(value=(SPRACHE["aktuell"] == "de"))
         self._pts = []
         self._bem_kreis = None
         self._snap_ausschluss = None
@@ -402,6 +408,8 @@ class CadApp:
         if code not in TEXTE or code == SPRACHE["aktuell"]:
             return
         setze_sprache(code)
+        speichere_sprache(code)
+        self.sprache_var.set(code)
         if code == "en":
             self.dezimalkomma.set(False)
         else:
