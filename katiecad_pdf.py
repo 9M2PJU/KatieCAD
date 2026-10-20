@@ -4,6 +4,7 @@ katiecad_pdf.py - PDF-Erzeugung fuer Modell- und Layout-Ansicht.
 Enthaelt KEIN Tkinter. Wird von CadApp aufgerufen.
 
 NEU (Schritt 2): BlockReferenz wird aufgeloest ausgegeben.
+NEU (Schritt 8): Schraffuren (Solid und Linien) werden unterstuetzt.
 """
 
 import math, os, sys, tempfile, subprocess
@@ -13,7 +14,7 @@ from katiecad_core import (
     ZEICHNUNGSFORMATE, MASSSTAEBE, LINIENTYPEN, PdfSeite,
     Text, Bemassung, Viewport,
     Linie, Rechteck, Polylinie, Kreis, Bogen,
-    BlockReferenz,
+    BlockReferenz, Schraffur,
     bogen_sweep, bogen_punkte,
     normmassstab_unter, massstab_text,
 )
@@ -85,6 +86,23 @@ def _pdf_element(seite, el, tf, zs, farbig, layers, einh_faktor, dezimalkomma):
             _pdf_element(seite, kind, tf, zs, farbig, layers,
                          einh_faktor, dezimalkomma)
         return
+
+    # NEU: Schraffur ausgeben
+    if isinstance(el, Schraffur):
+        farbe = _pdf_farbe(el, layers, farbig)
+        if el.typ == "solid":
+            pts = [tf(x, y) for (x, y) in el.punkte]
+            seite.flaeche(pts, farbe)
+        else:
+            # Grenzlinie (optional, hier zeichnen wir sie mit, um saubere Kanten zu haben)
+            pts = [tf(x, y) for (x, y) in el.punkte]
+            seite.linie(pts, 0.25, farbe, None, True)
+            
+            # Schraffurlinien
+            for (p1, p2) in el.geometrie_linien():
+                seite.linie([tf(p1[0], p1[1]), tf(p2[0], p2[1])], 0.18, farbe)
+        return
+
     farbe = _pdf_farbe(el, layers, farbig)
     w = _effektive_staerke_mm(el, layers)
     dash = None
