@@ -4,7 +4,8 @@ katiecad_i18n.py - Sprachumschaltung Deutsch / Englisch
 Enthaelt alle UI-Texte und die tr()-Funktion.
 """
 
-SPRACHE = {"aktuell": "de"}
+SPRACHE = {"aktuell": "en"}     # <-- Erststart Englisch; wird beim Start aus
+                                #     katiecad_config.py ueberschrieben.
 
 TEXTE = {
     "de": {
