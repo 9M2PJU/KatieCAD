@@ -5,6 +5,7 @@ Enthaelt alle UI-Texte und die tr()-Funktion.
 
 NEU (Schritt 6): Texte fuer Blockbefehle und -dialoge.
 NEU (Schritt 8): Texte fuer Schraffur.
+NEU: Texte fuer Radius- / Durchmesser-Bemaßung.
 """
 
 SPRACHE = {"aktuell": "en"}     # <-- Erststart Englisch; wird beim Start aus
@@ -46,6 +47,8 @@ TEXTE = {
         "menu.einfuegen.rechteck": "Rechteck",
         "menu.einfuegen.text": "Text",
         "menu.einfuegen.bemassung": "Bemaßung",
+        "menu.einfuegen.radius": "Radius (R)",
+        "menu.einfuegen.durchmesser": "Durchmesser (Ø)",
         "menu.einfuegen.schraffur": "Schraffur auf Auswahl",
         "menu.einfuegen.viewport": "Viewport platzieren",
         "menu.einfuegen.rahmen": "Rahmen + Schriftfeld",
@@ -321,6 +324,8 @@ TEXTE = {
         "menu.einfuegen.rechteck": "Rectangle",
         "menu.einfuegen.text": "Text",
         "menu.einfuegen.bemassung": "Dimension",
+        "menu.einfuegen.radius": "Radius (R)",
+        "menu.einfuegen.durchmesser": "Diameter (Ø)",
         "menu.einfuegen.schraffur": "Hatch selection",
         "menu.einfuegen.viewport": "Place viewport",
         "menu.einfuegen.rahmen": "Frame + title block",
