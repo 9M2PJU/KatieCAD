@@ -7,7 +7,8 @@ Dient als Anker fuer neue Chats: pruefen, ob alle Dateien da sind.
 VERSION = "0.2.0"
 
 MODULE = {
-    "katiecad.py":           "Einstiegspunkt",
+    # "katiecad.py" ist nur ein Einstiegspunkt und kein importierbares Modul.
+    # Der Eintrag fuehrt bei jedem Start zu einer unnoetigen Warnung.
     "katiecad_app.py":       "CadApp: UI, Events, Werkzeuge, State",
     "katiecad_core.py":      "Datenmodell, Geometrie, PDF-Writer",
     "katiecad_i18n.py":      "UI-Texte DE/EN",
