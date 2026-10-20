@@ -2,6 +2,8 @@
 """
 katiecad_pdf.py - PDF-Erzeugung fuer Modell- und Layout-Ansicht.
 Enthaelt KEIN Tkinter. Wird von CadApp aufgerufen.
+
+NEU (Schritt 2): BlockReferenz wird aufgeloest ausgegeben.
 """
 
 import math, os, sys, tempfile, subprocess
@@ -11,6 +13,7 @@ from katiecad_core import (
     ZEICHNUNGSFORMATE, MASSSTAEBE, LINIENTYPEN, PdfSeite,
     Text, Bemassung, Viewport,
     Linie, Rechteck, Polylinie, Kreis, Bogen,
+    BlockReferenz,
     bogen_sweep, bogen_punkte,
     normmassstab_unter, massstab_text,
 )
@@ -76,6 +79,12 @@ def _prims(el, skala, einh_faktor, dezimalkomma):
 
 
 def _pdf_element(seite, el, tf, zs, farbig, layers, einh_faktor, dezimalkomma):
+    # NEU: Block aufgeloest ausgeben
+    if isinstance(el, BlockReferenz):
+        for kind in el.aufgeloest():
+            _pdf_element(seite, kind, tf, zs, farbig, layers,
+                         einh_faktor, dezimalkomma)
+        return
     farbe = _pdf_farbe(el, layers, farbig)
     w = _effektive_staerke_mm(el, layers)
     dash = None
