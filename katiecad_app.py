@@ -836,6 +836,10 @@ class CadApp:
                            command=lambda: self._werkzeug_aus_menue("text"))
         m_einf.add_command(label=tr("menu.einfuegen.bemassung"),
                            command=lambda: self._werkzeug_aus_menue("bemassung"))
+        m_einf.add_command(label=tr("menu.einfuegen.radius"),
+                           command=lambda: self._bem_art_starten("radius"))
+        m_einf.add_command(label=tr("menu.einfuegen.durchmesser"),
+                           command=lambda: self._bem_art_starten("durchmesser"))
         m_einf.add_separator()
         m_einf.add_command(label=tr("tb.wz.stutzen"),
                            command=lambda: self._werkzeug_aus_menue("stutzen"))
@@ -1327,6 +1331,23 @@ class CadApp:
     def _werkzeug_aus_menue(self, key):
         self.aktives_werkzeug.set(key)
         self._werkzeug_gewechselt()
+
+    def _bem_art_starten(self, art):
+        """Aktiviert das Bemaßungswerkzeug mit vorgewähltem Radius/Durchmesser."""
+        if art not in ("radius", "durchmesser"):
+            return
+        self.bem_art.set(art)
+        self.aktives_werkzeug.set("bemassung")
+        self._werkzeug_gewechselt()
+        de = SPRACHE["aktuell"] == "de"
+        self.status.set(
+            ("Radius-Bemaßung: Kreis/Bogen anklicken, dann Textposition."
+             if de and art == "radius" else
+             "Radius dimension: click circle/arc, then text position."
+             if art == "radius" else
+             "Durchmesser-Bemaßung: Kreis/Bogen anklicken, dann Textposition."
+             if de else
+             "Diameter dimension: click circle/arc, then text position."))
 
     def _aktualisiere_osnap_anzeige(self):
         aktive = [k for k, v in self.osnap_modi.items() if v.get()]
@@ -5677,6 +5698,11 @@ class CadApp:
             self.block_liste()
         elif cmd == "block:explode":
             self.block_aufloesen()
+        elif cmd.startswith("bem:"):
+            self._bem_art_starten(cmd[4:])
+        elif cmd.startswith("tool:"):
+            self.aktives_werkzeug.set(cmd[5:])
+            self._werkzeug_gewechselt()
         elif cmd.startswith("tool:"):
             self.aktives_werkzeug.set(cmd[5:])
             self._werkzeug_gewechselt()
