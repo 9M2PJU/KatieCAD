@@ -37,6 +37,7 @@ TEXTE = {
         "menu.bearbeiten.auswahl_loeschen": "Auswahl löschen (Entf)",
         "menu.bearbeiten.alles_markieren": "Alles markieren (Strg+A)",
         "menu.einfuegen": "Einfügen",
+        "menu.bloecke": "Blöcke",
         "menu.einfuegen.auswahl": "Auswahl",
         "menu.einfuegen.linie": "Linie",
         "menu.einfuegen.polylinie": "Polylinie",
@@ -277,6 +278,7 @@ TEXTE = {
         "info.copyright": "(c) 2026 Merecete",
         "info.version": "Version 0.1.0",
         "info.lizenz": "Veröffentlicht unter der MIT-Lizenz.",
+        "info.btn_lizenz": "Lizenz",
     },
     "en": {
         "menu.datei": "File",
@@ -305,6 +307,7 @@ TEXTE = {
         "menu.bearbeiten.auswahl_loeschen": "Delete selection (Del)",
         "menu.bearbeiten.alles_markieren": "Select all (Ctrl+A)",
         "menu.einfuegen": "Insert",
+        "menu.bloecke": "Blocks",
         "menu.einfuegen.auswahl": "Select",
         "menu.einfuegen.linie": "Line",
         "menu.einfuegen.polylinie": "Polyline",
@@ -545,6 +548,7 @@ TEXTE = {
         "info.copyright": "(c) 2026 Merecete",
         "info.version": "Version 0.1.0",
         "info.lizenz": "Released under the MIT License.",
+        "info.btn_lizenz": "License",
     },
 }
 
