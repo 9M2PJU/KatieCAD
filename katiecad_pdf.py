@@ -90,7 +90,7 @@ def _pdf_element(seite, el, tf, zs, farbig, layers, einh_faktor, dezimalkomma):
     # NEU: Schraffur ausgeben
     if isinstance(el, Schraffur):
         farbe = _pdf_farbe(el, layers, farbig)
-        if el.typ == "solid":
+        if el.muster == "solid":
             pts = [tf(x, y) for (x, y) in el.punkte]
             seite.flaeche(pts, farbe)
         else:
