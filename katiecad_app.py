@@ -3646,8 +3646,8 @@ class CadApp:
     # --------------------------------------------------------
     def zeige_info_fenster(self):
         info_win = tk.Toplevel(self.root)
-        info_win.title(tr("info.titel"))
-        info_win.geometry("450x420")
+        info_win.title(tr("info.titel") + " - KatieCAD")
+        info_win.geometry("560x460")
         info_win.transient(self.root)
         info_win.configure(bg=FARBEN["bg_mittel"])
         info_win.resizable(False, False)
@@ -3671,31 +3671,36 @@ class CadApp:
                 logo_path = k_abs
                 break
 
-        if logo_path is None:
-            print("[KatieCAD] Logo nicht gefunden. Gesucht in:")
-            for k in kandidaten:
-                print(f"    {os.path.abspath(k)}")
-        elif not PILLOW_VERFUEGBAR:
-            print("[KatieCAD] Pillow nicht installiert – Logo wird nicht angezeigt.")
-        else:
+        if logo_path is not None and PILLOW_VERFUEGBAR:
             try:
                 logo_img = Image.open(logo_path).convert("RGBA")
-                logo_img = logo_img.resize((64, 64), Image.Resampling.LANCZOS)
+                # Etwas groesseres Logo wie bei XZN
+                logo_img = logo_img.resize((96, 96), Image.Resampling.LANCZOS)
                 logo_photo = ImageTk.PhotoImage(logo_img)
                 logo_lbl = tk.Label(title_row, image=logo_photo,
                                     bg=FARBEN["bg_mittel"], bd=0,
                                     highlightthickness=0)
                 logo_lbl.image = logo_photo
-                logo_lbl.pack(side="left", padx=(0, 14))
-                print(f"[KatieCAD] Logo geladen: {logo_path}")
+                logo_lbl.pack(side="left", padx=(0, 20))
             except Exception as e:
                 print(f"[KatieCAD] Logo konnte nicht geladen werden: {e}")
 
         tk.Label(title_row, text="KatieCAD",
-                 font=("Helvetica", 15, "bold"),
+                 font=("Helvetica", 18, "bold"),
                  bg=FARBEN["bg_mittel"], fg=FARBEN["cyan"]).pack(side="left", anchor="w")
 
-        tk.Frame(frame, bg=FARBEN["rand"], height=1).pack(fill="x", pady=(8, 14))
+        # Untertitel (Kursiv, etwas groesser)
+        tk.Label(frame, text=tr("info.untertitel"),
+                 font=("Helvetica", 10, "italic"),
+                 wraplength=480, justify="left",
+                 bg=FARBEN["bg_mittel"], fg=FARBEN["cyan"]).pack(anchor="w", pady=(16, 10))
+
+        tk.Frame(frame, bg=FARBEN["rand"], height=1).pack(fill="x", pady=14)
+
+        # Details
+        tk.Label(frame, text=tr("info.gebaut_mit"),
+                 font=("Helvetica", 9),
+                 bg=FARBEN["bg_mittel"], fg=FARBEN["text"]).pack(anchor="w", pady=(0, 16))
 
         tk.Label(frame, text=tr("info.version"),
                  font=("Helvetica", 9),
@@ -3705,14 +3710,12 @@ class CadApp:
                  font=("Helvetica", 9, "italic"),
                  bg=FARBEN["bg_mittel"], fg=FARBEN["text_dim"]).pack(anchor="w", pady=(0, 6))
 
-        tk.Label(frame, text="Released under the MIT License.",
+        tk.Label(frame, text=tr("info.lizenz"),
                  font=("Helvetica", 9),
-                 bg=FARBEN["bg_mittel"], fg=FARBEN["text_dim"]).pack(anchor="w", pady=(0, 16))
-
-        tk.Frame(frame, bg=FARBEN["rand"], height=1).pack(fill="x", pady=(0, 14))
+                 bg=FARBEN["bg_mittel"], fg=FARBEN["text_dim"]).pack(anchor="w", pady=(0, 6))
 
         btn_row = tk.Frame(frame, bg=FARBEN["bg_mittel"])
-        btn_row.pack(fill="x", side="bottom")
+        btn_row.pack(fill="x", side="bottom", pady=(10, 0))
 
         def make_btn(text, cmd):
             b = tk.Button(btn_row, text=text, command=cmd,
@@ -3720,7 +3723,7 @@ class CadApp:
                           activebackground=FARBEN["bg_hover"],
                           activeforeground=FARBEN["cyan"],
                           relief="raised", bd=1, font=("Helvetica", 9, "bold"),
-                          padx=14, pady=4, cursor="hand2")
+                          padx=16, pady=6, cursor="hand2")
             return b
 
         make_btn("License", lambda: zeige_lizenz_fenster(info_win)).pack(side="left")
