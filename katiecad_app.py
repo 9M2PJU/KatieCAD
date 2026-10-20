@@ -2618,12 +2618,17 @@ class CadApp:
         x0_px, y0_px, x0_mm, y0_mm = self._auswahl_rechteck_start
         x1_px, y1_px = event.x, event.y
         x1_mm, y1_mm = self.px_to_mm(x1_px, y1_px)
-        if x1_px < x0_px:
+        
+        # AutoCAD-Konvention:
+        #   links -> rechts = Fenster  (blau,  nur komplett enthaltene Objekte)
+        #   rechts -> links = Kreuzung (gruen, beruehrte Objekte)
+        if x1_px >= x0_px:
             farbe = FARBEN["cyan"]
-            self._auswahl_richtung = "rechts"
+            self._auswahl_richtung = "links"  # Window -> alles muss drin sein
         else:
             farbe = FARBEN["gruen"]
-            self._auswahl_richtung = "links"
+            self._auswahl_richtung = "rechts" # Crossing -> alles was beruehrt wird
+            
         if self._auswahl_rechteck_id:
             self.canvas.delete(self._auswahl_rechteck_id)
         self._auswahl_rechteck_id = self.canvas.create_rectangle(
@@ -2645,6 +2650,8 @@ class CadApp:
             if l and not l.sichtbar:
                 continue
             el_bbox = el.bbox()
+            # "links" bedeutet in unserer Logik: alles muss im Rechteck liegen (Window).
+            # "rechts" bedeutet: Beruehrung reicht (Crossing).
             if richtung == "links":
                 if bbox_enthalten(bbox, el_bbox):
                     treffer.append(el)
@@ -3424,8 +3431,8 @@ class CadApp:
                 self.canvas.delete(self._auswahl_rechteck_id)
                 self._auswahl_rechteck_id = None
             self.canvas.delete("auswahlvorschau")
-            # STRETCH waehlt ueberkreuzend aus -> interne Richtung "links"
-            self.auswahl = self._elemente_im_auswahlrechteck(bbox, "links")
+            # STRETCH waehlt ueberkreuzend aus -> interne Richtung "rechts" (Crossing)
+            self.auswahl = self._elemente_im_auswahlrechteck(bbox, "rechts")
             self.redraw()
             self._op_hinweis()
             return
@@ -3434,18 +3441,20 @@ class CadApp:
         else:
             bbox = (min(x0_mm, x1_mm), min(y0_mm, y1_mm),
                     max(x0_mm, x1_mm), max(y0_mm, y1_mm))
+            
             # AutoCAD-Konvention:
             #   links -> rechts = Fenster (komplett enthalten)
             #   rechts -> links = Kreuzung (beruehrt)
-            richtung = "rechts" if x1_px >= x0_px else "links"
+            richtung = "links" if x1_px >= x0_px else "rechts"
+            
             treffer = self._elemente_im_auswahlrechteck(bbox, richtung)
             self.auswahl = treffer
             de = SPRACHE["aktuell"] == "de"
             self.status.set(
                 (f"{len(self.auswahl)} Element(e) markiert "
-                 f"({'komplett' if richtung == 'rechts' else 'berührt'})." if de
+                 f"({'komplett' if richtung == 'links' else 'berührt'})." if de
                  else f"{len(self.auswahl)} element(s) selected "
-                 f"({'fully' if richtung == 'rechts' else 'crossing'})."))
+                 f"({'fully' if richtung == 'links' else 'crossing'})."))
         self._auswahl_rechteck_start = None
         self._drag_modus = None
         self._auswahl_richtung = None
@@ -5690,4 +5699,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
