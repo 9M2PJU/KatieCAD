@@ -47,7 +47,7 @@ from katiecad_core import (
     TEXT_BREITE, TEXT_ZEILE, CAD_VERSALHOEHE, LW_PX_FAKTOR, BEM_RICHTUNGEN,
     BEFEHLE, PdfSeite, ist_dunkel,
     Layer, Layout, Element, Linie, Kreis, Bogen, Rechteck, Polylinie, Text,
-    Bemassung, Viewport, Schraffur,
+    Bemassung, Viewport, Schraffur, konturen_aus_elementen,
     BlockDefinition, BlockReferenz, BlockBibliothek,
     bogen_sweep, bogen_punkte, winkel_im_bogen, bogen_aus_3_punkten,
     bogen_mitte_start_ende, abstand_punkt_segment, naechster_punkt_segment,
@@ -3652,7 +3652,7 @@ class CadApp:
             pts_px = [tf(x, y) for (x, y) in el.punkte]
             flat = [v for q in pts_px for v in q]
             
-            if el.typ == "solid":
+            if el.muster == "solid":
                 c.create_polygon(*flat, fill=farbe, outline="", tags=tags)
             else:
                 for (p1, p2) in el.geometrie_linien():
@@ -4034,6 +4034,9 @@ class CadApp:
     def _dict_zu_element(self, d):
         d = dict(d)
         typ = d.pop("typ")
+        if typ in ("solid", "linien"):      # Altformat: Schraffur, deren
+            d["muster"] = typ               # Elementtyp ueberschrieben wurde
+            typ = "schraffur"
         if typ == "viewport":
             if "zoom" not in d and "massstab" in d:
                 d["zoom"] = d.pop("massstab")
@@ -4131,10 +4134,10 @@ class CadApp:
                 for kind in el.aufgeloest():
                     self._element_zu_dxf(msp, kind)
             elif isinstance(el, Schraffur):
-                if el.typ == "solid":
-                    msp.add_hatch(color=7, dxfattribs=attribs).set_pattern_fill("SOLID")
-                    # Einfacher Ansatz: Grenze als Polylinie zeichnen
-                    msp.add_lwpolyline(el.punkte, close=True, dxfattribs=attribs)
+                if el.muster == "solid":
+                    h = msp.add_hatch(dxfattribs=attribs)
+                    h.set_solid_fill()
+                    h.paths.add_polyline_path(list(el.punkte), is_closed=True)
                 else:
                     for (p1, p2) in el.geometrie_linien():
                         msp.add_line(p1, p2, dxfattribs=attribs)
@@ -6009,15 +6012,26 @@ class CadApp:
     # Schraffur
     # --------------------------------------------------------
     def schraffur_anwenden(self):
+        """Schraffur auf Auswahl: Kreise, Rechtecke, geschlossene Polylinien
+        sowie aus Linien/Bogen/offenen Polylinien gebildete geschlossene
+        Konturen (Endpunkte muessen sich treffen)."""
         de = SPRACHE["aktuell"] == "de"
-        ziele = [e for e in self.auswahl if isinstance(e, (Polylinie, Rechteck))]
-        if not ziele:
-            self.status.set(("Bitte eine geschlossene Polylinie oder ein "
-                             "Rechteck markieren.") if de
-                            else "Please select a closed polyline or rectangle.")
+        kandidaten = [e for e in self.auswahl
+                      if isinstance(e, (Polylinie, Rechteck, Kreis, Linie, Bogen))]
+        konturen = konturen_aus_elementen(kandidaten, tol=0.05)
+        if not konturen:
+            self.status.set(
+                "Keine geschlossene Kontur gefunden. Bitte Kreis, Rechteck, "
+                "geschlossene Polylinie oder einen lückenlosen Linienzug "
+                "markieren." if de else
+                "No closed boundary found. Select a circle, rectangle, closed "
+                "polyline or a gap-free chain of lines.")
             return
 
-        typ = simpledialog.askstring("Schraffur", "Typ (solid oder linien):",
+        titel = "Schraffur" if de else "Hatch"
+        typ = simpledialog.askstring(titel,
+                                     "Typ (solid oder linien):" if de
+                                     else "Type (solid or linien):",
                                      initialvalue="linien", parent=self.root)
         if not typ:
             return
@@ -6025,38 +6039,44 @@ class CadApp:
         if typ not in ("solid", "linien"):
             return
 
-        abstand = 5.0
+        abstand, winkel = 5.0, 45.0
         if typ == "linien":
-            abstand_str = simpledialog.askstring("Schraffur", "Abstand (mm):",
-                                                 initialvalue="5.0",
-                                                 parent=self.root)
-            if not abstand_str:
-                return
             try:
+                abstand_str = simpledialog.askstring(
+                    titel, "Abstand (mm):" if de else "Spacing (mm):",
+                    initialvalue="5.0", parent=self.root)
+                if not abstand_str:
+                    return
                 abstand = float(abstand_str.replace(",", "."))
+                winkel_str = simpledialog.askstring(
+                    titel, "Winkel (Grad):" if de else "Angle (deg):",
+                    initialvalue="45", parent=self.root)
+                if not winkel_str:
+                    return
+                winkel = float(winkel_str.replace(",", "."))
             except ValueError:
+                return
+            if abstand <= 0:
                 return
 
         self._snapshot()
         liste = self._aktuelle_elemente_liste()
         neue_schraffuren = []
-
-        for el in ziele:
-            if isinstance(el, Polylinie) and not el.geschlossen:
-                continue
-            if isinstance(el, Rechteck):
-                pts = [(el.x1, el.y1), (el.x2, el.y1), (el.x2, el.y2), (el.x1, el.y2)]
-            else:
-                pts = el.punkte
-
-            schraffur = Schraffur(pts, typ=typ, abstand=abstand,
-                                  layer=el.layer, farbe=el.farbe,
-                                  eig_farbe=el.eig_farbe)
-            liste.insert(liste.index(el), schraffur)
+        for pts, quellen in konturen:
+            erstes = quellen[0]
+            idx = min((liste.index(q) for q in quellen if q in liste),
+                      default=len(liste))
+            schraffur = Schraffur(pts, muster=typ, abstand=abstand,
+                                  winkel=winkel, layer=erstes.layer,
+                                  farbe=erstes.farbe,
+                                  eig_farbe=erstes.eig_farbe)
+            liste.insert(idx, schraffur)
             neue_schraffuren.append(schraffur)
 
         self.auswahl = neue_schraffuren
         self.redraw()
+        self.status.set(f"{len(neue_schraffuren)} " +
+                        ("Schraffur(en) erstellt." if de else "hatch(es) created."))
 
 
 # ============================================================
