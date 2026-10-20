@@ -27,10 +27,10 @@ except ImportError:
     EZDXF_VERFUEGBAR = False
 
 try:
-    import ezdwg
-    EZDWG_VERFUEGBAR = True
+    import katiecad_cadimport as cadimport
+    CADIMPORT_VERFUEGBAR = True
 except ImportError:
-    EZDWG_VERFUEGBAR = False
+    CADIMPORT_VERFUEGBAR = False
 
 try:
     from PIL import Image, ImageTk
@@ -4170,170 +4170,79 @@ class CadApp:
                 pass
         t.set_placement((x, y))
 
-    def import_dxf(self):
+    def _cad_import(self, art):
+        """Gemeinsamer Import fuer DXF und DWG (art = 'dxf' | 'dwg')."""
         de = SPRACHE["aktuell"] == "de"
-        if not EZDXF_VERFUEGBAR:
-            messagebox.showwarning("DXF",
-                ("ezdxf nicht installiert." if de else "ezdxf is not installed."))
+        titel = art.upper()
+        if not CADIMPORT_VERFUEGBAR or not EZDXF_VERFUEGBAR:
+            messagebox.showwarning(titel,
+                ("ezdxf nicht installiert:  pip install ezdxf" if de
+                 else "ezdxf is not installed:  pip install ezdxf"))
             return
         pfad = filedialog.askopenfilename(
-            filetypes=[("DXF-Datei" if de else "DXF file", "*.dxf"),
-                       ("Alle Dateien" if de else "All files", "*.*")])
+            filetypes=[("DXF / DWG", "*.dxf *.dwg"),
+                       (("DXF-Datei" if de else "DXF file"), "*.dxf"),
+                       (("DWG-Datei" if de else "DWG file"), "*.dwg"),
+                       (("Alle Dateien" if de else "All files"), "*.*")])
         if not pfad:
             return
         try:
-            self._snapshot()
-            doc = ezdxf.readfile(pfad)
-            msp = doc.modelspace()
-            importiert = 0
-            for e in msp:
-                if self._dxf_zu_element(e):
-                    importiert += 1
-            self.redraw()
-            self.status.set(
-                (f"DXF importiert ({importiert} Elemente): {pfad}" if de
-                 else f"DXF imported ({importiert} elements): {pfad}"))
-        except Exception as e:
-            messagebox.showerror("DXF",
-                (f"Fehler:\n{e}" if de else f"Error:\n{e}"))
-
-    def _dxf_zu_element(self, e):
-        typ = e.dxftype()
-        layer = e.dxf.get("layer", "0")
-        if layer not in self.layers:
-            self.layers[layer] = Layer(layer, FARBEN["cyan"], 0.35)
-            self.layer_cb.config(values=list(self.layers.keys()))
+            self.root.config(cursor="watch")
+            self.root.update_idletasks()
+        except Exception:
+            pass
         try:
-            if typ == "LINE":
-                s = e.dxf.start; en = e.dxf.end
-                self.elemente.append(Linie(s.x, s.y, en.x, en.y, layer=layer,
-                                           farbe=FARBEN["cyan"],
-                                           linientyp="Volllinie (schmal)"))
-                return True
-            if typ == "CIRCLE":
-                c = e.dxf.center; r = e.dxf.radius
-                self.elemente.append(Kreis(c.x, c.y, r, layer=layer,
-                                           farbe=FARBEN["cyan"],
-                                           linientyp="Volllinie (schmal)"))
-                return True
-            if typ == "ARC":
-                c = e.dxf.center; r = e.dxf.radius
-                s = e.dxf.start_angle; en = e.dxf.end_angle
-                self.elemente.append(Bogen(c.x, c.y, r, s, en, layer=layer,
-                                           farbe=FARBEN["cyan"],
-                                           linientyp="Volllinie (schmal)"))
-                return True
-            if typ == "LWPOLYLINE":
-                pts = [(p[0], p[1]) for p in e.get_points()]
-                self.elemente.append(Polylinie(pts, geschlossen=bool(e.closed),
-                                               layer=layer, farbe=FARBEN["cyan"],
-                                               linientyp="Volllinie (schmal)"))
-                return True
-            if typ in ("TEXT", "MTEXT"):
-                inhalt = e.dxf.text if typ == "TEXT" else e.text
-                pos = e.dxf.insert
-                hoehe = e.dxf.get("height", 3.5)
-                self.elemente.append(Text(pos.x, pos.y, inhalt, hoehe, 0.0,
-                                           "Arial", layer=layer,
-                                           farbe=FARBEN["cyan"],
-                                           linientyp="Volllinie (schmal)"))
-                return True
-        except Exception as ex:
-            print(f"DXF-Element nicht importiert: {ex}")
-        return False
+            erg = cadimport.importiere_datei(pfad, self.layers)
+            if not erg.elemente:
+                messagebox.showwarning(titel,
+                    ("Es konnten keine Elemente importiert werden.\n"
+                     if de else "No elements could be imported.\n") +
+                    self._import_bericht(erg, de))
+                return
+            self._snapshot()
+            self.elemente.extend(erg.elemente)
+            self.layer_cb.config(values=list(self.layers.keys()))
+            self.zoom_grenzen()
+            msg = (f"{titel} importiert ({len(erg.elemente)} Elemente): {pfad}"
+                   if de else
+                   f"{titel} imported ({len(erg.elemente)} elements): {pfad}")
+            self.status.set(msg)
+            if erg.uebersprungen or erg.fehler or erg.hinweise:
+                messagebox.showinfo(titel, msg + "\n\n" +
+                                    self._import_bericht(erg, de))
+        except Exception as e:
+            messagebox.showerror(titel,
+                (f"Fehler beim Import:\n{e}" if de else f"Import error:\n{e}"))
+        finally:
+            try:
+                self.root.config(cursor="")
+            except Exception:
+                pass
+
+    @staticmethod
+    def _import_bericht(erg, de):
+        z = []
+        if erg.quelle:
+            z.append(("Quelle: " if de else "Source: ") + erg.quelle)
+        if erg.faktor != 1.0:
+            z.append((f"Einheiten automatisch nach mm umgerechnet (x{erg.faktor:g})"
+                      if de else f"Units converted to mm (x{erg.faktor:g})"))
+        if erg.uebersprungen:
+            z.append(("Nicht unterstützt (übersprungen): " if de
+                      else "Unsupported (skipped): ") +
+                     ", ".join(f"{k} x{v}" for k, v in
+                               erg.uebersprungen.most_common()))
+        if erg.fehler:
+            z.append((f"Fehlerhafte Elemente: {erg.fehler}" if de
+                      else f"Faulty elements: {erg.fehler}"))
+        z += erg.hinweise
+        return "\n".join(z)
+
+    def import_dxf(self):
+        self._cad_import("dxf")
 
     def import_dwg(self):
-        de = SPRACHE["aktuell"] == "de"
-        if not EZDWG_VERFUEGBAR:
-            messagebox.showwarning("DWG",
-                ("ezdwg nicht installiert." if de else "ezdwg is not installed."))
-            return
-        pfad = filedialog.askopenfilename(
-            filetypes=[("DWG-Datei" if de else "DWG file", "*.dwg"),
-                       ("Alle Dateien" if de else "All files", "*.*")])
-        if not pfad:
-            return
-        try:
-            self._snapshot()
-            doc = ezdwg.read(pfad)
-            msp = doc.modelspace()
-            importiert = 0
-            for e in msp.query("LINE LWPOLYLINE CIRCLE ARC TEXT MTEXT"):
-                if self._dwg_zu_element(e):
-                    importiert += 1
-            self.redraw()
-            self.status.set(
-                (f"DWG importiert ({importiert} Elemente): {pfad}" if de
-                 else f"DWG imported ({importiert} elements): {pfad}"))
-        except Exception as e:
-            messagebox.showerror("DWG",
-                (f"Fehler:\n{e}" if de else f"Error:\n{e}"))
-
-    def _dwg_zu_element(self, e):
-        try:
-            typ = e.dxftype()  # Manchmal ist dxftype eine Methode, manchmal ein Attribut
-            if callable(typ):
-                typ = typ()
-            
-            # Layer sicher auslesen
-            layer = "0"
-            if hasattr(e, "dxf"):
-                if isinstance(e.dxf, dict):
-                    layer = e.dxf.get("layer", "0")
-                else:
-                    layer = getattr(e.dxf, "layer", "0")
-            
-            if layer not in self.layers:
-                self.layers[layer] = Layer(layer, FARBEN["cyan"], 0.35)
-                self.layer_cb.config(values=list(self.layers.keys()))
-
-            if typ == "LINE":
-                # Sicherer Zugriff auf die Punkte
-                if hasattr(e.dxf, "start") and hasattr(e.dxf, "end"):
-                    s = e.dxf.start
-                    en = e.dxf.end
-                    # Manchmal sind die Koordinaten Vec3-Objekte, manchmal Tupel
-                    self.elemente.append(Linie(s.x, s.y, en.x, en.y, layer=layer,
-                                               farbe=FARBEN["cyan"],
-                                               linientyp="Volllinie (schmal)"))
-                    return True
-            elif typ == "CIRCLE":
-                if hasattr(e.dxf, "center") and hasattr(e.dxf, "radius"):
-                    c = e.dxf.center
-                    r = e.dxf.radius
-                    self.elemente.append(Kreis(c.x, c.y, r, layer=layer,
-                                               farbe=FARBEN["cyan"],
-                                               linientyp="Volllinie (schmal)"))
-                    return True
-            elif typ == "ARC":
-                if hasattr(e.dxf, "center") and hasattr(e.dxf, "radius"):
-                    c = e.dxf.center
-                    r = e.dxf.radius
-                    s = e.dxf.start_angle
-                    en = e.dxf.end_angle
-                    self.elemente.append(Bogen(c.x, c.y, r, s, en, layer=layer,
-                                               farbe=FARBEN["cyan"],
-                                               linientyp="Volllinie (schmal)"))
-                    return True
-            elif typ == "LWPOLYLINE":
-                # Bei ezdwg kann get_points() eine Methode sein, die aufgerufen werden muss
-                if hasattr(e, "get_points"):
-                    pts_raw = e.get_points()  # <-- Hier war oft der Fehler (fehlende Klammern)
-                    pts = [(p[0], p[1]) for p in pts_raw]
-                    geschlossen = False
-                    if hasattr(e, "closed"):
-                        geschlossen = bool(e.closed)
-                    elif hasattr(e.dxf, "flags"):
-                        geschlossen = bool(e.dxf.flags & 1) # Bit 1 = closed
-                    
-                    self.elemente.append(Polylinie(pts, geschlossen=geschlossen,
-                                                   layer=layer, farbe=FARBEN["cyan"],
-                                                   linientyp="Volllinie (schmal)"))
-                    return True
-                    
-        except Exception as ex:
-            print(f"DWG-Element Fehler ({type(ex).__name__}): {ex}")
-        return False
+        self._cad_import("dwg")
 
     def _update_eingabe_hinweis(self):
         h = self.lbl_hinweis.config
