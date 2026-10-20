@@ -35,7 +35,7 @@ from katiecad_core import (
     GRIFF_RADIUS, MIN_VP_GROESSE, PASTE_OFFSET_MM,
     TEXT_BREITE, TEXT_ZEILE, CAD_VERSALHOEHE, LW_PX_FAKTOR, BEM_RICHTUNGEN,
     BEFEHLE, PdfSeite, ist_dunkel,
-    Layer, Element, Linie, Kreis, Bogen, Rechteck, Polylinie, Text,
+    Layer, Layout, Element, Linie, Kreis, Bogen, Rechteck, Polylinie, Text,
     Bemassung, Viewport,
     bogen_sweep, bogen_punkte, winkel_im_bogen, bogen_aus_3_punkten,
     bogen_mitte_start_ende, abstand_punkt_segment, naechster_punkt_segment,
@@ -248,8 +248,12 @@ class CadApp:
         self.aktiver_layer = tk.StringVar(value="0")
 
         self.elemente = []
-        self.layout_elemente = []
-        self.ansicht = tk.StringVar(value="modell")
+
+        # ---- Layouts: Liste von Layout-Objekten (analog AutoCAD) ----
+        self.layouts = [Layout("Layout1", Layout.STANDARD_FORMAT,
+                               "#1c132d")]
+        self.aktives_layout = 0
+        self.ansicht = tk.StringVar(value="modell")  # "modell" oder "layout:N"
 
         self.aktives_werkzeug = tk.StringVar(value="auswahl")
         self.einheit = tk.StringVar(value="mm")
@@ -266,10 +270,8 @@ class CadApp:
         self.text_schriftart = tk.StringVar(value="Arial")
 
         self.bg_modell = "#120a1f"
-        self.bg_layout = "#1c132d"
 
         self.view_modell = {"zoom": 1.5, "ox": 100, "oy": 700}
-        self.view_layout = {"zoom": 1.5, "ox": 150, "oy": 700}
 
         self.osnap = tk.BooleanVar(value=True)
         self.grid_snap = tk.BooleanVar(value=True)
@@ -300,7 +302,8 @@ class CadApp:
         self.eingabe_var = tk.StringVar()
         self.status = tk.StringVar()
 
-        self.layout_format = tk.StringVar(value="A3 (420x297)")
+        # layout_format wird zur Property (siehe unten) -> kein eigenes Var mehr
+        self._layout_buttons = {}
 
         self.auswahl = []
         self._auswahl_rechteck_start = None
@@ -388,11 +391,55 @@ class CadApp:
 
         self.root.protocol("WM_DELETE_WINDOW", self.beenden)
 
+    # --------------------------------------------------------
+    # Layout-Properties (machen den Umbau auf mehrere Layouts
+    # transparent für den restlichen Code)
+    # --------------------------------------------------------
+    @property
+    def layout(self):
+        return self.layouts[self.aktives_layout]
+
+    @property
+    def layout_elemente(self):
+        return self.layouts[self.aktives_layout].elemente
+
+    @layout_elemente.setter
+    def layout_elemente(self, wert):
+        self.layouts[self.aktives_layout].elemente = wert
+
+    @property
+    def layout_format(self):
+        return self.layouts[self.aktives_layout].format
+
+    @layout_format.setter
+    def layout_format(self, wert):
+        self.layouts[self.aktives_layout].format = wert
+
+    @property
+    def bg_layout(self):
+        return self.layouts[self.aktives_layout].bg
+
+    @bg_layout.setter
+    def bg_layout(self, wert):
+        self.layouts[self.aktives_layout].bg = wert
+
     @property
     def view(self):
-        if self.ansicht.get() == "modell":
+        if not self._ist_layout():
             return self.view_modell
-        return self.view_layout
+        return self.layouts[self.aktives_layout].view
+
+    def _ist_layout(self):
+        return self.ansicht.get().startswith("layout")
+
+    def _layout_index(self):
+        s = self.ansicht.get()
+        if s.startswith("layout:"):
+            try:
+                return int(s.split(":", 1)[1])
+            except (ValueError, IndexError):
+                return 0
+        return 0
 
     def _mark_dirty(self):
         if not self._dirty:
@@ -442,6 +489,7 @@ class CadApp:
         self._aktualisiere_osnap_anzeige()
         self._update_kontext_widgets()
         self._update_eingabe_hinweis()
+        self._layout_switcher_neu_aufbauen()
         self.redraw()
 
     # --------------------------------------------------------
@@ -467,11 +515,35 @@ class CadApp:
                 el = self._dict_zu_element(d)
                 if el:
                     self.elemente.append(el)
-            self.layout_elemente = []
-            for d in snap.get("layout_elemente", []):
-                el = self._dict_zu_element(d)
-                if el:
-                    self.layout_elemente.append(el)
+            # Layouts wiederherstellen
+            layouts_daten = snap.get("layouts")
+            if layouts_daten is not None:
+                neue = []
+                for ld in layouts_daten:
+                    lay = Layout.from_dict(ld, self._dict_zu_element)
+                    neue.append(lay)
+                if neue:
+                    self.layouts = neue
+                else:
+                    self.layouts = [Layout("Layout1", Layout.STANDARD_FORMAT,
+                                           "#1c132d")]
+                if self.aktives_layout >= len(self.layouts):
+                    self.aktives_layout = len(self.layouts) - 1
+                if self._ist_layout():
+                    idx = self._layout_index()
+                    if idx >= len(self.layouts):
+                        idx = len(self.layouts) - 1
+                        self.aktives_layout = idx
+                        self.ansicht.set(f"layout:{idx}")
+            else:
+                # Alter Snapshot ohne layouts -> auf altes Schema zurückfallen
+                self.layouts = [Layout("Layout1", Layout.STANDARD_FORMAT,
+                                       "#1c132d")]
+                self.aktives_layout = 0
+                for d in snap.get("layout_elemente", []):
+                    el = self._dict_zu_element(d)
+                    if el:
+                        self.layouts[0].elemente.append(el)
             for ld in snap.get("layers", []):
                 self.layers[ld["name"]] = Layer(ld["name"],
                                                 ld.get("farbe", "#c29bff"),
@@ -485,6 +557,7 @@ class CadApp:
             self._paste_abbrechen()
             self._bem_abbrechen()
             self._bogen_abbrechen()
+            self._layout_switcher_neu_aufbauen()
             self._mark_dirty()
             self.redraw()
             self.status.set("Rueckgaengig gemacht.")
@@ -683,6 +756,7 @@ class CadApp:
         self.tb3.pack(side=tk.TOP, fill=tk.X)
         self._build_toolbars()
         self._build_eingabeleiste()
+        self._build_layout_switcher()
         self._build_statusbar()
 
         self.canvas = tk.Canvas(self.root, bg=self.bg_modell,
@@ -797,7 +871,7 @@ class CadApp:
         m_ansicht.add_command(label=tr("menu.ansicht.modell"),
                               command=lambda: self.setze_ansicht("modell"))
         m_ansicht.add_command(label=tr("menu.ansicht.layout"),
-                              command=lambda: self.setze_ansicht("layout"))
+                              command=self._ansicht_aktuelles_layout)
         m_ansicht.add_separator()
         m_ansicht.add_command(label=tr("menu.ansicht.zoom_grenzen"),
                               command=self.zoom_grenzen)
@@ -849,15 +923,9 @@ class CadApp:
                 child.destroy()
 
         # --- Toolbar 1 ---
+        # Hinweis: Ansicht (Modell/Layout) ist NICHT mehr hier oben,
+        # sondern im unteren Layout-Switcher.
         tb = self.tb1
-        ttk.Label(tb, text=tr("tb.ansicht"), style="Title.TLabel").pack(side=tk.LEFT)
-        ttk.Radiobutton(tb, text=tr("tb.modell"), value="modell",
-                        variable=self.ansicht,
-                        command=self.ansicht_wechseln).pack(side=tk.LEFT)
-        ttk.Radiobutton(tb, text=tr("tb.layout"), value="layout",
-                        variable=self.ansicht,
-                        command=self.ansicht_wechseln).pack(side=tk.LEFT, padx=(0, 12))
-        ttk.Separator(tb, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=8)
         ttk.Label(tb, text=tr("tb.werkzeug"), style="Title.TLabel").pack(side=tk.LEFT, padx=(0, 4))
         for key in ("auswahl", "linie", "polylinie", "kreis", "bogen",
                     "rechteck", "text", "bemassung"):
@@ -934,10 +1002,13 @@ class CadApp:
                              self.lbl_hoehe, self.sp_hoehe,
                              self.lbl_winkel, self.sp_winkel]
 
+        # Blattformat: Combobox zeigt/ändert das aktive Layout-Format
         self.lbl_fmt = ttk.Label(tb3, text=tr("tb.blattformat"), style="Title.TLabel")
-        self.cb_fmt = ttk.Combobox(tb3, textvariable=self.layout_format,
+        self._fmt_var = tk.StringVar(value=self.layout_format)
+        self.cb_fmt = ttk.Combobox(tb3, textvariable=self._fmt_var,
                                    values=list(ZEICHNUNGSFORMATE.keys()),
                                    width=14, state="readonly")
+        self.cb_fmt.bind("<<ComboboxSelected>>", self._layout_format_gewaehlt)
         self.btn_rahmen = ttk.Button(tb3, text=tr("tb.rahmen"),
                                      command=self.rahmen_einfuegen)
         self.btn_viewport = ttk.Button(tb3, text=tr("tb.viewport"),
@@ -1001,8 +1072,10 @@ class CadApp:
 
         ttk.Separator(tb3, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=8)
         ttk.Label(tb3, text=tr("tb.hintergrund"), style="Title.TLabel").pack(side=tk.LEFT)
-        self.bg_btn = tk.Button(tb3, bg=self.bg_modell, width=3,
-                                command=lambda: self.bg_waehlen(self.ansicht.get()),
+        bg_aktuell = self.bg_layout if self._ist_layout() else self.bg_modell
+        self.bg_btn = tk.Button(tb3, bg=bg_aktuell, width=3,
+                                command=lambda: self.bg_waehlen(
+                                    "layout" if self._ist_layout() else "modell"),
                                 relief=tk.FLAT, bd=0,
                                 highlightthickness=1,
                                 highlightbackground=FARBEN["cyan"])
@@ -1031,6 +1104,116 @@ class CadApp:
     def _retranslate_eingabeleiste(self):
         if hasattr(self, "lbl_eingabe"):
             self.lbl_eingabe.config(text=tr("eingabe.label"))
+
+    # --------------------------------------------------------
+    # Layout-Switcher (unten, statt oben links)
+    # --------------------------------------------------------
+    def _build_layout_switcher(self):
+        self.layout_switcher_frame = ttk.Frame(self.root, padding=(6, 3))
+        self.layout_switcher_frame.pack(side=tk.BOTTOM, fill=tk.X)
+
+        ttk.Label(self.layout_switcher_frame, text=tr("tb.ansicht"),
+                  style="Title.TLabel").pack(side=tk.LEFT, padx=(0, 4))
+
+        ttk.Radiobutton(self.layout_switcher_frame,
+                        text=tr("layout.switcher.modell"), value="modell",
+                        variable=self.ansicht,
+                        command=self.ansicht_wechseln).pack(side=tk.LEFT)
+
+        ttk.Separator(self.layout_switcher_frame, orient=tk.VERTICAL).pack(
+            side=tk.LEFT, fill=tk.Y, padx=6)
+
+        self._layout_buttons_frame = ttk.Frame(self.layout_switcher_frame)
+        self._layout_buttons_frame.pack(side=tk.LEFT)
+
+        ttk.Button(self.layout_switcher_frame, text=tr("layout.switcher.neu"),
+                   width=3, command=self.neues_layout).pack(side=tk.LEFT, padx=(4, 1))
+        ttk.Button(self.layout_switcher_frame, text=tr("layout.switcher.loeschen"),
+                   width=3, command=self.layout_loeschen).pack(side=tk.LEFT, padx=1)
+        ttk.Button(self.layout_switcher_frame, text=tr("layout.switcher.umbenennen"),
+                   width=3, command=self.layout_umbenennen).pack(side=tk.LEFT, padx=1)
+
+        self._layout_switcher_neu_aufbauen()
+
+    def _layout_switcher_neu_aufbauen(self):
+        if not hasattr(self, "_layout_buttons_frame"):
+            return
+        for w in self._layout_buttons_frame.winfo_children():
+            w.destroy()
+        for i, lay in enumerate(self.layouts):
+            ttk.Radiobutton(self._layout_buttons_frame, text=lay.name,
+                            value=f"layout:{i}",
+                            variable=self.ansicht,
+                            command=self.ansicht_wechseln
+                            ).pack(side=tk.LEFT, padx=(0, 2))
+
+    def _ansicht_aktuelles_layout(self):
+        self.setze_ansicht(f"layout:{self.aktives_layout}")
+
+    def _layout_format_gewaehlt(self, event=None):
+        neues = self._fmt_var.get()
+        if neues in ZEICHNUNGSFORMATE:
+            self._snapshot()
+            self.layout.format = neues
+            self.redraw()
+            self._mark_dirty()
+
+    def neues_layout(self):
+        name = f"Layout{len(self.layouts) + 1}"
+        basis = len(self.layouts)
+        while any(l.name == name for l in self.layouts):
+            basis += 1
+            name = f"Layout{basis}"
+        self._snapshot()
+        self.layouts.append(Layout(name, self.layout_format, self.bg_layout))
+        self._layout_switcher_neu_aufbauen()
+        self.aktives_layout = len(self.layouts) - 1
+        self.ansicht.set(f"layout:{self.aktives_layout}")
+        self.ansicht_wechseln()
+        self.status.set(tr("layout.angelegt"))
+
+    def layout_loeschen(self):
+        if len(self.layouts) <= 1:
+            messagebox.showinfo(tr("layout.loeschen.titel"),
+                                tr("layout.letztes_schuetzen"))
+            return
+        idx = self._layout_index() if self._ist_layout() else self.aktives_layout
+        lay = self.layouts[idx]
+        if not messagebox.askyesno(tr("layout.loeschen.titel"),
+                                   tr("layout.loeschen.frage", name=lay.name)):
+            return
+        self._snapshot()
+        del self.layouts[idx]
+        if self.aktives_layout >= len(self.layouts):
+            self.aktives_layout = len(self.layouts) - 1
+        self._layout_switcher_neu_aufbauen()
+        if self._ist_layout():
+            self.ansicht.set(f"layout:{self.aktives_layout}")
+            self.ansicht_wechseln()
+        else:
+            self.redraw()
+        self.status.set(tr("layout.geloescht"))
+
+    def layout_umbenennen(self):
+        idx = self._layout_index() if self._ist_layout() else self.aktives_layout
+        lay = self.layouts[idx]
+        neu = _LayoutNameDialog(self.root, tr("layout.umbenennen.titel"),
+                                lay.name).result
+        if not neu:
+            return
+        neu = neu.strip()
+        if not neu:
+            messagebox.showwarning(tr("layout.umbenennen.titel"),
+                                   tr("layout.name_leer"))
+            return
+        if any(l is not lay and l.name == neu for l in self.layouts):
+            messagebox.showwarning(tr("layout.umbenennen.titel"),
+                                   tr("layout.name_existiert"))
+            return
+        self._snapshot()
+        lay.name = neu
+        self._layout_switcher_neu_aufbauen()
+        self.status.set(tr("layout.umbenannt"))
 
     def _build_statusbar(self):
         bar = ttk.Frame(self.root, padding=(6, 4))
@@ -1183,7 +1366,9 @@ class CadApp:
         def zeige(widgets):
             for w in widgets:
                 w.pack(side=tk.LEFT, padx=2, before=self._tb3_anker)
-        zeige(self.layout_widgets if self.ansicht.get() == "layout" else self.basis_widgets)
+        zeige(self.layout_widgets if self._ist_layout() else self.basis_widgets)
+        if hasattr(self, "_fmt_var"):
+            self._fmt_var.set(self.layout_format)
         werkzeug = self.aktives_werkzeug.get()
         if werkzeug == "kreis":
             zeige(self.kreis_widgets)
@@ -1196,6 +1381,11 @@ class CadApp:
 
     # --------------------------------------------------------
     def ansicht_wechseln(self):
+        # Neuen Layout-Index übernehmen (falls "layout:N")
+        if self._ist_layout():
+            idx = self._layout_index()
+            if 0 <= idx < len(self.layouts):
+                self.aktives_layout = idx
         if self._aktiver_viewport is not None:
             self._aktiver_viewport.aktiv = False
             self._aktiver_viewport = None
@@ -1209,14 +1399,17 @@ class CadApp:
         self._bem_abbrechen()
         self._bogen_abbrechen()
         self._update_kontext_widgets()
-        bg = self.bg_modell if self.ansicht.get() == "modell" else self.bg_layout
+        bg = self.bg_modell if not self._ist_layout() else self.bg_layout
         self.canvas.config(bg=bg)
         self.bg_btn.config(bg=bg)
         self._zeichne_raster()
         self.redraw()
         de = SPRACHE["aktuell"] == "de"
-        self.status.set(("Ansicht: " if de else "View: ")
-                        + self.ansicht.get().capitalize())
+        if self._ist_layout():
+            self.status.set(("Ansicht: Layout '" if de else "View: layout '")
+                            + self.layout.name + "'")
+        else:
+            self.status.set(("Ansicht: Modell" if de else "View: model"))
 
     def setze_ansicht(self, name):
         self.ansicht.set(name)
@@ -1235,7 +1428,9 @@ class CadApp:
             self.bg_modell = hexc
         else:
             self.bg_layout = hexc
-        if self.ansicht.get() == bereich:
+        aktuell_layout = self._ist_layout()
+        if (bereich == "modell" and not aktuell_layout) or \
+           (bereich == "layout" and aktuell_layout):
             self.canvas.config(bg=hexc)
             self.bg_btn.config(bg=hexc)
             self.redraw()
@@ -1245,7 +1440,8 @@ class CadApp:
     def _bg_preset_angewendet(self, event=None):
         auswahl = self.bg_preset_cb.get()
         if auswahl in BG_PRESETS:
-            self._bg_setzen(self.ansicht.get(), BG_PRESETS[auswahl])
+            self._bg_setzen("layout" if self._ist_layout() else "modell",
+                            BG_PRESETS[auswahl])
 
     def _layer_gewechselt(self, event=None):
         self._layer_info_aktualisieren()
@@ -1262,7 +1458,7 @@ class CadApp:
         LayerDialog(self.root, self)
 
     def zoom_grenzen(self, event=None):
-        liste = self.elemente if self.ansicht.get() == "modell" else self.layout_elemente
+        liste = self.elemente if not self._ist_layout() else self.layout_elemente
         cw = self.canvas.winfo_width() or 1200
         ch = self.canvas.winfo_height() or 700
         if not liste:
@@ -1429,7 +1625,7 @@ class CadApp:
     def _zeichne_raster(self):
         c = self.canvas
         c.delete("raster")
-        if self.ansicht.get() == "layout":
+        if self._ist_layout():
             self._zeichne_blatt()
             return
         if not self.raster_sichtbar.get():
@@ -1488,15 +1684,16 @@ class CadApp:
     def _zeichne_blatt(self):
         c = self.canvas
         c.delete("blatt")
-        b, h = ZEICHNUNGSFORMATE[self.layout_format.get()]
+        b, h = ZEICHNUNGSFORMATE[self.layout_format]
         x1, y1 = self.mm_to_px(0, h)
         x2, y2 = self.mm_to_px(b, 0)
-        c.create_rectangle(x1, y1, x2, y2, fill="#1c132d", outline=FARBEN["cyan"],
+        c.create_rectangle(x1, y1, x2, y2, fill=self.bg_layout,
+                           outline=FARBEN["cyan"],
                            width=2, tags="blatt")
         c.tag_lower("blatt")
 
     def _zoom_auf_maus(self, event, faktor):
-        if self.ansicht.get() == "layout" and self._aktiver_viewport is not None:
+        if self._ist_layout() and self._aktiver_viewport is not None:
             vp = self._aktiver_viewport
             if vp.gesperrt:
                 de = SPRACHE["aktuell"] == "de"
@@ -1532,10 +1729,11 @@ class CadApp:
     def _reset_view(self):
         cw = self.canvas.winfo_width() or 1000
         ch = self.canvas.winfo_height() or 700
-        if self.ansicht.get() == "modell":
+        if not self._ist_layout():
             self.view_modell = {"zoom": 1.5, "ox": 100, "oy": ch - 50}
         else:
-            self.view_layout = {"zoom": 1.5, "ox": 150, "oy": ch - 50}
+            self.layouts[self.aktives_layout].view = {"zoom": 1.5, "ox": 150,
+                                                      "oy": ch - 50}
         self.redraw()
         self._zeichne_raster()
 
@@ -1550,7 +1748,7 @@ class CadApp:
     def on_pan(self, event):
         if self._rc_start and (abs(event.x - self._rc_start[0]) > 3 or abs(event.y - self._rc_start[1]) > 3):
             self._rc_bewegt = True
-        if self.ansicht.get() == "layout" and self._aktiver_viewport is not None:
+        if self._ist_layout() and self._aktiver_viewport is not None:
             vp = self._aktiver_viewport
             if self._vp_pan_start is None:
                 self._vp_pan_start = (event.x, event.y,
@@ -1606,7 +1804,7 @@ class CadApp:
             return
         if self._vp_aktion != "none":
             return
-        if self.ansicht.get() == "layout" and self._aktiver_viewport is None:
+        if self._ist_layout() and self._aktiver_viewport is None:
             vp = self._viewport_unter_maus(event)
             if vp is not None and self.aktives_werkzeug.get() == "auswahl":
                 self._viewport_kontextmenu(event, vp)
@@ -1998,8 +2196,10 @@ class CadApp:
                 ("   |   [Viewport: Rechtsklick für Menü, Doppelklick = aktivieren]"
                  if de else
                  "   |   [Viewport: right-click for menu, double-click = activate]"))
+        ansicht_name = (self.layout.name if self._ist_layout() else
+                        ("Modell" if de else "Model"))
         self.status.set(
-            f"[{self.ansicht.get().capitalize()}]  "
+            f"[{ansicht_name}]  "
             f"X = {pt[0] / einh:8.2f} {unit}   Y = {pt[1] / einh:8.2f} {unit}   |   "
             f"Zoom {self.view['zoom']:.2f}   |   "
             f"{'Layer' if de else 'Layer'}: {self.aktiver_layer.get()}   |   "
@@ -2032,7 +2232,7 @@ class CadApp:
         self.canvas.delete("vp_vorschau")
 
     def _vp_griff_unter_maus(self, event):
-        if self.ansicht.get() != "layout":
+        if not self._ist_layout():
             return None, None
         x_mm, y_mm = self.px_to_mm(event.x, event.y)
         tol = 9.0 / self.view["zoom"]
@@ -2189,7 +2389,7 @@ class CadApp:
             c.create_rectangle(x1 - 2, y1 - 2, x2 + 2, y2 + 2,
                                outline=farbe, width=3, dash=(3, 3), tags=tags)
             return
-        papier = self.view["zoom"] if self.ansicht.get() == "layout" else None
+        papier = self.view["zoom"] if self._ist_layout() else None
         w = self._lw_px(self._effektive_staerke_mm(el), papier) + 5
         for pts, geschlossen in self._el_polylinien(el, self.view["zoom"]):
             px = [self.mm_to_px(x, y) for (x, y) in pts]
@@ -2595,7 +2795,7 @@ class CadApp:
                     "vp_griffe", "griffe"):
             c.delete(tag)
         self._clear_temp()
-        if self.ansicht.get() == "modell":
+        if not self._ist_layout():
             for el in self.elemente:
                 l = self.layers.get(el.layer)
                 if l and not l.sichtbar:
@@ -2630,7 +2830,7 @@ class CadApp:
     def _effektive_zeichenfarbe(self, el):
         l = self.layers.get(el.layer)
         farbe = el.farbe if (el.eig_farbe or l is None) else l.farbe
-        bg = self.bg_modell if self.ansicht.get() == "modell" else self.bg_layout
+        bg = self.bg_modell if not self._ist_layout() else self.bg_layout
         if ist_dunkel(bg) and farbe.lower() in ("#000000", "#000", "black"):
             return "#ffffff"
         return farbe
@@ -2655,7 +2855,7 @@ class CadApp:
             farbe = self._effektive_zeichenfarbe(el)
             lt = LINIENTYPEN.get(el.linientyp, LINIENTYPEN["Volllinie (schmal)"])
             dash = None if isinstance(el, (Bemassung, Text)) else lt["dash"]
-            papier = self.view["zoom"] if self.ansicht.get() == "layout" else None
+            papier = self.view["zoom"] if self._ist_layout() else None
             w = self._lw_px(self._effektive_staerke_mm(el), papier)
             if isinstance(el, Bemassung):
                 w = max(1, min(w, 2))
@@ -2701,8 +2901,11 @@ class CadApp:
             self._zeichne_element(me, tags=("layout",), tf=tf, skala=skala, clip=clip)
 
     def rahmen_einfuegen(self):
+        if not self._ist_layout():
+            self.status.set("Rahmen nur im Layout möglich.")
+            return
         self._snapshot()
-        b, h = ZEICHNUNGSFORMATE[self.layout_format.get()]
+        b, h = ZEICHNUNGSFORMATE[self.layout_format]
         basis = {"layer": "0", "farbe": FARBEN["cyan"],
                  "linientyp": "Volllinie (breit)", "eig_farbe": True, "staerke": 0.7}
         basis2 = {"layer": "0", "farbe": FARBEN["cyan"],
@@ -2716,8 +2919,8 @@ class CadApp:
         self.layout_elemente.append(Linie(fx + 90, fy, fx + 90, fy + sh - 20, **basis2))
         de = SPRACHE["aktuell"] == "de"
         self.layout_elemente.append(Text(fx + 3, fy + sh - 6,
-            (f"Zeichnung: {self.layout_format.get()}" if de
-             else f"Drawing: {self.layout_format.get()}"), 5.0, 0.0, "Arial", **basis2))
+            (f"Zeichnung: {self.layout_format}" if de
+             else f"Drawing: {self.layout_format}"), 5.0, 0.0, "Arial", **basis2))
         self.layout_elemente.append(Text(fx + 3, fy + sh - 16,
             (f"Maßstab: {self.massstab.get()}" if de
              else f"Scale: {self.massstab.get()}"), 3.5, 0.0, "Arial", **basis2))
@@ -2732,6 +2935,9 @@ class CadApp:
         self.redraw()
 
     def viewport_modus_starten(self):
+        if not self._ist_layout():
+            self.status.set("Bitte zuerst ein Layout öffnen.")
+            return
         self._viewport_modus = True
         self.letzter_punkt = None
         de = SPRACHE["aktuell"] == "de"
@@ -2745,7 +2951,7 @@ class CadApp:
                 ("Alle Layout-Elemente entfernen?" if de
                  else "Remove all layout elements?")):
             self._snapshot()
-            self.layout_elemente = []
+            self.layouts[self.aktives_layout].elemente = []
             self._aktiver_viewport = None
             self.redraw()
 
@@ -2767,7 +2973,7 @@ class CadApp:
         title_row = tk.Frame(frame, bg=FARBEN["bg_mittel"])
         title_row.pack(anchor="w", fill="x")
 
-               # --- Logo suchen (mehrere mögliche Orte) ---
+        # --- Logo suchen (mehrere mögliche Orte) ---
         logo_path = None
         kandidaten = [
             "KatieCAD.png",
@@ -2866,15 +3072,23 @@ class CadApp:
                 ("Alle Elemente löschen?" if de else "Delete all elements?")):
             return
         self.elemente = []
-        self.layout_elemente = []
+        self.layouts = [Layout("Layout1", Layout.STANDARD_FORMAT, "#1c132d")]
+        self.aktives_layout = 0
+        self.ansicht.set("modell")
         self.auswahl = []
         self._aktiver_viewport = None
         self._paste_abbrechen()
         self._bem_abbrechen()
         self._bogen_abbrechen()
         self._undo_stack = []
+        self._layout_switcher_neu_aufbauen()
+        self._update_kontext_widgets()
+        bg = self.bg_modell
+        self.canvas.config(bg=bg)
+        self.bg_btn.config(bg=bg)
         self._mark_clean()
         self.redraw()
+        self._zeichne_raster()
 
     def speichern(self):
         de = SPRACHE["aktuell"] == "de"
@@ -2888,13 +3102,15 @@ class CadApp:
             "einheit": self.einheit.get(),
             "massstab": self.massstab.get(),
             "bg_modell": self.bg_modell,
-            "bg_layout": self.bg_layout,
-            "layout_format": self.layout_format.get(),
+            "layout_format": self.layout_format,   # Rückwärtskompatibilität
+            "bg_layout": self.layouts[0].bg,       # Rückwärtskompatibilität
             "raster_mm": self._zahl(self.raster_mm, 5.0),
             "fang_mm": self._zahl(self.fang_mm, 5.0),
             "layers": [l.to_dict() for l in self.layers.values()],
             "elemente": [e.to_dict() for e in self.elemente],
-            "layout_elemente": [e.to_dict() for e in self.layout_elemente],
+            "layouts": [l.to_dict() for l in self.layouts],
+            "aktives_layout": self.aktives_layout,
+            "ansicht": self.ansicht.get(),
             "sprache": SPRACHE["aktuell"],
         }
         try:
@@ -2934,8 +3150,6 @@ class CadApp:
         self.einheit.set(daten.get("einheit", "mm"))
         self.massstab.set(daten.get("massstab", "1:1"))
         self.bg_modell = daten.get("bg_modell", "#120a1f")
-        self.bg_layout = daten.get("bg_layout", "#1c132d")
-        self.layout_format.set(daten.get("layout_format", "A3 (420x297)"))
         self.raster_mm.set(daten.get("raster_mm", 5.0))
         self.fang_mm.set(daten.get("fang_mm", 5.0))
         for ld in daten.get("layers", []):
@@ -2944,26 +3158,61 @@ class CadApp:
                                             ld.get("sichtbar", True))
         self.layer_cb.config(values=list(self.layers.keys()))
         self.elemente = []
-        self.layout_elemente = []
+        for d in daten.get("elemente", []):
+            el = self._dict_zu_element(d)
+            if el:
+                self.elemente.append(el)
+
+        # Layouts laden
+        if "layouts" in daten and daten["layouts"]:
+            self.layouts = []
+            for ld in daten["layouts"]:
+                self.layouts.append(Layout.from_dict(ld, self._dict_zu_element))
+            if not self.layouts:
+                self.layouts = [Layout("Layout1", Layout.STANDARD_FORMAT, "#1c132d")]
+        else:
+            # Alte Datei: ein einziges Layout aus layout_elemente/layout_format
+            alt = Layout(daten.get("layout_format", Layout.STANDARD_FORMAT),
+                         daten.get("layout_format", Layout.STANDARD_FORMAT),
+                         daten.get("bg_layout", "#1c132d"))
+            alt.name = "Layout1"
+            for d in daten.get("layout_elemente", []):
+                el = self._dict_zu_element(d)
+                if el:
+                    if isinstance(el, Viewport):
+                        el.aktiv = False
+                    alt.elemente.append(el)
+            self.layouts = [alt]
+
+        self.aktives_layout = int(daten.get("aktives_layout", 0))
+        if self.aktives_layout >= len(self.layouts):
+            self.aktives_layout = len(self.layouts) - 1
+        gespeicherte_ansicht = daten.get("ansicht", "modell")
+        if gespeicherte_ansicht.startswith("layout"):
+            idx = 0
+            if ":" in gespeicherte_ansicht:
+                try:
+                    idx = int(gespeicherte_ansicht.split(":", 1)[1])
+                except ValueError:
+                    idx = 0
+            if idx >= len(self.layouts):
+                idx = len(self.layouts) - 1
+            self.aktives_layout = idx
+            self.ansicht.set(f"layout:{idx}")
+        else:
+            self.ansicht.set("modell")
+
         self.auswahl = []
         self._aktiver_viewport = None
         self._paste_abbrechen()
         self._bem_abbrechen()
         self._bogen_abbrechen()
-        for d in daten.get("elemente", []):
-            el = self._dict_zu_element(d)
-            if el:
-                self.elemente.append(el)
-        for d in daten.get("layout_elemente", []):
-            el = self._dict_zu_element(d)
-            if el:
-                if isinstance(el, Viewport):
-                    el.aktiv = False
-                self.layout_elemente.append(el)
-        bg = self.bg_modell if self.ansicht.get() == "modell" else self.bg_layout
+        bg = self.bg_modell if not self._ist_layout() else self.bg_layout
         self.canvas.config(bg=bg)
         self.bg_btn.config(bg=bg)
         self._undo_stack = []
+        self._layout_switcher_neu_aufbauen()
+        self._update_kontext_widgets()
         self._mark_clean()
         self.redraw()
         self._zeichne_raster()
@@ -3255,7 +3504,7 @@ class CadApp:
         w = self.aktives_werkzeug.get()
         n = len(self._pts)
         if w == "auswahl":
-            if self.ansicht.get() == "layout":
+            if self._ist_layout():
                 h(text=("Viewport: Klick markiert | Ecke ziehen = skalieren | "
                         "Mitte ziehen = verschieben | Rechtsklick = Menü" if de else
                         "Viewport: click = select | drag corner = resize | "
@@ -3500,7 +3749,7 @@ class CadApp:
         return Bogen(cx, cy, r, s, e, **self._layer_daten())
 
     def _ctx(self):
-        if self.ansicht.get() == "layout":
+        if self._ist_layout():
             if self._aktiver_viewport is not None:
                 return "vp", self._aktiver_viewport
             return "layout", None
@@ -4092,7 +4341,8 @@ class CadApp:
 
     def _zustand(self):
         return {"elemente": [e.to_dict() for e in self.elemente],
-                "layout_elemente": [e.to_dict() for e in self.layout_elemente],
+                "layouts": [l.to_dict() for l in self.layouts],
+                "aktives_layout": self.aktives_layout,
                 "layers": [l.to_dict() for l in self.layers.values()]}
 
     def _eingabe_punkt_werkzeug(self, text, einh):
@@ -4769,12 +5019,15 @@ class CadApp:
                          (vp.x, vp.y + vp.hoehe)],
                         0.25, "#000000", None, True)
 
-    def _pdf_erzeugen(self, quelle, farbig, vp_rahmen):
+    def _pdf_erzeugen(self, quelle, farbig, vp_rahmen, layout_index=None):
         de = SPRACHE["aktuell"] == "de"
-        b, h = ZEICHNUNGSFORMATE[self.layout_format.get()]
         if quelle == "layout":
+            if layout_index is None:
+                layout_index = self.aktives_layout
+            lay = self.layouts[layout_index]
+            b, h = ZEICHNUNGSFORMATE[lay.format]
             seite = PdfSeite(b, h)
-            for el in self.layout_elemente:
+            for el in lay.elemente:
                 l = self.layers.get(el.layer)
                 if l and not l.sichtbar:
                     continue
@@ -4783,6 +5036,9 @@ class CadApp:
                 else:
                     self._pdf_element(seite, el, lambda x, y: (x, y), 1.0, farbig)
             return seite.to_bytes()
+
+        # Modell
+        b, h = ZEICHNUNGSFORMATE[self.layouts[self.aktives_layout].format]
         sichtbar = [e for e in self.elemente
                     if not (self.layers.get(e.layer) and not self.layers[e.layer].sichtbar)]
         if not sichtbar:
@@ -4833,9 +5089,9 @@ class CadApp:
         dlg = DruckDialog(self.root, self)
         if not dlg.result:
             return
-        aktion, quelle, farbig, rahmen = dlg.result
+        aktion, quelle, farbig, rahmen, layout_index = dlg.result
         try:
-            daten = self._pdf_erzeugen(quelle, farbig, rahmen)
+            daten = self._pdf_erzeugen(quelle, farbig, rahmen, layout_index)
         except Exception as ex:
             messagebox.showerror("PDF", str(ex))
             return
@@ -4857,6 +5113,39 @@ class CadApp:
             self.status.set(("An den Drucker gesendet." if de
                              else "Sent to printer.") if aktion == "druck" else
                             ("Vorschau geöffnet." if de else "Preview opened."))
+
+
+# ============================================================
+# Layout-Name-Dialog (für Umbenennen)
+# ============================================================
+class _LayoutNameDialog(tk.Toplevel):
+    def __init__(self, parent, titel, startname=""):
+        super().__init__(parent)
+        self.result = None
+        self.title(titel)
+        self.geometry("360x140")
+        self.transient(parent)
+        self.grab_set()
+        self.configure(bg=FARBEN["bg_mittel"])
+        f = ttk.Frame(self, padding=12)
+        f.pack(fill=tk.BOTH, expand=True)
+        ttk.Label(f, text=tr("layout.neu.name")).pack(anchor=tk.W)
+        self.name_var = tk.StringVar(value=startname)
+        e = ttk.Entry(f, textvariable=self.name_var, width=30)
+        e.pack(fill=tk.X, pady=6)
+        e.focus_set()
+        bf = ttk.Frame(f)
+        bf.pack(pady=8)
+        ttk.Button(bf, text=tr("dlg.ok"), command=self._ok).pack(side=tk.LEFT, padx=4)
+        ttk.Button(bf, text=tr("dlg.abbrechen"),
+                   command=self.destroy).pack(side=tk.LEFT, padx=4)
+        self.bind("<Return>", lambda e: self._ok())
+        self.bind("<Escape>", lambda e: self.destroy())
+        self.wait_window(self)
+
+    def _ok(self):
+        self.result = self.name_var.get().strip()
+        self.destroy()
 
 
 # ============================================================
@@ -5490,26 +5779,46 @@ class ArrayDialog(tk.Toplevel):
 class DruckDialog(tk.Toplevel):
     def __init__(self, parent, app):
         super().__init__(parent)
+        self.app = app
         self.result = None
         self.title(tr("dlg.druck.titel"))
-        self.geometry("430x370")
+        self.geometry("460x470")
         self.transient(parent)
         self.grab_set()
         self.configure(bg=FARBEN["bg_mittel"])
         f = ttk.Frame(self, padding=12)
         f.pack(fill=tk.BOTH, expand=True)
         self.quelle = tk.StringVar(
-            value="layout" if app.ansicht.get() == "layout" else "modell")
+            value="layout" if app._ist_layout() else "modell")
         self.farbig = tk.BooleanVar(value=False)
         self.rahmen = tk.BooleanVar(value=False)
         ttk.Label(f, text=tr("dlg.druck.was"), style="Title.TLabel").pack(anchor=tk.W)
         ttk.Radiobutton(f, text=tr("dlg.druck.layout"),
-                        value="layout", variable=self.quelle).pack(anchor=tk.W, padx=10)
+                        value="layout", variable=self.quelle,
+                        command=self._refresh_layout_auswahl).pack(anchor=tk.W, padx=10)
         ttk.Radiobutton(f, text=tr("dlg.druck.modell"),
-                        value="modell", variable=self.quelle).pack(anchor=tk.W, padx=10)
+                        value="modell", variable=self.quelle,
+                        command=self._refresh_layout_auswahl).pack(anchor=tk.W, padx=10)
+
+        # Layout-Auswahl
+        self.layout_auswahl_frame = ttk.Frame(f)
+        self.layout_auswahl_frame.pack(anchor=tk.W, fill=tk.X, pady=(4, 0))
+        ttk.Label(self.layout_auswahl_frame,
+                  text=tr("dlg.druck.layout_auswahl")).pack(side=tk.LEFT, padx=(10, 4))
+        self.layout_names = [l.name for l in app.layouts]
+        self.layout_var = tk.StringVar(
+            value=self.layout_names[app.aktives_layout]
+            if 0 <= app.aktives_layout < len(self.layout_names) else "")
+        self.layout_cb = ttk.Combobox(self.layout_auswahl_frame,
+                                      textvariable=self.layout_var,
+                                      values=self.layout_names,
+                                      state="readonly", width=22)
+        self.layout_cb.pack(side=tk.LEFT)
+
         ttk.Label(f, text=tr("dlg.druck.blattformat"),
                   style="Title.TLabel").pack(anchor=tk.W, pady=(10, 0))
-        ttk.Combobox(f, textvariable=app.layout_format,
+        self.format_var = tk.StringVar(value=app.layout_format)
+        ttk.Combobox(f, textvariable=self.format_var,
                      values=list(ZEICHNUNGSFORMATE.keys()),
                      width=18, state="readonly").pack(anchor=tk.W, padx=10)
         ttk.Label(f, text=tr("dlg.druck.darstellung"),
@@ -5530,11 +5839,30 @@ class DruckDialog(tk.Toplevel):
                    command=lambda: self._ok("druck")).pack(side=tk.LEFT, padx=4)
         ttk.Button(bf, text=tr("dlg.abbrechen"),
                    command=self.destroy).pack(side=tk.LEFT, padx=4)
+        self._refresh_layout_auswahl()
         self.wait_window(self)
 
+    def _refresh_layout_auswahl(self):
+        if self.quelle.get() == "layout":
+            for w in self.layout_auswahl_frame.winfo_children():
+                w.pack(side=tk.LEFT, padx=2)
+            self.layout_cb.config(state="readonly")
+        else:
+            for w in self.layout_auswahl_frame.winfo_children():
+                w.pack_forget()
+
     def _ok(self, aktion):
+        idx = self.app.aktives_layout
+        if self.quelle.get() == "layout":
+            try:
+                idx = self.layout_names.index(self.layout_var.get())
+            except ValueError:
+                idx = self.app.aktives_layout
+        # Format ggf. aktualisieren, falls Layout gedruckt wird
+        if self.quelle.get() == "layout" and 0 <= idx < len(self.app.layouts):
+            self.app.layouts[idx].format = self.format_var.get()
         self.result = (aktion, self.quelle.get(),
-                       bool(self.farbig.get()), bool(self.rahmen.get()))
+                       bool(self.farbig.get()), bool(self.rahmen.get()), idx)
         self.destroy()
 
 
