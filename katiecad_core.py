@@ -1532,6 +1532,81 @@ class BlockBibliothek:
             return True
         return False
 
+class Schraffur(Element):
+    def __init__(self, punkte, typ="solid", winkel=45.0, abstand=5.0, **kw):
+        super().__init__("schraffur", **kw)
+        self.punkte = [tuple(p) for p in punkte]
+        self.typ = typ  # "solid" oder "linien"
+        self.winkel = winkel
+        self.abstand = abstand
+
+    def bbox(self):
+        if not self.punkte:
+            return (0, 0, 0, 0)
+        xs = [p[0] for p in self.punkte]
+        ys = [p[1] for p in self.punkte]
+        return (min(xs), min(ys), max(xs), max(ys))
+
+    def verschieben(self, dx, dy):
+        self.punkte = [(x + dx, y + dy) for (x, y) in self.punkte]
+
+    def drehen(self, cx, cy, winkel_deg):
+        self.punkte = [punkte_drehen(x, y, cx, cy, winkel_deg) for (x, y) in self.punkte]
+        self.winkel = (self.winkel + winkel_deg) % 360.0
+
+    def griffe(self):
+        return [(f"p{i}", x, y) for i, (x, y) in enumerate(self.punkte)]
+
+    def griff_bewegen(self, griff_id, x, y):
+        if not griff_id.startswith("p"): return
+        try:
+            idx = int(griff_id[1:])
+            if 0 <= idx < len(self.punkte):
+                self.punkte[idx] = (x, y)
+        except ValueError:
+            pass
+
+    def geometrie_linien(self):
+        """Berechnet die Schnittpunkte für die Linien-Schraffur (Scanline)."""
+        if self.typ != "linien" or len(self.punkte) < 3:
+            return []
+
+        # 1. Polygon in ein lokales Koordinatensystem drehen (damit die Linien horizontal sind)
+        rad = math.radians(-self.winkel)
+        ca, sa = math.cos(rad), math.sin(rad)
+        rot_pts = [(x * ca + y * sa, -x * sa + y * ca) for (x, y) in self.punkte]
+        
+        # 2. Bounding Box im gedrehten System bestimmen
+        min_y = min(p[1] for p in rot_pts)
+        max_y = max(p[1] for p in rot_pts)
+        
+        # 3. Horizontale Linien im Abstand "abstand" ziehen
+        linien = []
+        y = min_y
+        while y <= max_y:
+            schnitte = []
+            for i in range(len(rot_pts)):
+                p1 = rot_pts[i]
+                p2 = rot_pts[(i + 1) % len(rot_pts)]
+                if (p1[1] <= y < p2[1]) or (p2[1] <= y < p1[1]):
+                    t = (y - p1[1]) / (p2[1] - p1[1])
+                    x = p1[0] + t * (p2[0] - p1[0])
+                    schnitte.append(x)
+            schnitte.sort()
+            
+            # 4. Paare bilden und zurückdrehen
+            for i in range(0, len(schnitte) - 1, 2):
+                x1, x2 = schnitte[i], schnitte[i+1]
+                rad_back = math.radians(self.winkel)
+                cb, sb = math.cos(rad_back), math.sin(rad_back)
+                wx1 = x1 * cb + y * sb
+                wy1 = -x1 * sb + y * cb
+                wx2 = x2 * cb + y * sb
+                wy2 = -x2 * sb + y * cb
+                linien.append(((wx1, wy1), (wx2, wy2)))
+            y += self.abstand
+        return linien
+
 
 # ============================================================
 # Layout (ein Zeichnungsblatt mit eigenem Format, Hintergrund
