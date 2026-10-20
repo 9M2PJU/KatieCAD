@@ -248,8 +248,11 @@ TEXTE = {
         "vp.leiste.kein_layout_hinweis": "Bitte ein Layout öffnen, um die Viewport-Ansicht zu nutzen.",
         "vp.leiste.viewport_waehlen": "Bitte zuerst einen Viewport durch Doppelklick aktivieren.",
         "info.titel": "Info",
+        "info.untertitel": "Ein leichtgewichtiges 2D-CAD-System auf Python/Tkinter-Basis mit vollständigen Konstruktions-, Bearbeitungs- und Bemaßungsfunktionen sowie DXF-Unterstützung.",
+        "info.gebaut_mit": "Entwickelt mit Python und ein wenig Hilfe von KI.",
         "info.copyright": "(c) 2026 Merecete",
         "info.version": "Version 0.1.0",
+        "info.lizenz": "Veröffentlicht unter der MIT-Lizenz.",
     },
     "en": {
         "menu.datei": "File",
@@ -491,8 +494,11 @@ TEXTE = {
         "vp.leiste.kein_layout_hinweis": "Please open a layout to use the viewport view.",
         "vp.leiste.viewport_waehlen": "Please activate a viewport by double-clicking it first.",
         "info.titel": "About",
+        "info.untertitel": "A lightweight 2D CAD system powered by Python/Tkinter featuring essential drafting, editing, dimensioning, and full DXF support.",
+        "info.gebaut_mit": "Built with Python and a little help from AI.",
         "info.copyright": "(c) 2026 Merecete",
         "info.version": "Version 0.1.0",
+        "info.lizenz": "Released under the MIT License.",
     },
 }
 
