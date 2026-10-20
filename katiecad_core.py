@@ -1064,3 +1064,58 @@ class Viewport(Element):
         nx, ny = punkte_drehen(mx, my, cx, cy, winkel_deg)
         self.x = nx - self.breite / 2
         self.y = ny - self.hoehe / 2
+
+
+# ============================================================
+# Layout (ein Zeichnungsblatt mit eigenem Format, Hintergrund
+# und eigenen Layout-Elementen — analog zu AutoCAD-Layouts)
+# ============================================================
+class Layout:
+    """Ein einzelnes Zeichnungsblatt.
+
+    Kapselt:
+      - name         Anzeigename (z.B. "A0 gross", "A2 Detail")
+      - format       Key aus ZEICHNUNGSFORMATE (z.B. "A3 (420x297)")
+      - bg           Hintergrundfarbe des Blatts
+      - elemente     Layout-Elemente (Rahmen, Schriftfeld, Viewports, ...)
+      - view         Ansichts-Zustand (zoom, ox, oy) fuer dieses Blatt
+    """
+
+    STANDARD_FORMAT = "A3 (420x297)"
+    STANDARD_BG = "#1c132d"
+
+    def __init__(self, name="Layout1", format=None, bg=None,
+                 elemente=None, view=None):
+        self.name = name
+        self.format = format or self.STANDARD_FORMAT
+        self.bg = bg or self.STANDARD_BG
+        self.elemente = list(elemente) if elemente else []
+        self.view = dict(view) if view else {"zoom": 1.5, "ox": 150, "oy": 700}
+
+    def to_dict(self):
+        return {
+            "name": self.name,
+            "format": self.format,
+            "bg": self.bg,
+            "elemente": [e.to_dict() for e in self.elemente],
+            "view": dict(self.view),
+        }
+
+    @classmethod
+    def from_dict(cls, d, element_factory):
+        """Baut ein Layout aus einem dict. element_factory(d) muss ein
+        Element (oder None) zurueckliefern und wird fuer jedes Element
+        in d['elemente'] aufgerufen."""
+        lay = cls(
+            name=d.get("name", "Layout1"),
+            format=d.get("format", cls.STANDARD_FORMAT),
+            bg=d.get("bg", cls.STANDARD_BG),
+            view=d.get("view"),
+        )
+        for ed in d.get("elemente", []):
+            el = element_factory(ed)
+            if el is not None:
+                if isinstance(el, Viewport):
+                    el.aktiv = False
+                lay.elemente.append(el)
+        return lay
