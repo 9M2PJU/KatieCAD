@@ -487,6 +487,7 @@ class CadApp:
         self._update_kontext_widgets()
         self._update_eingabe_hinweis()
         self._layout_switcher_neu_aufbauen()
+        self._retranslate_viewport_leiste()
         self._viewport_modus_anzeige_aktualisieren()
         self.redraw()
 
@@ -762,6 +763,9 @@ class CadApp:
                                 cursor="crosshair")
         self.canvas.pack(fill=tk.BOTH, expand=True)
 
+        # Viewport-Leiste bauen (nach dem Canvas, damit before=self.canvas klappt)
+        self._build_viewport_leiste()
+
         self._update_kontext_widgets()
         self._viewport_modus_anzeige_aktualisieren()
 
@@ -870,6 +874,11 @@ class CadApp:
                               command=lambda: self.setze_ansicht("modell"))
         m_ansicht.add_command(label=tr("menu.ansicht.layout"),
                               command=self._ansicht_aktuelles_layout)
+        m_ansicht.add_separator()
+        m_ansicht.add_command(label=tr("vp.leiste.viewport"),
+                              command=self._menue_viewport_ansicht)
+        m_ansicht.add_command(label=tr("vp.leiste.layout"),
+                              command=self._menue_layout_ansicht)
         m_ansicht.add_separator()
         m_ansicht.add_command(label=tr("menu.ansicht.zoom_grenzen"),
                               command=self.zoom_grenzen)
@@ -1379,9 +1388,7 @@ class CadApp:
     # --------------------------------------------------------
     def _build_viewport_leiste(self):
         self.viewport_leiste = ttk.Frame(self.root, padding=(6, 3))
-        # vor dem Canvas packen (der ist zu diesem Zeitpunkt noch nicht da)
-        self.viewport_leiste.pack(side=tk.TOP, fill=tk.X, before=self.canvas) \
-            if hasattr(self, "canvas") else self.viewport_leiste.pack(side=tk.TOP, fill=tk.X)
+        self.viewport_leiste.pack(side=tk.TOP, fill=tk.X, before=self.canvas)
 
         ttk.Label(self.viewport_leiste, text=tr("tb.ansicht"),
                   style="Title.TLabel").pack(side=tk.LEFT, padx=(0, 4))
@@ -1397,7 +1404,6 @@ class CadApp:
         ttk.Separator(self.viewport_leiste, orient=tk.VERTICAL).pack(
             side=tk.LEFT, fill=tk.Y, padx=6)
 
-        # Zoom-Steuerung
         ttk.Label(self.viewport_leiste, text=tr("vp.leiste.zoom") + ":",
                   style="Title.TLabel").pack(side=tk.LEFT)
         self._vp_btn_plus = ttk.Button(self.viewport_leiste, text="+", width=3,
@@ -1411,8 +1417,10 @@ class CadApp:
                                       command=self._vp_fit_aktueller)
         self._vp_btn_fit.pack(side=tk.LEFT, padx=1)
 
-        ttk.Label(self.viewport_leiste, text="  " + tr("vp.leiste.massstab"),
-                  style="Title.TLabel").pack(side=tk.LEFT, padx=(8, 0))
+        self._vp_lbl_massstab = ttk.Label(self.viewport_leiste,
+                                          text="  " + tr("vp.leiste.massstab"),
+                                          style="Title.TLabel")
+        self._vp_lbl_massstab.pack(side=tk.LEFT, padx=(8, 0))
         self._vp_cb_massstab = ttk.Combobox(self.viewport_leiste,
                                             textvariable=self._vp_massstab_var,
                                             values=MASSSTAEBE, width=8,
@@ -1430,8 +1438,18 @@ class CadApp:
                                               command=self._vp_sperre_toggle)
         self._vp_chk_sperre.pack(side=tk.LEFT)
 
-        ttk.Label(self.viewport_leiste, textvariable=self._vp_status_var,
-                  style="Hint.TLabel").pack(side=tk.LEFT, padx=8)
+        self._vp_status_lbl = ttk.Label(self.viewport_leiste,
+                                        textvariable=self._vp_status_var,
+                                        style="Hint.TLabel")
+        self._vp_status_lbl.pack(side=tk.LEFT, padx=8)
+
+    def _retranslate_viewport_leiste(self):
+        if not hasattr(self, "viewport_leiste"):
+            return
+        # Kinder neu beschriften geht am einfachsten über komplettes Neubauen:
+        self.viewport_leiste.destroy()
+        self._build_viewport_leiste()
+        self._viewport_modus_anzeige_aktualisieren()
 
     def _viewport_leiste_sichtbar(self, sichtbar):
         if not hasattr(self, "viewport_leiste"):
@@ -1447,15 +1465,12 @@ class CadApp:
     def _viewport_modus_anzeige_aktualisieren(self):
         if not hasattr(self, "viewport_leiste"):
             return
-        # Sichtbarkeit: nur im Layout
         self._viewport_leiste_sichtbar(self._ist_layout())
         vp = self._aktiver_viewport
-        # Modus
         if self._ist_layout() and vp is not None:
             self._vp_modus_var.set("viewport")
         else:
             self._vp_modus_var.set("layout")
-        # Status
         if vp is None:
             self._vp_status_var.set(tr("vp.leiste.kein_vp"))
             self._vp_massstab_var.set("1:1")
@@ -1486,7 +1501,6 @@ class CadApp:
             idx = self.layout_elemente.index(vp)
         except ValueError:
             return "Viewport"
-        # Anzahl Viewports davor zählen
         n = sum(1 for i in range(idx + 1)
                 if isinstance(self.layout_elemente[i], Viewport))
         return f"Viewport {n}"
@@ -1498,7 +1512,6 @@ class CadApp:
                                 tr("vp.leiste.kein_layout_hinweis"))
             return
         if self._vp_modus_var.get() == "viewport":
-            # Viewport aktivieren: zuletzt aktiven, oder ersten sichtbaren
             vp = self._aktiver_viewport
             if vp is None:
                 vp = self._erster_viewport()
@@ -1510,6 +1523,17 @@ class CadApp:
             self._vp_aktivieren(vp)
         else:
             self._vp_deaktivieren()
+
+    def _menue_viewport_ansicht(self):
+        if not self._ist_layout():
+            self._ansicht_aktuelles_layout()
+        self._vp_modus_var.set("viewport")
+        self._vp_modus_gewaehlt()
+
+    def _menue_layout_ansicht(self):
+        if self._ist_layout():
+            self._vp_modus_var.set("layout")
+            self._vp_modus_gewaehlt()
 
     def _erster_viewport(self):
         for el in self.layout_elemente:
@@ -1543,8 +1567,6 @@ class CadApp:
         return (vp.x + vp.breite / 2, vp.y + vp.hoehe / 2)
 
     def _vp_zoom_um_punkt(self, vp, faktor, punkt_mm):
-        """Zoomt vp.zoom um faktor, hält den Modellpunkt unter punkt_mm
-        (in Layout-mm) fest."""
         mx_mm, my_mm = punkt_mm
         mod_x, mod_y = self._papier_zu_modell(vp, mx_mm, my_mm)
         self._snapshot()
@@ -1574,7 +1596,6 @@ class CadApp:
         mod_x, mod_y = self._papier_zu_modell(vp, cx_mm, cy_mm)
         self._snapshot()
         vp.zoom = neuer_zoom
-        # Zentrum so anpassen, dass der alte Modellmittelpunkt in der Mitte bleibt
         vcx = vp.x + vp.breite / 2
         vcy = vp.y + vp.hoehe / 2
         vp.modell_zentrum_x = mod_x - (cx_mm - vcx) / vp.zoom
@@ -1932,7 +1953,6 @@ class CadApp:
                                 else "Viewport scale is locked.")
                 return
             mx_mm, my_mm = self.px_to_mm(event.x, event.y)
-            # nur zoomen, wenn Maus innerhalb des Viewports
             if not (vp.x <= mx_mm <= vp.x + vp.breite and
                     vp.y <= my_mm <= vp.y + vp.hoehe):
                 return
@@ -2046,11 +2066,9 @@ class CadApp:
             return
         if self._vp_aktion != "none":
             return
-        # Aktiver Viewport: rechte Taste = Pan
         if self._ist_layout() and self._aktiver_viewport is not None:
             self.on_pan_start(event)
             return
-        # Kein aktiver Viewport im Layout: Viewport-Kontextmenü
         if self._ist_layout() and self._aktiver_viewport is None:
             vp = self._viewport_unter_maus(event)
             if vp is not None and self.aktives_werkzeug.get() == "auswahl":
