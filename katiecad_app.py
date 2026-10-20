@@ -1326,7 +1326,8 @@ class CadApp:
     # --------------------------------------------------------
     def _build_viewport_leiste(self):
         self.viewport_leiste = ttk.Frame(self.root, padding=(6, 3))
-        self.viewport_leiste.pack(side=tk.TOP, fill=tk.X, before=self.canvas)
+        # Wird NICHT sofort gepackt – die Sichtbarkeit steuert
+        # _viewport_modus_anzeige_aktualisieren() abhängig vom Modus.
 
         ttk.Label(self.viewport_leiste, text=tr("tb.ansicht"),
                   style="Title.TLabel").pack(side=tk.LEFT, padx=(0, 4))
@@ -1397,8 +1398,10 @@ class CadApp:
                 self.viewport_leiste.pack(side=tk.TOP, fill=tk.X,
                                           before=self.canvas)
         else:
-            if self.viewport_leiste.winfo_ismapped():
-                self.viewport_leiste.pack_forget()
+            # pack_forget() ist idempotent und sicher, auch wenn die Leiste
+            # gerade nicht gemappt ist. So ist sie garantiert weg, egal wie
+            # die Pack-Reihenfolge beim Start aussieht.
+            self.viewport_leiste.pack_forget()
 
     def _viewport_modus_anzeige_aktualisieren(self):
         if not hasattr(self, "viewport_leiste"):
