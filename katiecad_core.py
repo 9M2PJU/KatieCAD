@@ -1052,13 +1052,20 @@ class Bemassung(Element):
 
     @staticmethod
     def linear_richtung(p1, p2, m):
+        dx, dy = abs(p2[0] - p1[0]), abs(p2[1] - p1[1])
+        
+        # NEU: Wenn die Linie schräg ist, nehmen wir automatisch den Winkel der Linie
+        if dx > 1e-6 and dy > 1e-6:
+            return "ausgerichtet"
+            
         cx, cy = (p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2
-        ex = abs(m[0] - cx) - abs(p2[0] - p1[0]) / 2
-        ey = abs(m[1] - cy) - abs(p2[1] - p1[1]) / 2
+        ex = abs(m[0] - cx) - dx / 2
+        ey = abs(m[1] - cy) - dy / 2
         r = "horizontal" if ey >= ex else "vertikal"
-        if r == "horizontal" and abs(p2[0] - p1[0]) < 1e-9 < abs(p2[1] - p1[1]):
+        
+        if r == "horizontal" and dx < 1e-9 < dy:
             r = "vertikal"
-        elif r == "vertikal" and abs(p2[1] - p1[1]) < 1e-9 < abs(p2[0] - p1[0]):
+        elif r == "vertikal" and dy < 1e-9 < dx:
             r = "horizontal"
         return r
 
@@ -1566,4 +1573,3 @@ class Layout:
                     el.aktiv = False
                 lay.elemente.append(el)
         return lay
-
