@@ -18,7 +18,8 @@ NEU (Schritt 8 - SCHRAFFUR):
 
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, colorchooser, simpledialog
-import math, json, re
+import math, json, re, zlib
+from copy import deepcopy
 import os, sys, tempfile, subprocess
 import tkinter.font as tkfont
 
@@ -48,6 +49,7 @@ from katiecad_projekt import (Projekt, ProjektFehler, PROJEKT_ENDUNG,
 from katiecad_bloecke import (block_speichern, block_laden,
                               vorschlag_dateiname, BlockDateiFehler)
 from katiecad_sidebar import Seitenleiste
+from katiecad_widgets import FlatButton, farb_swatch
 from katiecad_core import (
     FARBEN, EINHEITEN, ZEICHNUNGSFORMATE, MASSSTAEBE, LINIENTYPEN,
     RASTER_GROESSEN, BG_PRESETS, SCHRIFTARTEN, LINIENSTAERKEN,
@@ -57,7 +59,7 @@ from katiecad_core import (
     Layer, Layout, Element, Linie, Kreis, Bogen, Rechteck, Polylinie, Text,
     Bemassung, Viewport, Schraffur, konturen_aus_elementen,
     AttributDefinition, Leitung, Verbindungspunkt, Querverweis,
-    vp_tags_eindeutig, LEITUNG_FARBE,
+    vp_tags_eindeutig, LEITUNG_FARBE, UI_SCHRIFT,
     BlockDefinition, BlockReferenz, BlockBibliothek,
     bogen_sweep, bogen_punkte, winkel_im_bogen, bogen_aus_3_punkten,
     bogen_mitte_start_ende, abstand_punkt_segment, naechster_punkt_segment,
@@ -75,10 +77,12 @@ from katiecad_dialogs import (
     _BlockNameDialog, _BlockAuswahlDialog,
     ProjektNeuDialog, AttributDefinitionDialog, BlockAttributeDialog,
     QuerverweisDialog, VerbindungspunkteDialog, ProjektDruckDialog,
+    VerbindungspunktDialog,
 )
 from katiecad_pdf import pdf_erzeugen, pdf_senden, pdf_mehrseitig_erzeugen
 from katiecad_elektro import (querverweis_ziele, qv_texte_aus_blattdaten,
                               qv_texte_aus_elementen, naechster_vp,
+                              naechster_anschluss, anschlusspunkte,
                               naechste_bezeichnung)
 from types import SimpleNamespace
 
@@ -86,6 +90,11 @@ from types import SimpleNamespace
 # ============================================================
 # Style-Setup (tkinter-abhängig, daher hier)
 # ============================================================
+# macOS: rechte Maustaste = Button-2, mittlere = Button-3 (bei X11/Windows umgekehrt)
+_MAC = sys.platform == "darwin"
+BTN_MITTE, BTN_RECHTS = ("3", "2") if _MAC else ("2", "3")
+
+
 def _style_setup(root):
     st = ttk.Style(root)
     try:
@@ -95,17 +104,17 @@ def _style_setup(root):
 
     st.configure("TFrame", background=FARBEN["bg_mittel"])
     st.configure("TLabel", background=FARBEN["bg_mittel"],
-                 foreground=FARBEN["text"], font=("Segoe UI", 9))
+                 foreground=FARBEN["text"], font=(UI_SCHRIFT, 9))
     st.configure("Title.TLabel", background=FARBEN["bg_mittel"],
-                 foreground=FARBEN["cyan"], font=("Segoe UI", 9, "bold"))
+                 foreground=FARBEN["cyan"], font=(UI_SCHRIFT, 9, "bold"))
     st.configure("Hint.TLabel", background=FARBEN["bg_mittel"],
-                 foreground=FARBEN["cyan"], font=("Segoe UI", 9, "italic"))
+                 foreground=FARBEN["cyan"], font=(UI_SCHRIFT, 9, "italic"))
 
     st.configure("TButton",
                  background=FARBEN["bg_hell"],
                  foreground=FARBEN["cyan"],
                  borderwidth=1, focusthickness=0,
-                 font=("Segoe UI", 9, "bold"),
+                 font=(UI_SCHRIFT, 9, "bold"),
                  padding=(8, 4))
     st.map("TButton",
            background=[("active", FARBEN["bg_hover"]),
@@ -115,7 +124,7 @@ def _style_setup(root):
     st.configure("TRadiobutton",
                  background=FARBEN["bg_mittel"],
                  foreground=FARBEN["text"],
-                 font=("Segoe UI", 9))
+                 font=(UI_SCHRIFT, 9))
     st.map("TRadiobutton",
            background=[("active", FARBEN["bg_mittel"])],
            foreground=[("active", FARBEN["cyan"]),
@@ -124,7 +133,7 @@ def _style_setup(root):
     st.configure("TCheckbutton",
                  background=FARBEN["bg_mittel"],
                  foreground=FARBEN["text"],
-                 font=("Segoe UI", 9))
+                 font=(UI_SCHRIFT, 9))
     st.map("TCheckbutton",
            background=[("active", FARBEN["bg_mittel"])],
            foreground=[("active", FARBEN["cyan"]),
@@ -165,7 +174,7 @@ def _style_setup(root):
     st.configure("Treeview.Heading",
                  background=FARBEN["bg_mittel"],
                  foreground=FARBEN["cyan"],
-                 font=("Segoe UI", 9, "bold"))
+                 font=(UI_SCHRIFT, 9, "bold"))
     st.map("Treeview",
            background=[("selected", FARBEN["select_bg"])],
            foreground=[("selected", FARBEN["select_fg"])])
@@ -177,6 +186,16 @@ def _style_setup(root):
 class CadApp:
     def __init__(self, root):
         self.root = root
+        if _MAC:
+            # Jedes <Control-...>-Kuerzel gilt auf dem Mac auch mit Cmd
+            _orig_bind = self.root.bind
+
+            def _bind_mac(seq=None, func=None, add=None):
+                res = _orig_bind(seq, func, add)
+                if func is not None and seq and seq.startswith("<Control-"):
+                    _orig_bind("<Command-" + seq[len("<Control-"):], func, add)
+                return res
+            self.root.bind = _bind_mac
         self.root.title("KatieCAD")
         self.root.geometry("1500x950")
         self.root.configure(bg=FARBEN["bg_dunkel"])
@@ -285,6 +304,7 @@ class CadApp:
         self._leitung_dialog = None
         self._qv_vorgabe = None         # Querverweis-Einstellungen
         self._vp_letzte_bez = ""
+        self._vp_text_anzeigen = True
         self._qv_cache = {}
 
         self._clipboard = []
@@ -483,12 +503,55 @@ class CadApp:
         if sl is not None:
             sl.undo_redo_setzen(bool(self._undo_stack), bool(self._redo_stack))
 
+    @staticmethod
+    def _snap_groesse(st):
+        try:
+            n = len(st.get("elemente", ()))
+            n += sum(len(l.get("elemente", ())) for l in st.get("layouts", ()))
+            return n
+        except Exception:
+            return 0
+
+    def _snap_pack(self, st):
+        """Grosse Zeichnungen: Zustand komprimiert ablegen (Faktor ~10-20).
+        Ohne das belegt jeder der bis zu 50 Undo-Schritte eine volle Kopie
+        aller Elemente (bei DXF-Importen schnell mehrere GB)."""
+        if self._snap_groesse(st) < 1500:
+            return st
+        raw = json.dumps(st, separators=(",", ":")).encode("utf-8")
+        return ("z", zlib.compress(raw, 1))
+
+    @staticmethod
+    def _snap_unpack(snap):
+        if isinstance(snap, tuple) and len(snap) == 2 and snap[0] == "z":
+            return json.loads(zlib.decompress(snap[1]).decode("utf-8"))
+        return snap
+
+    def _historie_limit(self, n_elemente):
+        """Max. Schritte je Stapel; bei grossen Zeichnungen weniger."""
+        if n_elemente < 3000:
+            return self._undo_max
+        return max(8, min(self._undo_max, 150000 // max(1, n_elemente)))
+
+    def _stapel_begrenzen(self, stapel, n_elemente):
+        grenze = self._historie_limit(n_elemente)
+        while len(stapel) > grenze:
+            stapel.pop(0)
+
+    def _stacks_merken(self, pfad):
+        """Undo/Redo eines Blattes fuer den Wiederaufruf merken - aber nur
+        fuer die zuletzt besuchten Blaetter (Speicher)."""
+        self._undo_pro_blatt.pop(pfad, None)
+        self._undo_pro_blatt[pfad] = (self._undo_stack, self._redo_stack)
+        while len(self._undo_pro_blatt) > 4:
+            self._undo_pro_blatt.pop(next(iter(self._undo_pro_blatt)))
+
     def _push_undo(self, vorher):
         """Legt einen Zustand VOR einer Aenderung auf den Undo-Stack.
         Jede neue Aenderung macht die Redo-Historie ungueltig."""
-        self._undo_stack.append(vorher)
-        if len(self._undo_stack) > self._undo_max:
-            self._undo_stack.pop(0)
+        n = self._snap_groesse(vorher)
+        self._undo_stack.append(self._snap_pack(vorher))
+        self._stapel_begrenzen(self._undo_stack, n)
         self._redo_stack.clear()
         self._mark_dirty()
         self._aktualisiere_undo_redo()
@@ -516,18 +579,19 @@ class CadApp:
         if not quelle:
             self.status.set(tr(leer_key))
             return
-        aktuell = self._zustand()
-        snap = quelle.pop()
+        aktuell_roh = self._zustand()
+        aktuell = self._snap_pack(aktuell_roh)
+        snap_roh = quelle.pop()
         ziel.append(aktuell)
-        if len(ziel) > self._undo_max:
-            ziel.pop(0)
+        self._stapel_begrenzen(ziel, self._snap_groesse(aktuell_roh))
         try:
+            snap = self._snap_unpack(snap_roh)
             self._zustand_wiederherstellen(snap)
         except Exception as e:
             print(f"Undo/Redo-Fehler: {e}")
             if ziel and ziel[-1] is aktuell:
                 ziel.pop()
-            quelle.append(snap)
+            quelle.append(snap_roh)
             self._aktualisiere_undo_redo()
             return
         self._mark_dirty()
@@ -823,6 +887,11 @@ class CadApp:
         self.root.option_add('*Menu.foreground', FARBEN["cyan"])
         self.root.option_add('*Menu.activeBackground', FARBEN["cyan"])
         self.root.option_add('*Menu.activeForeground', FARBEN["bg_dunkel"])
+        # Ausklapplisten der Comboboxen (sonst unter Linux/Mac hell/uneinheitlich)
+        self.root.option_add('*TCombobox*Listbox.background', FARBEN["bg_hell"])
+        self.root.option_add('*TCombobox*Listbox.foreground', FARBEN["cyan"])
+        self.root.option_add('*TCombobox*Listbox.selectBackground', FARBEN["select_bg"])
+        self.root.option_add('*TCombobox*Listbox.selectForeground', FARBEN["select_fg"])
 
         menubar = tk.Menu(self.root,
                           bg=FARBEN["bg_mittel"], fg=FARBEN["cyan"],
@@ -875,19 +944,6 @@ class CadApp:
         m_projekt.add_command(label=tr("menu.projekt.loeschen"),
                               command=self.projekt_loeschen)
         menubar.add_cascade(label=tr("menu.projekt"), menu=m_projekt)
-
-        # Elektro
-        m_elektro = tk.Menu(menubar, tearoff=0,
-                            bg=FARBEN["bg_mittel"], fg=FARBEN["cyan"],
-                            activebackground=FARBEN["cyan"],
-                            activeforeground=FARBEN["bg_dunkel"])
-        m_elektro.add_command(label=tr("menu.elektro.vpunkt"),
-                              command=lambda: self._werkzeug_setzen("vpunkt"))
-        m_elektro.add_command(label=tr("menu.elektro.leitung"),
-                              command=lambda: self._werkzeug_setzen("leitung"))
-        m_elektro.add_command(label=tr("menu.elektro.querverweis"),
-                              command=lambda: self._werkzeug_setzen("querverweis"))
-        menubar.add_cascade(label=tr("menu.elektro"), menu=m_elektro)
 
         # Bearbeiten
         m_bearb = tk.Menu(menubar, tearoff=0,
@@ -1018,6 +1074,19 @@ class CadApp:
                               command=self.block_aufloesen)
         menubar.add_cascade(label=tr("menu.bloecke"), menu=m_bloecke)
 
+        # Elektro
+        m_elektro = tk.Menu(menubar, tearoff=0,
+                            bg=FARBEN["bg_mittel"], fg=FARBEN["cyan"],
+                            activebackground=FARBEN["cyan"],
+                            activeforeground=FARBEN["bg_dunkel"])
+        m_elektro.add_command(label=tr("menu.elektro.vpunkt"),
+                              command=lambda: self._werkzeug_setzen("vpunkt"))
+        m_elektro.add_command(label=tr("menu.elektro.leitung"),
+                              command=lambda: self._werkzeug_setzen("leitung"))
+        m_elektro.add_command(label=tr("menu.elektro.querverweis"),
+                              command=lambda: self._werkzeug_setzen("querverweis"))
+        menubar.add_cascade(label=tr("menu.elektro"), menu=m_elektro)
+
         # Sprache
         m_sprache = tk.Menu(menubar, tearoff=0,
                             bg=FARBEN["bg_mittel"], fg=FARBEN["cyan"],
@@ -1102,11 +1171,8 @@ class CadApp:
         cb_ls.bind("<<ComboboxSelected>>", self._stil_auf_auswahl)
         ttk.Label(tb2, text="mm").pack(side=tk.LEFT)
         ttk.Label(tb2, text="  " + tr("tb.farbe"), style="Title.TLabel").pack(side=tk.LEFT, padx=(8, 0))
-        self.farbe_btn = tk.Button(tb2, bg=self.zeichenfarbe, width=3,
-                                   command=self.farbe_waehlen,
-                                   relief=tk.FLAT, bd=0,
-                                   highlightthickness=1,
-                                   highlightbackground=FARBEN["cyan"])
+        self.farbe_btn = self._farb_swatch(tb2, self.zeichenfarbe,
+                                           self.farbe_waehlen)
         self.farbe_btn.pack(side=tk.LEFT, padx=4)
         ttk.Checkbutton(tb2, text=tr("tb.eig_farbe"),
                         variable=self.eigene_farbe).pack(side=tk.LEFT, padx=(0, 6))
@@ -1213,12 +1279,9 @@ class CadApp:
         ttk.Separator(tb3, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=8)
         ttk.Label(tb3, text=tr("tb.hintergrund"), style="Title.TLabel").pack(side=tk.LEFT)
         bg_aktuell = self.bg_layout if self._ist_layout() else self.bg_modell
-        self.bg_btn = tk.Button(tb3, bg=bg_aktuell, width=3,
-                                command=lambda: self.bg_waehlen(
-                                    "layout" if self._ist_layout() else "modell"),
-                                relief=tk.FLAT, bd=0,
-                                highlightthickness=1,
-                                highlightbackground=FARBEN["cyan"])
+        self.bg_btn = self._farb_swatch(
+            tb3, bg_aktuell,
+            lambda: self.bg_waehlen("layout" if self._ist_layout() else "modell"))
         self.bg_btn.pack(side=tk.LEFT, padx=4)
         self.bg_preset_cb = ttk.Combobox(tb3, values=list(BG_PRESETS.keys()),
                                          width=18, state="readonly")
@@ -1366,10 +1429,9 @@ class CadApp:
                 var.set(not var.get())
                 if command:
                     command()
-            b = tk.Button(bar, text=text + (f" [{key_hint}]" if key_hint else ""),
-                          relief=tk.FLAT, bd=0, padx=10, pady=4, command=cmd,
-                          font=("Segoe UI", 9, "bold"),
-                          highlightthickness=1)
+            b = FlatButton(bar, text=text + (f" [{key_hint}]" if key_hint else ""),
+                           padx=10, pady=4, command=cmd,
+                           font=(UI_SCHRIFT, 9, "bold"))
             b.pack(side=tk.LEFT, padx=2)
             def update_style(*_):
                 if var.get():
@@ -1390,14 +1452,12 @@ class CadApp:
         self.fang_btn = toggle_btn("osnap",
                                     "OFANG" if SPRACHE["aktuell"] == "de" else "OSNAP",
                                     self.osnap, key_hint="F3")
-        self.fang_pfeil = tk.Button(
-            bar, text="▾", relief=tk.FLAT, bd=0, padx=4, pady=4,
-            font=("Segoe UI", 8, "bold"),
+        self.fang_pfeil = FlatButton(
+            bar, text="▾", padx=4, pady=4,
+            font=(UI_SCHRIFT, 8, "bold"),
             bg=FARBEN["bg_hell"], fg=FARBEN["cyan"],
             activebackground=FARBEN["bg_hover"],
             activeforeground=FARBEN["text_hell"],
-            highlightthickness=1,
-            highlightbackground=FARBEN["rand"],
             command=self._zeige_osnap_menue)
         self.fang_pfeil.pack(side=tk.LEFT, padx=(0, 2))
         self.snap_btn = toggle_btn("snap", tr("sb.fang"), self.grid_snap, key_hint="F9")
@@ -1904,20 +1964,26 @@ class CadApp:
         return "break"
 
     # --------------------------------------------------------
+    _farb_swatch = staticmethod(farb_swatch)
+
     def _bind_events(self):
         c = self.canvas
         c.bind("<Button-1>", self.on_click)
         c.bind("<B1-Motion>", self.on_drag_b1)
         c.bind("<ButtonRelease-1>", self.on_release)
         c.bind("<Double-Button-1>", self.on_doppelklick)
-        c.bind("<Double-Button-2>", self.zoom_grenzen)
-        c.bind("<Double-Button-3>", self.zoom_grenzen)
-        c.bind("<Button-2>", self.on_pan_start)
-        c.bind("<B2-Motion>", self.on_pan)
-        c.bind("<ButtonRelease-2>", self.on_pan_end)
-        c.bind("<Button-3>", self.on_rechtsklick_start)
-        c.bind("<B3-Motion>", self.on_pan)
-        c.bind("<ButtonRelease-3>", self.on_rechtsklick_end)
+        m, r = BTN_MITTE, BTN_RECHTS
+        c.bind(f"<Double-Button-{m}>", self.zoom_grenzen)
+        c.bind(f"<Double-Button-{r}>", self.zoom_grenzen)
+        c.bind(f"<Button-{m}>", self.on_pan_start)
+        c.bind(f"<B{m}-Motion>", self.on_pan)
+        c.bind(f"<ButtonRelease-{m}>", self.on_pan_end)
+        c.bind(f"<Button-{r}>", self.on_rechtsklick_start)
+        c.bind(f"<B{r}-Motion>", self.on_pan)
+        c.bind(f"<ButtonRelease-{r}>", self.on_rechtsklick_end)
+        if _MAC:       # Ctrl+Klick = Rechtsklick (Trackpad / Einknopf-Maus)
+            c.bind("<Control-Button-1>", self.on_rechtsklick_start)
+            c.bind("<Control-ButtonRelease-1>", self.on_rechtsklick_end)
         c.bind("<Motion>", self.on_move)
         c.bind("<MouseWheel>", self.on_wheel)
         c.bind("<Button-4>", lambda e: self._zoom_auf_maus(e, 1.1))
@@ -2119,6 +2185,12 @@ class CadApp:
         step_px = max(0.01, self._zahl(self.raster_mm, 5.0)) * v["zoom"]
         while step_px < 12:
             step_px *= 5
+        if self.raster_punktiert.get():
+            # Jeder Punkt ist ein Canvas-Element und wird bei JEDEM Neuzeichnen
+            # neu erzeugt (Zoomen/Schwenken). Begrenzung verhindert zehntausende
+            # Elemente auf grossen Bildschirmen (Speicher/CPU).
+            while (w / step_px + 1) * (h / step_px + 1) > 6000:
+                step_px *= 5
         haupt_step = step_px * 5
         ox = v["ox"]
         oy = v["oy"]
@@ -2507,7 +2579,10 @@ class CadApp:
             if l and not l.sichtbar:
                 continue
             if isinstance(el, (Verbindungspunkt, Querverweis)):
-                sammle(el.x, el.y, "endpunkt", 0)     # Anschlusspunkt
+                sammle(el.x, el.y, "endpunkt", 0)     # Anschlusspunkt / Basis
+                if isinstance(el, Querverweis):
+                    sx, sy = el.spitze_punkt()
+                    sammle(sx, sy, "endpunkt", 0)     # Pfeilspitze
                 continue
             if isinstance(el, BlockReferenz):
                 kinder = el.aufgeloest()
@@ -2643,10 +2718,10 @@ class CadApp:
                           fill=g, width=3, tags="snapmarker")
         label = tr(f"osnap.{typ}")
         c.create_text(px + 16, py - 16, text=label, anchor=tk.SW,
-                      fill=FARBEN["bg_dunkel"], font=("Segoe UI", 9, "bold"),
+                      fill=FARBEN["bg_dunkel"], font=(UI_SCHRIFT, 9, "bold"),
                       tags="snapmarker")
         c.create_text(px + 15, py - 17, text=label, anchor=tk.SW,
-                      fill=FARBEN["gelb"], font=("Segoe UI", 9, "bold"),
+                      fill=FARBEN["gelb"], font=(UI_SCHRIFT, 9, "bold"),
                       tags="snapmarker")
 
     def _snap_marker_loeschen(self):
@@ -2846,7 +2921,7 @@ class CadApp:
         my = (py1 + py2) / 2
         self.canvas.create_text(mx, my,
                                 text=f"{breite:.1f} x {hoehe:.1f} mm",
-                                fill=FARBEN["gelb"], font=("Segoe UI", 9, "bold"),
+                                fill=FARBEN["gelb"], font=(UI_SCHRIFT, 9, "bold"),
                                 tags="vp_vorschau")
 
     def _aktuelle_elemente_liste(self):
@@ -3787,6 +3862,10 @@ class CadApp:
                     "vp_griffe", "griffe"):
             c.delete(tag)
         self._clear_temp()
+        if len(self._font_cache) > 40:
+            # Es existieren keine Canvas-Elemente mehr (siehe delete oben):
+            # Schriftobjekte freigeben, sonst wachsen sie mit jeder Zoomstufe.
+            self._font_cache.clear()
         if not self._ist_layout():
             for el in self.elemente:
                 l = self.layers.get(el.layer)
@@ -4907,12 +4986,22 @@ class CadApp:
                           fill=farbe, tags=tags)
             return
 
-        em = max(4, int(round(h_px / CAD_VERSALHOEHE)))
+        em = max(4, min(600, int(round(h_px / CAD_VERSALHOEHE))))
         f = self._font(fam, em)
+        # Die Schrift des Systems kann breiter/schmaler als Arial sein (z. B.
+        # DejaVu unter Linux). Groesse so anpassen, dass die Breite der
+        # Modellbreite entspricht -> Anker (rechts/zentriert) stimmen.
+        w_soll = w_mm * skala
+        w_px = max(f.measure(z) for z in zeilen)
+        if w_px > 0 and w_soll > 0 and abs(w_px - w_soll) > 1.0:
+            em2 = max(4, min(600, int(round(em * w_soll / w_px))))
+            if em2 != em:
+                em = em2
+                f = self._font(fam, em)
         asc = f.metrics("ascent")
         desc = f.metrics("descent")
         ls = f.metrics("linespace")
-        w_px = max(f.measure(z) for z in zeilen)
+        w_px = w_soll
 
         top = (n - 1) * ls + asc
         cl = (top - desc) / 2.0
@@ -5112,7 +5201,7 @@ class CadApp:
         def label(x, y, s, dy=-12):
             px, py = tf(x, y)
             c.create_text(px, py + dy, text=s, fill=FARBEN["gelb"],
-                          font=("Segoe UI", 9, "bold"), tags="vorschau")
+                          font=(UI_SCHRIFT, 9, "bold"), tags="vorschau")
 
         def hilfslinie(a, b):
             zeige(Linie(a[0], a[1], b[0], b[1]),
@@ -5702,7 +5791,7 @@ class CadApp:
                                     dash=(2, 3), tags="vorschau")
             self.canvas.create_text(
                 px_ + 10, py_ - 14, anchor=tk.W, fill=FARBEN["gelb"],
-                font=("Segoe UI", 9, "bold"), tags="vorschau",
+                font=(UI_SCHRIFT, 9, "bold"), tags="vorschau",
                 text=f"dx {dx / einh:.2f}  dy {dy / einh:.2f}")
             return
 
@@ -5732,7 +5821,7 @@ class CadApp:
                                     tags="vorschau")
             self.canvas.create_text(px_ + 10, py_ - 14, anchor=tk.W,
                                     fill=FARBEN["gelb"],
-                                    font=("Segoe UI", 9, "bold"),
+                                    font=(UI_SCHRIFT, 9, "bold"),
                                     tags="vorschau",
                                     text=f"{winkel:.2f}°")
             return
@@ -5755,7 +5844,7 @@ class CadApp:
         self.canvas.create_line(bx, by, px_, py_, fill=FARBEN["gelb"],
                                 dash=(2, 3), tags="vorschau")
         self.canvas.create_text(px_ + 10, py_ - 14, anchor=tk.W, fill=FARBEN["gelb"],
-                                font=("Segoe UI", 9, "bold"), tags="vorschau",
+                                font=(UI_SCHRIFT, 9, "bold"), tags="vorschau",
                                 text=f"dx {dx / einh:.2f}  dy {dy / einh:.2f}  |  "
                                      f"{math.hypot(dx, dy) / einh:.2f} {self.einheit.get()}")
 
@@ -6386,8 +6475,7 @@ class CadApp:
             return True
         if not self._blatt_sichern():
             return False
-        self._undo_pro_blatt[p.blatt_pfad(p.aktiv)] = (
-            self._undo_stack, self._redo_stack)
+        self._stacks_merken(p.blatt_pfad(p.aktiv))
         self._blatt_laden(index)
         try:
             p.speichern()
@@ -6421,8 +6509,7 @@ class CadApp:
                                  tr("msg.projekt.fehler", fehler=e),
                                  parent=self.root)
             return
-        self._undo_pro_blatt[p.blatt_pfad(p.aktiv)] = (
-            self._undo_stack, self._redo_stack)
+        self._stacks_merken(p.blatt_pfad(p.aktiv))
         self._blatt_laden(p.blaetter.index(b))
         p.speichern()
         self.status.set(tr("msg.blatt.neu", name=b.name))
@@ -6560,6 +6647,7 @@ class CadApp:
         dlg = BlockAttributeDialog(self.root, ref)
         if dlg.result:
             ref.setze_attribute(dlg.result)
+            ref.setze_ausgeblendet(dlg.ausgeblendet)
 
     def attribute_bearbeiten(self, ref=None):
         """ATTEDIT: Attributwerte eines markierten Blocks bearbeiten."""
@@ -6579,6 +6667,7 @@ class CadApp:
             return
         self._snapshot()
         ref.setze_attribute(dlg.result)
+        ref.setze_ausgeblendet(dlg.ausgeblendet)
         self.redraw()
         self.status.set(tr("msg.attedit.fertig", name=ref.block_name))
 
@@ -6739,30 +6828,33 @@ class CadApp:
     # NEU (Elektro): Verbindungspunkte
     # ========================================================
     def _vp_platzieren(self, x, y):
-        dlg = _LayoutNameDialog(self.root, tr("vp.titel"),
-                                naechste_bezeichnung(self._vp_letzte_bez),
-                                label=tr("vp.bezeichnung"))
+        dlg = VerbindungspunktDialog(
+            self.root, naechste_bezeichnung(self._vp_letzte_bez),
+            self._vp_text_anzeigen)
         if dlg.result is None:
             return
-        self._vp_letzte_bez = dlg.result
+        self._vp_letzte_bez = dlg.result["wert"]
+        self._vp_text_anzeigen = dlg.result["sichtbar"]
         self._snapshot()
         daten = self._layer_daten()
         daten["staerke"] = 0.25
         vp = Verbindungspunkt(x, y, None, Verbindungspunkt.TEXT_HOEHE, 0.0,
                               self.text_schriftart.get(), tag="VP",
-                              wert=dlg.result, **daten)
+                              wert=dlg.result["wert"],
+                              sichtbar=dlg.result["sichtbar"], **daten)
         self._ziel_liste().append(vp)
         self.redraw()
-        self.status.set(tr("msg.vp.gesetzt", name=dlg.result or "-"))
+        self.status.set(tr("msg.vp.gesetzt", name=dlg.result["wert"] or "-"))
 
     def _vp_bearbeiten(self, el):
-        dlg = _LayoutNameDialog(self.root, tr("msg.vp.bearbeiten"), el.wert,
-                                label=tr("vp.bezeichnung"))
+        dlg = VerbindungspunktDialog(self.root, el.wert, el.sichtbar,
+                                     titel=tr("msg.vp.bearbeiten"))
         if dlg.result is None:
             return
         self._snapshot()
-        el.wert = dlg.result
+        el.wert = dlg.result["wert"]
         el.inhalt = el.wert
+        el.sichtbar = dlg.result["sichtbar"]
         self.redraw()
 
     def _el_sichtbar(self, el):
@@ -6802,25 +6894,25 @@ class CadApp:
         if self._ist_layout():
             return
         tol = 10.0 / self.view["zoom"]
-        vp = naechster_vp(self.elemente, x, y, tol, self._el_sichtbar)
-        if vp is None:
+        ap = naechster_anschluss(self.elemente, x, y, tol, self._el_sichtbar)
+        if ap is None:
             self.status.set(tr("msg.vp.keiner"))
             return
         dlg = self._leitung_dialog
         if self._leitung_p1 is None:
-            self._leitung_p1 = vp
+            self._leitung_p1 = ap
             if dlg is not None:
-                dlg.setze(self._vp_name(vp), None)
+                dlg.setze(ap.name, None)
             return
         p1 = self._leitung_p1
-        if math.hypot(vp.x - p1.x, vp.y - p1.y) < 1e-9:
+        if math.hypot(ap.x - p1.x, ap.y - p1.y) < 1e-9:
             self.status.set(tr("msg.vp.gleicher"))
             return
         if dlg is not None:
-            dlg.setze(self._vp_name(p1), self._vp_name(vp))
+            dlg.setze(p1.name, ap.name)
         self._snapshot()
         self._ziel_liste().append(
-            Leitung(p1.x, p1.y, vp.x, vp.y, layer=self.aktiver_layer.get()))
+            Leitung(p1.x, p1.y, ap.x, ap.y, layer=self.aktiver_layer.get()))
         self._leitung_p1 = None
         self._clear_temp()
         self.redraw()
@@ -6830,25 +6922,37 @@ class CadApp:
 
     def _leitung_vorschau(self, event):
         x, y = self.px_to_mm(event.x, event.y)
-        vp = naechster_vp(self.elemente, x, y, 10.0 / self.view["zoom"],
-                          self._el_sichtbar)
+        aps = anschlusspunkte(self.elemente, self._el_sichtbar)
+        tol = 10.0 / self.view["zoom"]
+        ap = None
+        bd = None
+        for a in aps:
+            d = math.hypot(a.x - x, a.y - y)
+            if d <= tol and (bd is None or d < bd):
+                ap, bd = a, d
         self._clear_temp()
         c = self.canvas
+        # alle moeglichen Anschlusspunkte dezent markieren
+        for a in aps[:800]:
+            q = self.mm_to_px(a.x, a.y)
+            c.create_rectangle(q[0] - 3, q[1] - 3, q[0] + 3, q[1] + 3,
+                               outline=FARBEN["gelb"] if "gelb" in FARBEN else FARBEN["cyan"],
+                               width=1, tags="vorschau")
         p1 = self._leitung_p1
         if p1 is not None:
-            a = self.mm_to_px(p1.x, p1.y)
-            b = self.mm_to_px(vp.x, vp.y) if vp else (event.x, event.y)
-            c.create_line(*a, *b, fill=LEITUNG_FARBE, dash=(5, 3), width=2,
+            a1 = self.mm_to_px(p1.x, p1.y)
+            b1 = self.mm_to_px(ap.x, ap.y) if ap else (event.x, event.y)
+            c.create_line(*a1, *b1, fill=LEITUNG_FARBE, dash=(5, 3), width=2,
                           tags="vorschau")
-            c.create_oval(a[0] - 7, a[1] - 7, a[0] + 7, a[1] + 7,
+            c.create_oval(a1[0] - 7, a1[1] - 7, a1[0] + 7, a1[1] + 7,
                           outline=FARBEN["magenta"], width=2, tags="vorschau")
-        if vp is not None:
-            q = self.mm_to_px(vp.x, vp.y)
+        if ap is not None:
+            q = self.mm_to_px(ap.x, ap.y)
             c.create_oval(q[0] - 7, q[1] - 7, q[0] + 7, q[1] + 7,
                           outline=FARBEN["cyan"], width=2, tags="vorschau")
         self._fadenkreuz(event.x, event.y)
         self.status.set(tr("msg.leitung.hinweis")
-                        + (f"   [{self._vp_name(vp)}]" if vp else ""))
+                        + (f"   [{ap.name}]" if ap else ""))
 
     # ========================================================
     # NEU (Elektro): Querverweis
@@ -7218,7 +7322,7 @@ class CadApp:
             if ref not in liste:
                 continue
             idx = liste.index(ref)
-            kinder = ref.aufgeloest()
+            kinder = [deepcopy(k) for k in ref.aufgeloest()]
             liste.pop(idx)
             for k in kinder:
                 liste.insert(idx, k)
