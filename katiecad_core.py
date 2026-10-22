@@ -2131,4 +2131,3 @@ class Querverweis(Element):
     def griff_bewegen(self, griff_id, x, y):
         if griff_id == "p":
             self.x, self.y = x, y
-
