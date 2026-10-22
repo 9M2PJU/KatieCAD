@@ -13,6 +13,13 @@ SPRACHE = {"aktuell": "en"}     # <-- Erststart Englisch; wird beim Start aus
 
 TEXTE = {
     "de": {
+        "an.vp": "Verbindungspunkt {text}",
+        "an.qv_basis": "Querverweis {text} (Basis)",
+        "an.qv_spitze": "Querverweis {text} (Spitze)",
+        "dlg.vp.titel": "Verbindungspunkt",
+        "dlg.vp.text": "Bezeichnung (z. B. 13, A1, L1):",
+        "dlg.vp.anzeigen": "Text anzeigen",
+        "dlg.attedit.anzeigen": "anzeigen",
         "tb.wz.vpunkt": "Verb.-Punkt",
         "tb.wz.leitung": "Leitung",
         "tb.wz.querverweis": "Querverweis",
@@ -34,13 +41,13 @@ TEXTE = {
         "vp.bezeichnung": "Bezeichnung (z. B. 13, A1, L1):",
         "msg.vp.gesetzt": "Verbindungspunkt '{name}' gesetzt. Klick = weiterer Punkt, ESC = beenden.",
         "msg.vp.bearbeiten": "Verbindungspunkt bearbeiten",
-        "msg.vp.keiner": "Hier liegt kein Verbindungspunkt.",
+        "msg.vp.keiner": "Hier liegt kein Anschlusspunkt (Verbindungspunkt oder Basis/Spitze eines Querverweises).",
         "msg.vp.gleicher": "Bitte einen anderen Verbindungspunkt als zweiten Punkt wählen.",
         "msg.leitung.erstellt": "Leitung erstellt. Nächsten ersten Verbindungspunkt wählen (ESC = beenden).",
         "msg.leitung.hinweis": "Leitung: Verbindungspunkte nacheinander anklicken.",
         "msg.modell_noetig": "Bitte in die Modell-Ansicht wechseln.",
         "dlg.leitung.titel": "Verbindungspunkte wählen",
-        "dlg.leitung.info": "Klicke nacheinander zwei Verbindungspunkte an. Zwischen ihnen entsteht automatisch eine Leitung.",
+        "dlg.leitung.info": "Klicke nacheinander zwei Anschlusspunkte an (Verbindungspunkte oder Basis/Spitze eines Querverweises). Zwischen ihnen entsteht automatisch eine Leitung.",
         "dlg.leitung.punkt1": "1. Punkt:",
         "dlg.leitung.punkt2": "2. Punkt:",
         "dlg.leitung.leer": "– (noch nicht gewählt)",
@@ -442,6 +449,13 @@ TEXTE = {
         "info.btn_lizenz": "Lizenz",
     },
     "en": {
+        "an.vp": "Connection point {text}",
+        "an.qv_basis": "Cross-reference {text} (base)",
+        "an.qv_spitze": "Cross-reference {text} (tip)",
+        "dlg.vp.titel": "Connection point",
+        "dlg.vp.text": "Label (e.g. 13, A1, L1):",
+        "dlg.vp.anzeigen": "Show text",
+        "dlg.attedit.anzeigen": "show",
         "tb.wz.vpunkt": "Conn. point",
         "tb.wz.leitung": "Wire",
         "tb.wz.querverweis": "Cross-ref",
@@ -463,13 +477,13 @@ TEXTE = {
         "vp.bezeichnung": "Label (e.g. 13, A1, L1):",
         "msg.vp.gesetzt": "Connection point '{name}' placed. Click = next point, ESC = finish.",
         "msg.vp.bearbeiten": "Edit connection point",
-        "msg.vp.keiner": "There is no connection point here.",
+        "msg.vp.keiner": "There is no connection point here (connection point or base/tip of a cross-reference).",
         "msg.vp.gleicher": "Please pick a different connection point as the second point.",
         "msg.leitung.erstellt": "Wire created. Pick the next first connection point (ESC = finish).",
         "msg.leitung.hinweis": "Wire: click connection points one after the other.",
         "msg.modell_noetig": "Please switch to model view.",
         "dlg.leitung.titel": "Select connection points",
-        "dlg.leitung.info": "Click two connection points one after the other. A wire is created between them automatically.",
+        "dlg.leitung.info": "Click two connection points one after the other (connection points or base/tip of a cross-reference). A wire is created between them automatically.",
         "dlg.leitung.punkt1": "Point 1:",
         "dlg.leitung.punkt2": "Point 2:",
         "dlg.leitung.leer": "– (not selected yet)",
@@ -888,3 +902,4 @@ def tr(schluessel, **kwargs):
 def setze_sprache(code):
     if code in TEXTE:
         SPRACHE["aktuell"] = code
+
