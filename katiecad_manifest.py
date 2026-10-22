@@ -4,7 +4,7 @@ katiecad_manifest.py - Zentrale Liste aller Module + Version.
 Dient als Anker fuer neue Chats: pruefen, ob alle Dateien da sind.
 """
 
-VERSION = "0.4.0"
+VERSION = "0.5.0"
 
 MODULE = {
     # "katiecad.py" ist nur ein Einstiegspunkt und kein importierbares Modul.
@@ -19,6 +19,7 @@ MODULE = {
     "katiecad_projekt.py":   "Projektverwaltung (Ordner, Blattliste, *.katieprj)",
     "katiecad_bloecke.py":   "Blockdateien (*.katieblock) lesen/schreiben",
     "katiecad_sidebar.py":   "Seitenleiste: Undo/Redo + Blattliste (Breite verstellbar)",
+    "katiecad_widgets.py":   "Plattformunabhaengige Knoepfe/Farbfelder (macOS-sicher)",
     "katiecad_elektro.py":   "Elektro-Logik: Querverweis-Ziele, Verbindungspunkte",
 }
 
@@ -33,3 +34,4 @@ def fehlende_module():
         if importlib.util.find_spec(mod) is None:
             fehlend.append(name)
     return fehlend
+
