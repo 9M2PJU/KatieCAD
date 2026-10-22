@@ -4187,14 +4187,15 @@ class CadApp:
             return (isinstance(el, Rechteck) and
                     all(abs(a - c) < 1e-6 for a, c in
                         zip((el.x1, el.y1, el.x2, el.y2), r)))
-        alt = TB.old_frame_rect(b, h)
+        aussen, innen = TB.frame_rects(b, h)
+        alte = [r for r in TB.old_frame_rects(b, h) if r != innen]
         liste[:] = [e for e in liste
-                    if not TB.is_title_block(e) and not gleich(e, alt)]
+                    if not TB.is_title_block(e)
+                    and not any(gleich(e, r) for r in alte)]
         basis = {"layer": "0", "farbe": FARBEN["cyan"],
                  "linientyp": "Volllinie (breit)", "eig_farbe": True, "staerke": 0.7}
         basis2 = {"layer": "0", "farbe": FARBEN["cyan"],
                   "linientyp": "Volllinie (schmal)", "eig_farbe": True, "staerke": 0.35}
-        aussen, innen = TB.frame_rects(b, h)
         if not any(gleich(e, aussen) for e in liste):
             liste.append(Rechteck(*aussen, **basis))
         if not any(gleich(e, innen) for e in liste):
