@@ -21,6 +21,7 @@ from katiecad_core import (
     parse_massstab, massstab_text,
 )
 from katiecad_projekt import name_pruefen
+from katiecad_widgets import farb_swatch
 
 
 # ============================================================
@@ -61,12 +62,8 @@ def zeige_lizenz_fenster(parent):
     footer = tk.Frame(win, bg=FARBEN["bg_mittel"], padx=20, pady=14)
     footer.pack(side="bottom", fill="x")
 
-    tk.Button(footer, text=tr("dlg.schliessen"), command=win.destroy,
-              bg=FARBEN["bg_hell"], fg=FARBEN["text"],
-              activebackground=FARBEN["bg_hover"],
-              activeforeground=FARBEN["cyan"],
-              relief="raised", bd=1, font=("Helvetica", 9, "bold"),
-              padx=14, pady=4, cursor="hand2").pack(side="right")
+    ttk.Button(footer, text=tr("dlg.schliessen"),
+               command=win.destroy).pack(side="right")
 
     header = tk.Frame(win, bg=FARBEN["bg_mittel"], padx=20, pady=14)
     header.pack(side="top", fill="x")
@@ -175,8 +172,8 @@ class PropertiesDialog(tk.Toplevel):
         self.farbe_var = tk.StringVar(value=element.farbe)
         ff = ttk.Frame(f)
         ff.grid(row=row, column=1, sticky=tk.W, pady=4)
-        self.farbe_btn = tk.Button(ff, bg=self.farbe_var.get(), width=5,
-                                   command=self._farbe_waehlen, relief=tk.FLAT, bd=0)
+        self.farbe_btn = farb_swatch(ff, self.farbe_var.get(),
+                                     self._farbe_waehlen, width=6)
         self.farbe_btn.pack(side=tk.LEFT)
         ttk.Label(ff, textvariable=self.farbe_var).pack(side=tk.LEFT, padx=6)
         row += 1
@@ -621,8 +618,8 @@ class LayerEditDialog(tk.Toplevel):
         ttk.Label(f, text=tr("dlg.layer.farbe")).grid(row=1, column=0, sticky=tk.W, pady=4)
         ff = ttk.Frame(f)
         ff.grid(row=1, column=1, sticky=tk.W)
-        self.farbe_btn = tk.Button(ff, bg=self.farbe_var.get(), width=5,
-                                   command=self._farbe_waehlen, relief=tk.FLAT, bd=0)
+        self.farbe_btn = farb_swatch(ff, self.farbe_var.get(),
+                                     self._farbe_waehlen, width=6)
         self.farbe_btn.pack(side=tk.LEFT)
         ttk.Label(ff, textvariable=self.farbe_var).pack(side=tk.LEFT, padx=6)
         ttk.Label(f, text=tr("dlg.layer.staerke")).grid(row=2, column=0,
@@ -1285,6 +1282,7 @@ class BlockAttributeDialog(tk.Toplevel):
     def __init__(self, parent, ref, titel=None):
         super().__init__(parent)
         self.result = None
+        self.ausgeblendet = set()
         self.title(titel or tr("dlg.attedit.titel", name=ref.block_name))
         self.transient(parent)
         self.grab_set()
@@ -1294,6 +1292,7 @@ class BlockAttributeDialog(tk.Toplevel):
         f = ttk.Frame(self, padding=14)
         f.pack(fill=tk.BOTH, expand=True)
         self._vars = {}
+        self._sicht = {}
         self._entries = []
         gesehen = set()
         zeile = 0
@@ -1310,7 +1309,12 @@ class BlockAttributeDialog(tk.Toplevel):
             var = tk.StringVar(value=ref.attribute.get(ad.tag, ad.wert))
             e = ttk.Entry(f, textvariable=var, width=32)
             e.grid(row=zeile, column=1, sticky=tk.EW, pady=3)
+            sv = tk.BooleanVar(value=ad.tag not in ref.ausgeblendet)
+            ttk.Checkbutton(f, text=tr("dlg.attedit.anzeigen"),
+                            variable=sv).grid(row=zeile, column=2,
+                                              padx=(8, 0), pady=3)
             self._vars[ad.tag] = var
+            self._sicht[ad.tag] = sv
             self._entries.append(e)
             zeile += 1
         if not self._vars:
@@ -1318,7 +1322,7 @@ class BlockAttributeDialog(tk.Toplevel):
                       style="Hint.TLabel").grid(row=0, column=0)
 
         bf = ttk.Frame(f)
-        bf.grid(row=zeile + 1, column=0, columnspan=2, pady=(10, 0))
+        bf.grid(row=zeile + 1, column=0, columnspan=3, pady=(10, 0))
         ttk.Button(bf, text=tr("dlg.ok"), command=self._ok).pack(
             side=tk.LEFT, padx=4)
         ttk.Button(bf, text=tr("dlg.abbrechen"),
@@ -1333,6 +1337,8 @@ class BlockAttributeDialog(tk.Toplevel):
 
     def _ok(self):
         self.result = {t: v.get() for t, v in self._vars.items()}
+        # Tags, deren Text in dieser Instanz ausgeblendet werden soll
+        self.ausgeblendet = {t for t, v in self._sicht.items() if not v.get()}
         self.destroy()
 
 
@@ -1507,4 +1513,42 @@ class ProjektDruckDialog(tk.Toplevel):
             return
         self.result = (aktion, idx, self.quelle.get(),
                        bool(self.farbig.get()), bool(self.rahmen.get()))
+        self.destroy()
+
+
+class VerbindungspunktDialog(tk.Toplevel):
+    """Bezeichnung eines Verbindungspunkts + Schalter 'Text anzeigen'.
+    result: {'wert': str, 'sichtbar': bool} oder None."""
+
+    def __init__(self, parent, wert="", sichtbar=True, titel=None):
+        super().__init__(parent)
+        self.result = None
+        self.title(titel or tr("dlg.vp.titel"))
+        self.transient(parent)
+        self.grab_set()
+        self.configure(bg=FARBEN["bg_mittel"])
+        self.resizable(False, False)
+        f = ttk.Frame(self, padding=14)
+        f.pack(fill=tk.BOTH, expand=True)
+        ttk.Label(f, text=tr("dlg.vp.text")).pack(anchor=tk.W)
+        self.v_wert = tk.StringVar(value=wert)
+        self.e = ttk.Entry(f, textvariable=self.v_wert, width=30)
+        self.e.pack(fill=tk.X, pady=(2, 8))
+        self.v_sicht = tk.BooleanVar(value=sichtbar)
+        ttk.Checkbutton(f, text=tr("dlg.vp.anzeigen"),
+                        variable=self.v_sicht).pack(anchor=tk.W)
+        bf = ttk.Frame(f)
+        bf.pack(pady=(10, 0))
+        ttk.Button(bf, text=tr("dlg.ok"), command=self._ok).pack(side=tk.LEFT, padx=4)
+        ttk.Button(bf, text=tr("dlg.abbrechen"), command=self.destroy).pack(side=tk.LEFT, padx=4)
+        self.bind("<Return>", lambda e: self._ok())
+        self.bind("<Escape>", lambda e: self.destroy())
+        self.e.focus_set()
+        self.e.select_range(0, tk.END)
+        _zentrieren(self, parent)
+        self.wait_window(self)
+
+    def _ok(self):
+        self.result = {"wert": self.v_wert.get().strip(),
+                       "sichtbar": bool(self.v_sicht.get())}
         self.destroy()
