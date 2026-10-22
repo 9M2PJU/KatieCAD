@@ -1,0 +1,23 @@
+#!/bin/sh
+# KatieCAD launcher - installed as /usr/bin/katiecad
+# App files live in /usr/share/katiecad/
+set -e
+APP_DIR="/usr/share/katiecad"
+
+# Allow local pip-bundled deps (used by the AppImage layout) without
+# affecting system installs: if a site-packages dir sits next to this
+# prefix, prefer it.
+for _cand in \
+    "$APP_DIR/../lib/python3/site-packages" \
+    "$APP_DIR/../lib/python/site-packages" \
+    "/usr/lib/katiecad/site-packages" \
+    "$HOME/.local/share/katiecad/site-packages"
+do
+    if [ -d "$_cand" ]; then
+        PYTHONPATH="${_cand}${PYTHONPATH:+:$PYTHONPATH}"
+        export PYTHONPATH
+        break
+    fi
+done
+
+exec python3 "$APP_DIR/KatieCAD.py" "$@"

@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=KatieCAD
+GenericName=CAD Drawing Tool
+Comment=Lightweight CAD drawing tool with DXF/DWG support
+Exec=katiecad %F
+Icon=katiecad
+Terminal=false
+Categories=Graphics;Engineering;2DGraphics;
+Keywords=CAD;DXF;DWG;drawing;engineering;
+StartupWMClass=KatieCAD
+MimeType=application/dxf;image/vnd.dxf;application/acad;

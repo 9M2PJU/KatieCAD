@@ -1,0 +1,59 @@
+name: release-installers
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set version from tag
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
+
+      - name: Build .deb
+        run: |
+          chmod +x packaging/build-deb.sh
+          ./packaging/build-deb.sh "$VERSION" dist
+
+      - name: Build .rpm
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y rpm
+          chmod +x packaging/build-rpm.sh
+          ./packaging/build-rpm.sh "$VERSION" dist
+
+      - name: Build AppImage
+        run: |
+          sudo apt-get install -y python3-pip desktop-file-utils
+          wget -q -O /tmp/appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x /tmp/appimagetool
+          chmod +x packaging/build-appimage.sh
+          PATH="/tmp:$PATH" ./packaging/build-appimage.sh "$VERSION" dist
+        env:
+          ARCH: x86_64
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: katiecad-${{ env.VERSION }}-linux
+          path: dist/*
+
+  release:
+    needs: build-linux
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: katiecad-${{ github.ref_name }}-linux
+          path: dist
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true

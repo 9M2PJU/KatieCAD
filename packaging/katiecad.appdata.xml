@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>katiecad.desktop</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <name>KatieCAD</name>
+  <summary>Lightweight CAD drawing tool</summary>
+  <description>
+    <p>
+      KatieCAD is a lightweight 2D CAD drawing tool built with Python and
+      Tkinter. It offers core drawing, editing and dimensioning tools,
+      layers, layout view with viewports, and DXF import/export via ezdxf
+      plus DWG import support.
+    </p>
+  </description>
+  <launchable type="desktop-id">katiecad.desktop</launchable>
+  <screenshots>
+    <screenshot type="default">
+      <caption>KatieCAD model space</caption>
+      <image>https://raw.githubusercontent.com/Merecete/KatieCAD/main/Shot1.png</image>
+    </screenshot>
+  </screenshots>
+  <url type="homepage">https://github.com/Merecete/KatieCAD</url>
+  <content_rating type="oars-1.1" />
+</component>
