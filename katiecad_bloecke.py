@@ -64,3 +64,4 @@ def block_laden(pfad, element_factory):
     if not d.elemente:
         raise BlockDateiFehler("leer")
     return d
+
