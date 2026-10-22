@@ -1307,10 +1307,11 @@ class BlockAttributeDialog(tk.Toplevel):
     result: dict {TAG: Wert} oder None.
     """
 
-    def __init__(self, parent, ref, titel=None):
+    def __init__(self, parent, ref, titel=None, ausschliessen=()):
         super().__init__(parent)
         self.result = None
         self.ausgeblendet = set()
+        self._ausschluss = set(ausschliessen or ())
         self.title(titel or tr("dlg.attedit.titel", name=ref.block_name))
         self.transient(parent)
         _modal(self)
@@ -1325,7 +1326,7 @@ class BlockAttributeDialog(tk.Toplevel):
         gesehen = set()
         zeile = 0
         for ad in ref.attribut_definitionen():
-            if ad.tag in gesehen:
+            if ad.tag in gesehen or ad.tag in self._ausschluss:
                 continue
             gesehen.add(ad.tag)
             text = ad.prompt if ad.prompt and ad.prompt != ad.tag \
@@ -1736,4 +1737,61 @@ class FestMaskeDialog(tk.Toplevel):
     def _ok(self):
         self.result = {"werte": {t: v.get().strip() for t, v in self._vars.items()},
                        "rolle": self.v_rolle.get() if self._rolle else None}
+        self.destroy()
+
+
+class TitleBlockDialog(tk.Toplevel):
+    """Choose a title block template.
+
+    entries: list of (label, key) - key is None (frame only), "builtin" or a
+    file path. result: the chosen key, "" for 'frame only', or None (cancel)."""
+
+    def __init__(self, parent, entries, preselect=None, on_open_folder=None,
+                 folders_text=""):
+        super().__init__(parent)
+        self.result = None
+        self._keys = [k for _l, k in entries]
+        self.title(tr("dlg.tb.titel"))
+        self.transient(parent)
+        _modal(self)
+        self.configure(bg=FARBEN["bg_mittel"])
+        f = ttk.Frame(self, padding=14)
+        f.pack(fill=tk.BOTH, expand=True)
+        ttk.Label(f, text=tr("dlg.tb.auswahl")).pack(anchor=tk.W, pady=(0, 4))
+        self.lb = tk.Listbox(f, height=min(12, max(5, len(entries))), width=44,
+                             exportselection=False, activestyle="dotbox",
+                             bg=FARBEN["bg_hell"], fg=FARBEN["cyan"],
+                             selectbackground=FARBEN["select_bg"],
+                             selectforeground=FARBEN["select_fg"],
+                             highlightthickness=0, relief=tk.FLAT)
+        for label, _k in entries:
+            self.lb.insert(tk.END, label)
+        self.lb.pack(fill=tk.BOTH, expand=True)
+        idx = 1 if len(entries) > 1 else 0
+        if preselect in self._keys:
+            idx = self._keys.index(preselect)
+        self.lb.selection_set(idx)
+        self.lb.see(idx)
+        self.lb.bind("<Double-Button-1>", lambda e: self._ok())
+        ttk.Label(f, text=tr("dlg.tb.hinweis") + ("\n" + folders_text if folders_text else ""),
+                  style="Hint.TLabel", wraplength=380, justify=tk.LEFT).pack(
+            anchor=tk.W, pady=(8, 4))
+        bf = ttk.Frame(f)
+        bf.pack(pady=(8, 0))
+        ttk.Button(bf, text=tr("dlg.ok"), command=self._ok).pack(side=tk.LEFT, padx=4)
+        ttk.Button(bf, text=tr("dlg.abbrechen"), command=self.destroy).pack(side=tk.LEFT, padx=4)
+        if on_open_folder is not None:
+            ttk.Button(bf, text=tr("dlg.tb.ordner"), command=on_open_folder).pack(
+                side=tk.LEFT, padx=4)
+        self.bind("<Return>", lambda e: self._ok())
+        self.bind("<Escape>", lambda e: self.destroy())
+        _zentrieren(self, parent)
+        self.wait_window(self)
+
+    def _ok(self):
+        sel = self.lb.curselection()
+        if not sel:
+            return
+        key = self._keys[sel[0]]
+        self.result = "" if key is None else key
         self.destroy()
