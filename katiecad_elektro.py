@@ -9,6 +9,7 @@ zusammen. Jeder zeigt als Ziel die Blattnummer(n) der anderen.
 from collections import Counter, defaultdict
 
 from katiecad_core import Querverweis, Verbindungspunkt, BlockReferenz
+from katiecad_i18n import tr
 
 
 def qv_texte_aus_blattdaten(daten):
@@ -74,6 +75,48 @@ def verbindungspunkte(elemente, sichtbar=lambda el: True):
             out.extend(k for k in el.aufgeloest()
                        if isinstance(k, Verbindungspunkt))
     return out
+
+
+class Anschluss:
+    """Ein Punkt, an dem eine Leitung enden darf."""
+    __slots__ = ("x", "y", "name")
+
+    def __init__(self, x, y, name):
+        self.x, self.y, self.name = x, y, name
+
+
+def anschlusspunkte(elemente, sichtbar=lambda el: True):
+    """Alle Leitungs-Anschlusspunkte:
+       - Verbindungspunkte (auch aus Bloecken)
+       - Querverweise: NUR Basis und Spitze des Pfeils"""
+    out = []
+    for el in elemente:
+        if not sichtbar(el):
+            continue
+        if isinstance(el, Querverweis):
+            t = el.text or "-"
+            bx, by = el.basis_punkt()
+            sx, sy = el.spitze_punkt()
+            out.append(Anschluss(bx, by, tr("an.qv_basis", text=t)))
+            out.append(Anschluss(sx, sy, tr("an.qv_spitze", text=t)))
+        elif isinstance(el, Verbindungspunkt):
+            out.append(Anschluss(el.x, el.y, tr("an.vp", text=el.wert or "-")))
+        elif isinstance(el, BlockReferenz):
+            for k in el.aufgeloest():
+                if isinstance(k, Verbindungspunkt):
+                    out.append(Anschluss(k.x, k.y,
+                                         tr("an.vp", text=k.wert or "-")))
+    return out
+
+
+def naechster_anschluss(elemente, x, y, tol, sichtbar=lambda el: True):
+    """Naechster Anschlusspunkt innerhalb `tol` (mm) oder None."""
+    best, bd = None, None
+    for a in anschlusspunkte(elemente, sichtbar):
+        d = ((a.x - x) ** 2 + (a.y - y) ** 2) ** 0.5
+        if d <= tol and (bd is None or d < bd):
+            best, bd = a, d
+    return best
 
 
 def naechster_vp(elemente, x, y, tol, sichtbar=lambda el: True):
