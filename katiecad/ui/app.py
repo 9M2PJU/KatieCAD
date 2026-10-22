@@ -45,6 +45,7 @@ except ImportError:
 from katiecad.common.i18n import tr, SPRACHE, setze_sprache, TEXTE
 from katiecad.common.config import (lade_konfiguration, speichere_sprache,
                              speichere_konfiguration)
+from katiecad.model import titleblock as TB
 from katiecad.model.project import (Projekt, ProjektFehler, PROJEKT_ENDUNG,
                               BLOCK_ENDUNG)
 from katiecad.model.blocks import (block_speichern, block_laden,
@@ -80,6 +81,7 @@ from katiecad.ui.dialogs import (
     ProjektNeuDialog, AttributDefinitionDialog, BlockAttributeDialog,
     QuerverweisDialog, VerbindungspunkteDialog, ProjektDruckDialog,
     VerbindungspunktDialog, VerbindungDialog, FestMaskeDialog,
+    TitleBlockDialog,
 )
 from katiecad.fileio.pdf import pdf_erzeugen, pdf_senden, pdf_mehrseitig_erzeugen
 from katiecad.electrical.logic import (querverweis_ziele, qv_texte_aus_blattdaten,
@@ -889,6 +891,8 @@ class CadApp:
             self.root, self,
             breite=lade_konfiguration().get("sidebar_breite"))
         self.seitenleiste.einbauen()
+        if lade_konfiguration().get("sidebar_sichtbar") is False:
+            self.seitenleiste.ausblenden()
 
         self.canvas = tk.Canvas(self.root, bg=self.bg_modell,
                                 highlightthickness=1,
@@ -961,6 +965,8 @@ class CadApp:
         m_projekt.add_separator()
         m_projekt.add_command(label=tr("menu.projekt.blatt_neu"),
                               command=self.blatt_neu)
+        m_projekt.add_command(label=tr("menu.projekt.blatt_duplizieren"),
+                              command=self.blatt_duplizieren)
         m_projekt.add_command(label=tr("menu.projekt.blatt_umbenennen_f2"),
                               command=self.blatt_umbenennen)
         m_projekt.add_command(label=tr("menu.projekt.blatt_loeschen"),
@@ -1044,6 +1050,8 @@ class CadApp:
                            command=self.viewport_modus_starten)
         m_einf.add_command(label=tr("menu.einfuegen.rahmen"),
                            command=self.rahmen_einfuegen)
+        m_einf.add_command(label=tr("menu.einfuegen.schriftkopf_speichern"),
+                           command=self.schriftkopf_vorlage_speichern)
         m_einf.add_separator()
         m_einf.add_command(label=tr("menu.einfuegen.schraffur"),
                            command=self.schraffur_anwenden)
@@ -1064,6 +1072,8 @@ class CadApp:
         m_ansicht.add_command(label=tr("vp.leiste.layout"),
                               command=self._menue_layout_ansicht)
         m_ansicht.add_separator()
+        m_ansicht.add_command(label=tr("menu.ansicht.seitenleiste"),
+                              command=self.seitenleiste_umschalten)
         m_ansicht.add_command(label=tr("menu.ansicht.zoom_grenzen"),
                               command=self.zoom_grenzen)
         m_ansicht.add_separator()
@@ -1168,6 +1178,8 @@ class CadApp:
 
         # --- Toolbar 1 ---
         tb = self.tb1
+        ttk.Button(tb, text="\u2630", width=3,
+                   command=self.seitenleiste_umschalten).pack(side=tk.LEFT, padx=(0, 8))
         ttk.Label(tb, text=tr("tb.werkzeug"), style="Title.TLabel").pack(side=tk.LEFT, padx=(0, 4))
         for key in ("auswahl", "linie", "polylinie", "kreis", "bogen",
                     "rechteck", "text", "bemassung",
@@ -2046,6 +2058,7 @@ class CadApp:
         self.root.bind("<Control-Z>", lambda e: self.undo())
         self.root.bind("<Control-y>", lambda e: self.redo())
         self.root.bind("<F2>", lambda e: self.blatt_umbenennen())
+        self.root.bind("<F4>", lambda e: self.seitenleiste_umschalten())
         self.root.bind("<Control-Y>", lambda e: self.redo())
         self.root.bind("<Control-Shift-Z>", lambda e: self.redo())
         self.root.bind("<Control-Shift-z>", lambda e: self.redo())
@@ -3945,6 +3958,10 @@ class CadApp:
             self._geraete_aktualisieren()
         except Exception as ex:
             print(f"[KatieCAD] Geraete: {ex}")
+        try:
+            self._titelfelder_aktualisieren()
+        except Exception as ex:
+            print(f"[KatieCAD] Schriftkopf: {ex}")
         for tag in ("element", "blatt", "layout", "auswahl_highlight",
                     "vp_griffe", "griffe"):
             c.delete(tag)
@@ -4098,39 +4115,142 @@ class CadApp:
                 continue
             self._zeichne_element(me, tags=("layout",), tf=tf, skala=skala, clip=clip)
 
-    def rahmen_einfuegen(self):
-        if not self._ist_layout():
-            self.status.set("Rahmen nur im Layout möglich.")
+    def _attr_ausschluss(self, ref):
+        """Tags, die nicht abgefragt werden (Schriftkopf: automatische Felder)."""
+        return TB.RESERVED if TB.is_title_block(ref) else ()
+
+    def _titelfelder_aktualisieren(self):
+        """Automatische Schriftkopf-Felder (Seite, Datum, ...) aller Layouts."""
+        if not any(TB.is_title_block(e) for lay in self.layouts for e in lay.elemente):
             return
+        p = self.projekt
+        idx = p.aktiv if p is not None else 0
+        for lay in self.layouts:
+            info = TB.make_info(p, idx, SPRACHE["aktuell"], lay.format)
+            TB.refresh_fields(lay.elemente, info, self.massstab.get())
+
+    @staticmethod
+    def _ordner_oeffnen(pfad):
+        try:
+            os.makedirs(pfad, exist_ok=True)
+            if sys.platform.startswith("win"):
+                os.startfile(pfad)
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", pfad])
+            else:
+                subprocess.Popen(["xdg-open", pfad])
+        except Exception as e:
+            print(f"[KatieCAD] Ordner konnte nicht geoeffnet werden: {e}")
+
+    def rahmen_einfuegen(self):
+        """Blattrand (links 20 mm, sonst 5 mm) und Schriftkopf aus einer
+        Vorlagen-Zeichnung (Ordner title_blocks). Ein vorhandener Schriftkopf
+        wird dabei ersetzt."""
+        if not self._ist_layout():
+            self.status.set(tr("msg.tb.nur_layout"))
+            return
+        p = self.projekt
+        ordner = TB.template_folders(p.ordner if p is not None else None)
+        eintraege = [(tr("dlg.tb.ohne"), None), (tr("dlg.tb.builtin"), "builtin")]
+        eintraege += [(n, pf) for n, pf in TB.list_templates(ordner)]
+        cfg = lade_konfiguration()
+        dlg = TitleBlockDialog(
+            self.root, eintraege, preselect=cfg.get("title_block"),
+            on_open_folder=lambda: self._ordner_oeffnen(ordner[0]),
+            folders_text=tr("dlg.tb.ordner_zeile", pfad=ordner[0]))
+        if dlg.result is None:
+            return
+        wahl = dlg.result                       # "" = nur Rahmen
+        elemente, name = [], ""
+        if wahl == "builtin":
+            elemente, name = TB.default_elements(SPRACHE["aktuell"]), "Standard"
+        elif wahl:
+            try:
+                elemente = TB.load_template(wahl, self._dict_zu_element)
+            except (OSError, ValueError) as e:
+                messagebox.showerror(tr("dlg.tb.titel"),
+                                     tr("msg.tb.fehler", fehler=e),
+                                     parent=self.root)
+                return
+            name = os.path.splitext(os.path.basename(wahl))[0]
+        try:
+            cfg["title_block"] = wahl
+            speichere_konfiguration(cfg)
+        except Exception:
+            pass
+
         self._snapshot()
         b, h = ZEICHNUNGSFORMATE[self.layout_format]
+        liste = self.layout_elemente
+
+        def gleich(el, r):
+            return (isinstance(el, Rechteck) and
+                    all(abs(a - c) < 1e-6 for a, c in
+                        zip((el.x1, el.y1, el.x2, el.y2), r)))
+        alt = TB.old_frame_rect(b, h)
+        liste[:] = [e for e in liste
+                    if not TB.is_title_block(e) and not gleich(e, alt)]
         basis = {"layer": "0", "farbe": FARBEN["cyan"],
                  "linientyp": "Volllinie (breit)", "eig_farbe": True, "staerke": 0.7}
         basis2 = {"layer": "0", "farbe": FARBEN["cyan"],
                   "linientyp": "Volllinie (schmal)", "eig_farbe": True, "staerke": 0.35}
-        self.layout_elemente.append(Rechteck(0, 0, b, h, **basis))
-        self.layout_elemente.append(Rechteck(10, 5, b - 5, h - 5, **basis2))
-        sw, sh = 180, 60
-        fx, fy = b - 5 - sw, 5
-        self.layout_elemente.append(Rechteck(fx, fy, fx + sw, fy + sh, **basis))
-        self.layout_elemente.append(Linie(fx, fy + sh - 20, fx + sw, fy + sh - 20, **basis2))
-        self.layout_elemente.append(Linie(fx + 90, fy, fx + 90, fy + sh - 20, **basis2))
-        de = SPRACHE["aktuell"] == "de"
-        self.layout_elemente.append(Text(fx + 3, fy + sh - 6,
-            (f"Zeichnung: {self.layout_format}" if de
-             else f"Drawing: {self.layout_format}"), 5.0, 0.0, "Arial", **basis2))
-        self.layout_elemente.append(Text(fx + 3, fy + sh - 16,
-            (f"Maßstab: {self.massstab.get()}" if de
-             else f"Scale: {self.massstab.get()}"), 3.5, 0.0, "Arial", **basis2))
-        self.layout_elemente.append(Text(fx + 3, fy + 6,
-            ("Einheit: mm" if de else "Unit: mm"), 3.5, 0.0, "Arial", **basis2))
-        self.layout_elemente.append(Text(fx + 93, fy + sh - 6,
-            ("Werkstoff:" if de else "Material:"), 3.5, 0.0, "Arial", **basis2))
-        self.layout_elemente.append(Text(fx + 93, fy + sh - 16,
-            ("Datum / Name:" if de else "Date / Name:"), 3.5, 0.0, "Arial", **basis2))
-        self.layout_elemente.append(Text(fx + 93, fy + 6,
-            "DIN EN ISO 5457 / DIN 6771", 2.5, 0.0, "Arial", **basis2))
+        aussen, innen = TB.frame_rects(b, h)
+        if not any(gleich(e, aussen) for e in liste):
+            liste.append(Rechteck(*aussen, **basis))
+        if not any(gleich(e, innen) for e in liste):
+            liste.append(Rechteck(*innen, **basis2))
+        if elemente:
+            ref = TB.make_block(name, elemente, b, h, layer="0")
+            info = TB.make_info(p, p.aktiv if p is not None else 0,
+                                SPRACHE["aktuell"], self.layout_format)
+            TB.refresh_fields(liste + [ref], info, self.massstab.get())
+            self._attribute_abfragen(ref)
+            liste.append(ref)
+            self.auswahl = [ref]
+            self.status.set(tr("msg.tb.eingefuegt", name=name))
+        else:
+            self.status.set(tr("msg.tb.nur_rahmen"))
         self.redraw()
+
+    def schriftkopf_vorlage_speichern(self):
+        """Speichert die Modell-Zeichnung als Schriftkopf-Vorlage."""
+        if not self.elemente:
+            self.status.set(tr("msg.tb.leer"))
+            return
+        ordner = TB.program_folder()
+        try:
+            os.makedirs(ordner, exist_ok=True)
+        except OSError:
+            pass
+        pfad = filedialog.asksaveasfilename(
+            parent=self.root, initialdir=ordner, defaultextension=".cadjson",
+            filetypes=[("CAD file", "*.cadjson")],
+            title=tr("menu.einfuegen.schriftkopf_speichern"))
+        if not pfad:
+            return
+        try:
+            self._json_atomar_schreiben(pfad, TB.template_data(self.elemente))
+        except OSError as e:
+            messagebox.showerror(tr("msg.speichern_fehlgeschlagen"), str(e),
+                                 parent=self.root)
+            return
+        self.status.set(tr("msg.tb.gespeichert", pfad=pfad))
+
+    # --------------------------------------------------------
+    # Seitenleiste ein-/ausblenden
+    # --------------------------------------------------------
+    def seitenleiste_umschalten(self):
+        sl = self.seitenleiste
+        if sl.ist_sichtbar():
+            sl.ausblenden()
+        else:
+            sl.einblenden(vor=self.canvas)
+        try:
+            cfg = lade_konfiguration()
+            cfg["sidebar_sichtbar"] = sl.ist_sichtbar()
+            speichere_konfiguration(cfg)
+        except Exception as e:
+            print(f"[KatieCAD] Konfiguration: {e}")
 
     def viewport_modus_starten(self):
         if not self._ist_layout():
@@ -6609,6 +6729,32 @@ class CadApp:
         p.speichern()
         self.status.set(tr("msg.blatt.neu", name=b.name))
 
+    def blatt_duplizieren(self):
+        """Dupliziert das aktive Blatt vollstaendig (Modell, Layouts, Blocks)."""
+        p = self.projekt
+        if p is None:
+            self.status.set(tr("msg.projekt.kein_projekt"))
+            return
+        name = _LayoutNameDialog(self.root, tr("msg.blatt.duplizieren_titel"),
+                                 p.kopie_name(p.blaetter[p.aktiv].name),
+                                 label=tr("dlg.blatt.name")).result
+        if name is None:
+            return
+        if not self._blatt_sichern():
+            return
+        try:
+            b = p.blatt_duplizieren(p.aktiv, name)
+            p.speichern()
+        except (OSError, ProjektFehler) as e:
+            messagebox.showerror(tr("msg.projekt.titel"),
+                                 tr("msg.projekt.fehler", fehler=e),
+                                 parent=self.root)
+            return
+        self._stacks_merken(p.blatt_pfad(p.aktiv))
+        self._blatt_laden(p.blaetter.index(b))
+        p.speichern()
+        self.status.set(tr("msg.blatt.dupliziert", name=b.name))
+
     def blatt_loeschen(self):
         p = self.projekt
         if p is None:
@@ -6737,9 +6883,10 @@ class CadApp:
     def _attribute_abfragen(self, ref):
         """Fragt beim Einfuegen die Attributwerte ab (falls vorhanden).
         Abbrechen behaelt die Vorgabewerte."""
-        if not ref.attribut_definitionen():
+        aus = self._attr_ausschluss(ref)
+        if not [ad for ad in ref.attribut_definitionen() if ad.tag not in aus]:
             return
-        dlg = BlockAttributeDialog(self.root, ref)
+        dlg = BlockAttributeDialog(self.root, ref, ausschliessen=aus)
         if dlg.result:
             ref.setze_attribute(dlg.result)
             ref.setze_ausgeblendet(dlg.ausgeblendet)
@@ -6760,7 +6907,8 @@ class CadApp:
                 self.status.set(tr("msg.attedit.keine_attribute"))
                 return
             ref = mit[0]
-        dlg = BlockAttributeDialog(self.root, ref)
+        dlg = BlockAttributeDialog(self.root, ref,
+                                   ausschliessen=self._attr_ausschluss(ref))
         if dlg.result is None:
             return
         self._snapshot()
@@ -7390,6 +7538,9 @@ class CadApp:
                 geraete(ctx.elemente, i + 1), i + 1,
                 {j + 1: (geraete_aus_blattdaten_liste(self, j))
                  for j in range(len(p.blaetter)) if j != i})
+            for lay in getattr(ctx, "layouts", []):
+                TB.refresh_fields(lay.elemente,
+                                  TB.make_info(p, i, SPRACHE["aktuell"], lay.format))
         try:
             pdf, uebersprungen = pdf_mehrseitig_erzeugen(
                 [(n, c) for _, n, c in kontexte], quelle, farbig, rahmen)
