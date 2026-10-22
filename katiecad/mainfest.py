@@ -13,6 +13,7 @@ MODULE = {
     "katiecad.ui.widgets":        "Platform-independent buttons / colour swatches (macOS-safe)",
     "katiecad.model.core":        "Data model, geometry, electrical elements, PDF writer",
     "katiecad.model.project":     "Project management (folder, sheet list, *.katieprj)",
+    "katiecad.model.titleblock": "Title block templates (title_blocks/), frame geometry, automatic fields",
     "katiecad.model.blocks":      "Block / device files (*.katieblock) read/write",
     "katiecad.electrical.logic":  "Electrical logic: cross references, device references, wires",
     "katiecad.fileio.pdf":        "PDF output from model/layout",
