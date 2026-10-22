@@ -32,28 +32,43 @@ PREFIX = "TITLEBLOCK:"
 FOLDER_NAME = "title_blocks"
 RESERVED = ("PAGE", "PAGES", "SHEET", "PROJECT", "DATE", "SCALE", "FORMAT")
 
-MARGIN_LEFT = 20.0        # mm, binding margin
+MARGIN_LEFT = 20.0        # mm, binding margin (A3 and larger)
 MARGIN_OTHER = 5.0        # mm, top / right / bottom
+A4_SIZE = (297, 210)      # landscape A4
+A4_MARGIN_LEFT = 5.0      # mm, A4: punched margin is at the TOP
+A4_MARGIN_TOP = 15.0      # mm
 
 
 # ---------------------------------------------------------------
 # Frame geometry
 # ---------------------------------------------------------------
+def margins(width, height):
+    """(left, top, right, bottom) of the sheet frame in mm.
+    A4: 5 mm left, 15 mm top (punched margin), 5 mm right/bottom.
+    All other formats: 20 mm left, 5 mm elsewhere."""
+    if (round(width), round(height)) == A4_SIZE:
+        return (A4_MARGIN_LEFT, A4_MARGIN_TOP, MARGIN_OTHER, MARGIN_OTHER)
+    return (MARGIN_LEFT, MARGIN_OTHER, MARGIN_OTHER, MARGIN_OTHER)
+
+
 def frame_rects(width, height):
     """((paper edge), (inner frame)) as (x1, y1, x2, y2) in mm."""
+    left, top, right, bottom = margins(width, height)
     return ((0.0, 0.0, width, height),
-            (MARGIN_LEFT, MARGIN_OTHER, width - MARGIN_OTHER,
-             height - MARGIN_OTHER))
+            (left, bottom, width - right, height - top))
 
 
-def old_frame_rect(width, height):
-    """Inner frame of earlier versions (10 mm left margin)."""
-    return (10.0, 5.0, width - 5.0, height - 5.0)
+def old_frame_rects(width, height):
+    """Inner frames drawn by earlier versions (to be replaced)."""
+    return [(10.0, 5.0, width - 5.0, height - 5.0),     # 10 mm left margin
+            (20.0, 5.0, width - 5.0, height - 5.0),     # 20 mm left, also on A4
+            (5.0, 15.0, width - 5.0, height - 15.0)]    # A4 frame
 
 
 def block_origin(width, height):
     """Where the template's (0, 0) is placed: lower right corner of the frame."""
-    return (width - MARGIN_OTHER, MARGIN_OTHER)
+    _l, _t, right, bottom = margins(width, height)
+    return (width - right, bottom)
 
 
 # ---------------------------------------------------------------
