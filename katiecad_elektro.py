@@ -138,3 +138,4 @@ def naechste_bezeichnung(zuletzt):
     if i == len(z):
         return z
     return z[:i] + str(int(z[i:]) + 1).zfill(len(z) - i)
+
