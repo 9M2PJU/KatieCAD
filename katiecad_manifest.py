@@ -34,4 +34,3 @@ def fehlende_module():
         if importlib.util.find_spec(mod) is None:
             fehlend.append(name)
     return fehlend
-
