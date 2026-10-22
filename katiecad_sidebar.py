@@ -15,6 +15,7 @@ Die Leiste enthaelt keine Fachlogik; sie ruft nur Methoden der CadApp:
 und liest app.projekt (katiecad_projekt.Projekt oder None).
 """
 
+import sys
 import tkinter as tk
 from tkinter import ttk
 
@@ -144,6 +145,9 @@ class Seitenleiste(ttk.Frame):
         self.tree.bind("<<TreeviewSelect>>", self._gewaehlt)
         self.tree.bind("<Double-Button-1>", self._doppelklick)
         self.tree.bind("<Button-3>", self._kontextmenue)
+        if sys.platform == "darwin":     # Mac: Rechtsklick = Button-2 / Ctrl+Klick
+            self.tree.bind("<Button-2>", self._kontextmenue)
+            self.tree.bind("<Control-Button-1>", self._kontextmenue)
         self.tree.bind("<F2>", lambda e: app.blatt_umbenennen())
 
         bz = ttk.Frame(self.f_blaetter)
