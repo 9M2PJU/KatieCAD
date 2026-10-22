@@ -1,7 +1,6 @@
 # KatieCAD
 
-A lightweight CAD drawing tool built with Python and Tkinter, featuring
-core drawing, editing and dimensioning tools, plus DXF import/export.
+KatieCAD is a lightweight CAD system built with Python and Tkinter, aimed primarily at electrical engineering—especially switchgear construction, distribution boards, and building installation. Projects can contain multiple drawings that are edited side by side. It deliberately adds electrical-specific features such as cross-references and wires, and is gradually gaining real electrical “intelligence” for generating device lists, terminal plans, and similar outputs (currently work in progress). At the same time, it remains a general-purpose CAD with the familiar basics: you can draw freely without using project mode, and create and save blocks individually.
 
 ![Screenshot1](Shot1.png)
 
