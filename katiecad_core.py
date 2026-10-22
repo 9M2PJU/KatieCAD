@@ -13,7 +13,7 @@ NEU (Elektro-Basis): AttributDefinition + BlockReferenz.attribute
      (Funktionstexte wie Name, Geraetetyp, Leistung ...).
 """
 
-import math, zlib
+import math, sys, zlib
 from copy import deepcopy
 
 from katiecad_i18n import tr, SPRACHE
@@ -91,6 +91,10 @@ MIN_VP_GROESSE = 10.0
 PASTE_OFFSET_MM = 10.0
 
 TEXT_BREITE = 0.72
+# Oberflaechen-Schrift je Plattform (Segoe UI gibt es nur unter Windows)
+UI_SCHRIFT = ("Segoe UI" if sys.platform.startswith("win")
+              else "Helvetica Neue" if sys.platform == "darwin"
+              else "DejaVu Sans")
 TEXT_ZEILE = 1.65
 CAD_VERSALHOEHE = 0.72
 LW_PX_FAKTOR = 6.5
@@ -984,7 +988,12 @@ class Text(Element):
 
     def masse(self):
         zeilen = self.inhalt.split("\n") or [""]
-        w = max(max(len(z) for z in zeilen), 1) * TEXT_BREITE * self.hoehe
+        # Echte Zeichenbreiten (Helvetica/Arial-Metrik, identisch zum PDF):
+        # "A" ist breiter als "1". Eine feste Breite pro Zeichen liess Texte
+        # ueber den Einfuegepunkt hinausragen.
+        fs = self.hoehe / CAD_VERSALHOEHE
+        w = max(max(pdf_textbreite(z, fs) for z in zeilen),
+                TEXT_BREITE * self.hoehe)
         h = (len(zeilen) - 1) * TEXT_ZEILE * self.hoehe + 1.4 * self.hoehe
         return w, h
 
@@ -1136,7 +1145,8 @@ class Bemassung(Element):
         s = h / 2.5
         gap, ueber, tgap = 0.625 * s, 1.25 * s, 0.625 * s
         txt = self.text(faktor, komma)
-        tw = max(1, max(len(z) for z in txt.split("\n"))) * TEXT_BREITE * h
+        tw = max(max(pdf_textbreite(z, h / CAD_VERSALHOEHE)
+                     for z in txt.split("\n")), TEXT_BREITE * h)
         res = {"linien": [], "pfeile": [], "text": None, "mitte": None}
         manuell = self.tx is not None and self.ty is not None
         r = self.richtung
@@ -1452,7 +1462,8 @@ class BlockReferenz(Element):
     """
 
     def __init__(self, x, y, block_name, elemente,
-                 skalierung=1.0, winkel=0.0, attribute=None, **kw):
+                 skalierung=1.0, winkel=0.0, attribute=None,
+                 ausgeblendet=None, **kw):
         super().__init__("block", **kw)
         self.x, self.y = x, y
         self.block_name = block_name
@@ -1464,6 +1475,9 @@ class BlockReferenz(Element):
         self.attribute = dict(attribute) if attribute else {}
         for ad in self.attribut_definitionen():
             self.attribute.setdefault(ad.tag, ad.wert)
+        # Tags, deren Text in DIESER Instanz nicht angezeigt wird
+        self.ausgeblendet = set(ausgeblendet or [])
+        self._cache = None          # (Signatur, aufgeloeste Kinder)
 
     # ---- Attribute ---------------------------------------------
     def attribut_definitionen(self):
@@ -1471,6 +1485,10 @@ class BlockReferenz(Element):
 
     def attribut_wert(self, tag):
         return self.attribute.get(tag, "")
+
+    def setze_ausgeblendet(self, tags):
+        bekannt = {ad.tag for ad in self.attribut_definitionen()}
+        self.ausgeblendet = {t for t in tags if t in bekannt}
 
     def setze_attribute(self, werte):
         """Uebernimmt Werte {TAG: Wert} (nur bekannte Tags)."""
@@ -1546,6 +1564,15 @@ class BlockReferenz(Element):
 
     def aufgeloest(self):
         """Liefert die transformierten Kind-Elemente als flache Liste."""
+        # Ergebnis wird zwischengespeichert: Snap, Zeichnen und Treffertests
+        # rufen das pro Mausbewegung auf - ohne Cache entstehen dabei
+        # tausende tiefe Kopien (Speicherdruck bei vielen Symbolen).
+        # Die Liste ist NUR LESEND zu verwenden (Aufloesen: vorher kopieren).
+        sig = (self.x, self.y, self.skalierung, self.winkel,
+               tuple(sorted(self.attribute.items())),
+               tuple(sorted(self.ausgeblendet)))
+        if self._cache is not None and self._cache[0] == sig:
+            return self._cache[1]
         out = []
         for el in self.elemente:
             k = deepcopy(el)
@@ -1555,13 +1582,18 @@ class BlockReferenz(Element):
                 # die Beschriftung kommt aus dem Attributwert der Instanz.
                 k.wert = str(self.attribute.get(k.tag, k.wert))
                 k.inhalt = k.wert
+                if k.tag in self.ausgeblendet:
+                    k.sichtbar = False
                 out.append(k)
                 continue
             if isinstance(k, AttributDefinition):
+                if k.tag in self.ausgeblendet:
+                    continue
                 k = k.als_text(self.attribute.get(k.tag, k.wert))
                 if k is None:
                     continue
             out.append(k)
+        self._cache = (sig, out)
         return out
 
     # ---- Element-API -------------------------------------------
@@ -1594,6 +1626,8 @@ class BlockReferenz(Element):
 
     def to_dict(self):
         d = super().to_dict()
+        d.pop("_cache", None)
+        d["ausgeblendet"] = sorted(self.ausgeblendet)
         # Kinder als dicts ablegen (nicht die Objekte selbst)
         d["elemente"] = [e.to_dict() for e in self.elemente]
         return d
@@ -2003,8 +2037,8 @@ class Querverweis(Element):
     BREITE = 2.0
     LAENGE = 5.0
     ABSTAND = 1.0
-    TEXT_HOEHE = 3.5
-    ZIEL_HOEHE = 2.0
+    TEXT_HOEHE = 2.5            # Kennung (vorher 3.5)
+    ZIEL_HOEHE = 1.0            # Zielangabe (vorher 2.0)
     _VEKTOR = {0: (1.0, 0.0), 90: (0.0, 1.0), 180: (-1.0, 0.0), 270: (0.0, -1.0)}
 
     def __init__(self, x, y, text="", art="abgehend", richtung=0, **kw):
@@ -2025,6 +2059,15 @@ class Querverweis(Element):
         if not self.ziel or not self.text.strip():
             return ""
         return "(" + tr("qv.blatt") + " " + ", ".join(str(n) for n in self.ziel) + ")"
+
+    def basis_punkt(self):
+        """Anschluss an der Pfeilbasis (= Einfuegepunkt)."""
+        return (self.x, self.y)
+
+    def spitze_punkt(self):
+        """Anschluss an der Pfeilspitze."""
+        dx, dy = self._VEKTOR[self.richtung]
+        return (self.x + dx * self.LAENGE, self.y + dy * self.LAENGE)
 
     def pfeil_punkte(self):
         dx, dy = self._VEKTOR[self.richtung]
@@ -2055,12 +2098,12 @@ class Querverweis(Element):
         stil = dict(layer=self.layer, farbe=self.farbe,
                     linientyp=self.linientyp, eig_farbe=self.eig_farbe)
         if self.text.strip():
-            v = 2.0 if ziel else 0.0
+            v = 1.3 if ziel else 0.0
             out.append(Text(qx + nx * v, qy + ny * v, self.text,
                             self.TEXT_HOEHE, a, "Arial",
                             einfuegepunkt="mitte_" + horiz, **stil))
         if ziel:
-            v = -1.8
+            v = -1.1
             out.append(Text(qx + nx * v, qy + ny * v, ziel,
                             self.ZIEL_HOEHE, a, "Arial",
                             einfuegepunkt="mitte_" + horiz, **stil))
@@ -2088,3 +2131,4 @@ class Querverweis(Element):
     def griff_bewegen(self, griff_id, x, y):
         if griff_id == "p":
             self.x, self.y = x, y
+
