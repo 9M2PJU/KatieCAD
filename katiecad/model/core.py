@@ -2128,8 +2128,8 @@ class Querverweis(Element):
     BREITE = 2.0
     LAENGE = 5.0
     ABSTAND = 1.0
-    TEXT_HOEHE = 2.5            # Kennung (vorher 3.5)
-    ZIEL_HOEHE = 1.5            # Zielangabe (war 2.0 -> 1.0 -> jetzt 1.5)
+    TEXT_HOEHE = 2.0            # Kennung
+    ZIEL_HOEHE = 1.0            # Zielangabe
     _VEKTOR = {0: (1.0, 0.0), 90: (0.0, 1.0), 180: (-1.0, 0.0), 270: (0.0, -1.0)}
 
     def __init__(self, x, y, text="", art="abgehend", richtung=0, **kw):
@@ -2189,12 +2189,12 @@ class Querverweis(Element):
         stil = dict(layer=self.layer, farbe=self.farbe,
                     linientyp=self.linientyp, eig_farbe=self.eig_farbe)
         if self.text.strip():
-            v = 1.6 if ziel else 0.0
+            v = 1.3 if ziel else 0.0
             out.append(Text(qx + nx * v, qy + ny * v, self.text,
                             self.TEXT_HOEHE, a, "Arial",
                             einfuegepunkt="mitte_" + horiz, **stil))
         if ziel:
-            v = -1.4
+            v = -1.1
             out.append(Text(qx + nx * v, qy + ny * v, ziel,
                             self.ZIEL_HOEHE, a, "Arial",
                             einfuegepunkt="mitte_" + horiz, **stil))
@@ -2414,7 +2414,7 @@ class _FestMaske(Element):
 
 
 class ElektroMaske(_FestMaske):
-    """Basis fuer Elektrogeraete: <IND> (3.5), <TYP>, <PER>, <REF> (je 2.5).
+    """Basis fuer Elektrogeraete: <IND> (2.5), <TYP>, <PER>, <REF> (je 1.5).
 
     Der Einfuegepunkt (x, y) ist die UNTERE RECHTE Ecke der Maske; alle
     Texte sind rechtsbuendig und wachsen nach oben, damit die Maske an ein
@@ -2426,9 +2426,9 @@ class ElektroMaske(_FestMaske):
     Hilfsbaustein -> nur das Hauptsymbol), siehe katiecad.electrical.logic."""
     FELDER = ("IND", "TYP", "PER")
     ROLLEN = ("haupt", "hilfs")
-    HOEHEN = {"IND": 3.5, "TYP": 2.5, "PER": 2.5}
-    REF_HOEHE = 2.5
-    ABSTAND = {"PER": 1.6, "TYP": 3.0, "IND": 4.0}   # Mitte zu Mitte nach oben
+    HOEHEN = {"IND": 2.5, "TYP": 1.5, "PER": 1.5}
+    REF_HOEHE = 1.5
+    ABSTAND = {"PER": 1.1, "TYP": 2.0, "IND": 3.0}   # Mitte zu Mitte nach oben
     ZEILEN = ()
 
     def __init__(self, x, y, werte=None, rolle="haupt", **kw):
@@ -2464,15 +2464,15 @@ class ElektroMaske(_FestMaske):
 
 class Klemme(_FestMaske):
     """Klemme: sichtbarer Kreis mit zwei Anschluessen (oben / unten) und den
-    festen Feldern <IND> (3.5), <TYP>, <PER> (2.5) und <NUM> (2.0)."""
+    festen Feldern <IND> (2.5), <TYP>, <PER> (1.5) und <NUM> (1.0)."""
     FELDER = ("IND", "TYP", "PER", "NUM")
-    DURCHMESSER = 2.5
+    DURCHMESSER = 2.0
     # Beschriftung: rechtsbuendig direkt links neben dem Kreis. IND steht auf
     # Hoehe der Kreismitte, TYP und PER darunter.
-    ZEILEN = (("IND", -3.25, 0.0, 3.5, "mitte_rechts"),
-              ("TYP", -3.25, -4.0, 2.5, "mitte_rechts"),
-              ("PER", -3.25, -7.5, 2.5, "mitte_rechts"),
-              ("NUM", 2.25, 0.0, 2.0, "mitte_links"))
+    ZEILEN = (("IND", -3.0, 0.0, 2.5, "mitte_rechts"),
+              ("TYP", -3.0, -3.0, 1.5, "mitte_rechts"),
+              ("PER", -3.0, -5.5, 1.5, "mitte_rechts"),
+              ("NUM", 2.0, 0.0, 1.0, "mitte_links"))
 
     def __init__(self, x, y, werte=None, **kw):
         super().__init__("klemme", x, y, werte, **kw)
