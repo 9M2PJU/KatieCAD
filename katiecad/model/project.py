@@ -173,6 +173,35 @@ class Projekt:
             self.blaetter.insert(nach_index + 1, b)
         return b
 
+    def kopie_name(self, name):
+        """Free name for a copy: 'X (Kopie)', 'X (Kopie 2)', ..."""
+        namen = {b.name for b in self.blaetter}
+        kandidat = f"{name} (Kopie)"
+        i = 2
+        while kandidat in namen:
+            kandidat = f"{name} (Kopie {i})"
+            i += 1
+        return kandidat
+
+    def blatt_duplizieren(self, index, name=None):
+        """Copies sheet `index` completely (the file is copied; the caller
+        must have saved the sheet before). The copy is inserted directly
+        after the original. Returns the new Blatt."""
+        import shutil
+        if not (0 <= index < len(self.blaetter)):
+            raise ProjektFehler("invalid sheet")
+        quelle = self.blatt_pfad(index)
+        if not os.path.isfile(quelle):
+            raise ProjektFehler(f"sheet file missing: {quelle}")
+        name = (name or "").strip() or self.kopie_name(self.blaetter[index].name)
+        b = self.blatt_hinzufuegen(name, nach_index=index)
+        try:
+            shutil.copy2(quelle, self.blatt_pfad(b))
+        except OSError:
+            self.blaetter.remove(b)
+            raise
+        return b
+
     def blatt_entfernen(self, index, datei_loeschen=True):
         b = self.blaetter.pop(index)
         if datei_loeschen:
@@ -227,3 +256,4 @@ class Projekt:
                 return False, sorted(os.listdir(self.ordner))
             except OSError:
                 return False, []
+
