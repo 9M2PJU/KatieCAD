@@ -53,6 +53,25 @@ class Seitenleiste(ttk.Frame):
         """Packt Leiste und Griff links ins Hauptfenster."""
         self.pack(side=tk.LEFT, fill=tk.Y)
         self.griff.pack(side=tk.LEFT, fill=tk.Y)
+        self._sichtbar = True
+
+    # ---------------------------------------------------------
+    # Ein-/Ausblenden
+    # ---------------------------------------------------------
+    def ist_sichtbar(self):
+        return getattr(self, "_sichtbar", True)
+
+    def ausblenden(self):
+        self.pack_forget()
+        self.griff.pack_forget()
+        self._sichtbar = False
+
+    def einblenden(self, vor=None):
+        """Zeigt die Leiste wieder an (links, vor dem Zeichenbereich `vor`)."""
+        kw = {"before": vor} if vor is not None else {}
+        self.pack(side=tk.LEFT, fill=tk.Y, **kw)
+        self.griff.pack(side=tk.LEFT, fill=tk.Y, **kw)
+        self._sichtbar = True
 
     # ---------------------------------------------------------
     # Groesse
@@ -153,6 +172,7 @@ class Seitenleiste(ttk.Frame):
         bz = ttk.Frame(self.f_blaetter)
         bz.pack(fill=tk.X, pady=(6, 0))
         for text, cmd in (("+", app.blatt_neu),
+                          ("2\u00d7", app.blatt_duplizieren),
                           ("\u2212", app.blatt_loeschen),
                           ("\u25B2", lambda: app.blatt_verschieben(-1)),
                           ("\u25BC", lambda: app.blatt_verschieben(+1)),
@@ -257,6 +277,8 @@ class Seitenleiste(ttk.Frame):
         m.add_command(label=tr("sb.kontext.umbenennen"),
                       command=lambda: self.app.blatt_umbenennen())
         m.add_command(label=tr("sb.kontext.neu"), command=self.app.blatt_neu)
+        m.add_command(label=tr("sb.kontext.duplizieren"),
+                      command=self.app.blatt_duplizieren)
         m.add_separator()
         m.add_command(label=tr("sb.kontext.hoch"),
                       command=lambda: self.app.blatt_verschieben(-1))
