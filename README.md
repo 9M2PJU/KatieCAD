@@ -6,6 +6,10 @@ KatieCAD is a lightweight CAD system built with Python and Tkinter, aimed primar
 
 ![Screenshot2](Shot2.png)
 
+![Screenshot2](Shot3.png)
+
+![Screenshot2](Shot4.png)
+
 ## Features
 
 - **Drawing tools:** Line, Polyline, Circle, Arc, Rectangle, Text
