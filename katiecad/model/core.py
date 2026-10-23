@@ -1625,6 +1625,10 @@ class BlockReferenz(Element):
             el.winkel = (el.winkel + self.winkel) % 360.0
             if isinstance(el, Verbindungspunkt):
                 el.radius *= self.skalierung
+                if el.richtungen is not None:
+                    el.richtungen = sorted(
+                        {int(round((r + self.winkel) / 90.0)) * 90 % 360
+                         for r in el.richtungen})
         elif isinstance(el, Querverweis):
             el.x, el.y = self._welt_pts(el.x, el.y)
             el.richtung = round((el.richtung + self.winkel) / 90.0) * 90 % 360
@@ -2063,14 +2067,27 @@ class Verbindungspunkt(AttributDefinition):
 
     def __init__(self, x, y, inhalt=None, hoehe=2.0, winkel=0.0,
                  schriftart="Arial", einfuegepunkt=None, tag="VP",
-                 prompt="", wert="", sichtbar=True, radius=0.5, **kw):
+                 prompt="", wert="", sichtbar=True, radius=0.5,
+                 richtungen=None, **kw):
         super().__init__(x, y, inhalt, hoehe, winkel, schriftart,
                          "mitte_links", tag=tag, prompt=prompt, wert=wert,
                          sichtbar=sichtbar, **kw)
         self.typ = "vpunkt"
+        # Aktive Anschlussrichtungen (0 Ost, 90 Nord, 180 West, 270 Sued).
+        # None = nicht festgelegt (aeltere Dateien): frei -> alle, im Geraet
+        # -> naechste Aussenkante des Symbols.
+        self.richtungen = (None if richtungen is None else
+                           sorted({int(round(float(r) / 90.0)) * 90 % 360
+                                   for r in richtungen}))
         self.radius = float(radius)
         self.wert = "" if wert is None else str(wert)
         self.inhalt = self.wert
+
+    def drehen(self, cx, cy, winkel_deg):
+        super().drehen(cx, cy, winkel_deg)
+        if self.richtungen is not None:
+            self.richtungen = sorted({int(round((r - winkel_deg) / 90.0)) * 90 % 360
+                                      for r in self.richtungen})
 
     def text_element(self):
         """Beschriftung als normales Text-Element (oder None)."""
