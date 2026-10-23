@@ -164,6 +164,43 @@ class Projekt:
             "doku": self.doku,
         })
 
+    def umbenennen(self, neuer_name):
+        """Benennt das Projekt um: Projektdatei und - falls der Ordner bisher
+        genauso hiess wie das Projekt - auch den Projektordner.
+        -> True, wenn der Ordner mitumbenannt wurde. Wirft ProjektFehler
+        ('leer'|'zeichen'|'ende'|'reserviert'|'existiert')."""
+        neu = (neuer_name or "").strip()
+        fehler = name_pruefen(neu)
+        if fehler:
+            raise ProjektFehler(fehler)
+        alt = self.name
+        if neu == alt:
+            return False
+        alte_datei = self.projektdatei
+        ordner_neu = None
+        if os.path.basename(os.path.normpath(self.ordner)) == alt:
+            ordner_neu = os.path.join(os.path.dirname(os.path.normpath(self.ordner)), neu)
+            if os.path.exists(ordner_neu) and neu.lower() != alt.lower():
+                raise ProjektFehler("existiert")
+        neue_datei = os.path.join(self.ordner, neu + PROJEKT_ENDUNG)
+        if os.path.exists(neue_datei) and neu.lower() != alt.lower():
+            raise ProjektFehler("existiert")
+        try:
+            if os.path.exists(alte_datei):
+                os.replace(alte_datei, neue_datei)
+            self.name = neu
+            self.speichern()
+            if ordner_neu:
+                os.rename(self.ordner, ordner_neu)
+                self.ordner = ordner_neu
+                return True
+        except OSError as e:
+            if ordner_neu is None or self.ordner != ordner_neu:
+                # Ordner blieb unveraendert; Projekt ist trotzdem umbenannt
+                return False
+            raise ProjektFehler(str(e))
+        return False
+
     # ---- Blaetter ----------------------------------------------
     def neuer_blattname(self):
         i = len(self.blaetter) + 1
@@ -300,3 +337,4 @@ class Projekt:
                 return False, sorted(os.listdir(self.ordner))
             except OSError:
                 return False, []
+
