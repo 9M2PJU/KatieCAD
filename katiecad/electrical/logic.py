@@ -533,10 +533,14 @@ def _block_kanten(kinder):
     return min(xs), min(ys), max(xs), max(ys)
 
 
-def _pin_richtung(x, y, kanten):
+def _pin_richtung(pin, kanten):
     """Erlaubte Richtung eines Pins in einem Geraet: die naechstgelegene
     Aussenkante des Symbols (bei Gleichstand senkrecht vor waagerecht).
-    Ohne Kanten (freier Pin): alle Richtungen."""
+    Ohne Kanten (freier Pin): alle Richtungen. Ausdruecklich eingestellte
+    Richtungen des Pins (`richtungen`) haben immer Vorrang."""
+    if getattr(pin, "richtungen", None) is not None:
+        return set(pin.richtungen)
+    x, y = pin.x, pin.y
     if kanten is None:
         return None
     x1, y1, x2, y2 = kanten
@@ -552,7 +556,7 @@ def _auto_anker(elemente):
     def sammle(k, besitzer, kanten):
         bid = id(besitzer)
         if isinstance(k, Verbindungspunkt):
-            out.append((k.x, k.y, _pin_richtung(k.x, k.y, kanten), bid, besitzer))
+            out.append((k.x, k.y, _pin_richtung(k, kanten), bid, besitzer))
         elif isinstance(k, Verbindung):
             for (ax, ay, d) in k.anschluesse():
                 out.append((ax, ay, {d}, bid, besitzer))
