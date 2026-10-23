@@ -2036,14 +2036,17 @@ LEITUNG_STAERKE = 0.35
 
 
 class Leitung(Linie):
-    """Rote Verbindungslinie zwischen zwei Verbindungspunkten."""
+    """Rote Verbindungslinie zwischen zwei Anschlusspunkten.
+    auto=True: wird automatisch erzeugt/entfernt (siehe
+    katiecad.electrical.logic.leitungen_automatisch)."""
 
-    def __init__(self, x1, y1, x2, y2, **kw):
+    def __init__(self, x1, y1, x2, y2, auto=False, **kw):
         kw.setdefault("farbe", LEITUNG_FARBE)
         kw.setdefault("eig_farbe", True)
         kw.setdefault("staerke", LEITUNG_STAERKE)
         super().__init__(x1, y1, x2, y2, **kw)
         self.typ = "leitung"
+        self.auto = bool(auto)
 
 
 class Verbindungspunkt(AttributDefinition):
@@ -2516,7 +2519,7 @@ class Koordinatenfeld(Element):
     INSET = 1.0                       # Abstand Rahmen <-> Viewport-Umriss
     UMRISS_FARBE = "#8b7ea8"
 
-    def __init__(self, x, y, breite=287.0, hoehe=150.0, spalten=6, zeilen=4,
+    def __init__(self, x, y, breite=287.0, hoehe=164.0, spalten=6, zeilen=4,
                  rand=5.0, text_hoehe=3.5, raster=False, **kw):
         kw.setdefault("staerke", 0.35)
         super().__init__("koordinatenfeld", **kw)
