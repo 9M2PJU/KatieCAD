@@ -56,21 +56,32 @@ def _json_schreiben(pfad, daten):
 
 
 class Blatt:
-    def __init__(self, name, datei):
+    def __init__(self, name, datei, bericht=None):
         self.name = name
         self.datei = datei          # Dateiname relativ zum Projektordner
+        # None = Zeichnungsblatt; sonst Typ eines erzeugten Berichtsblatts
+        # ("deckblatt", "inhalt", "geraete", "klemmen", "kabel")
+        self.bericht = bericht
 
     def to_dict(self):
-        return {"name": self.name, "datei": self.datei}
+        d = {"name": self.name, "datei": self.datei}
+        if self.bericht:
+            d["bericht"] = self.bericht
+        return d
 
 
 class Projekt:
-    def __init__(self, name, ordner, blaetter=None, aktiv=0, naechste_id=1):
+    def __init__(self, name, ordner, blaetter=None, aktiv=0, naechste_id=1,
+                 daten=None, doku=None):
         self.name = name
         self.ordner = ordner
         self.blaetter = list(blaetter) if blaetter else []
         self.aktiv = aktiv
         self.naechste_id = naechste_id
+        # Projektdaten fuer Deckblatt/Schriftkopf (Kunde, Auftrag, ...)
+        self.daten = dict(daten) if isinstance(daten, dict) else {}
+        # Einstellungen der Dokumentation (gewaehlte Berichte, Vorlage, ...)
+        self.doku = dict(doku) if isinstance(doku, dict) else {}
 
     # ---- Pfade --------------------------------------------------
     @property
@@ -128,10 +139,11 @@ class Projekt:
         for bd in d.get("blaetter", []):
             if isinstance(bd, dict) and bd.get("datei"):
                 blaetter.append(Blatt(bd.get("name") or bd["datei"],
-                                      bd["datei"]))
+                                      bd["datei"], bd.get("bericht") or None))
         p = cls(name, ordner, blaetter,
                 aktiv=int(d.get("aktiv", 0) or 0),
-                naechste_id=int(d.get("naechste_id", len(blaetter) + 1)))
+                naechste_id=int(d.get("naechste_id", len(blaetter) + 1)),
+                daten=d.get("daten"), doku=d.get("doku"))
         # Die Projektdatei heisst evtl. anders als im JSON (umkopiert):
         # der Dateiname hat Vorrang, damit speichern() am selben Ort schreibt.
         p.name = os.path.splitext(os.path.basename(pfad))[0]
@@ -148,6 +160,8 @@ class Projekt:
             "aktiv": self.aktiv,
             "naechste_id": self.naechste_id,
             "blaetter": [b.to_dict() for b in self.blaetter],
+            "daten": self.daten,
+            "doku": self.doku,
         })
 
     # ---- Blaetter ----------------------------------------------
@@ -171,6 +185,36 @@ class Projekt:
             self.blaetter.append(b)
         else:
             self.blaetter.insert(nach_index + 1, b)
+        return b
+
+    # ---- Berichtsblaetter (erzeugte Listen, Deckblatt, ...) -----
+    def zeichnungsblaetter(self):
+        """Indizes der Blaetter, die KEINE erzeugten Berichtsblaetter sind."""
+        return [i for i, b in enumerate(self.blaetter) if not b.bericht]
+
+    def berichte_entfernen(self):
+        """Entfernt alle Berichtsblaetter samt Dateien. -> Anzahl."""
+        weg = [b for b in self.blaetter if b.bericht]
+        for b in weg:
+            self.blaetter.remove(b)
+            try:
+                os.remove(os.path.join(self.ordner, b.datei))
+            except OSError:
+                pass
+        if self.aktiv >= len(self.blaetter):
+            self.aktiv = max(0, len(self.blaetter) - 1)
+        return len(weg)
+
+    def bericht_einfuegen(self, name, typ, position=None):
+        """Registriert ein Berichtsblatt an `position` (None = am Ende).
+        Die Datei schreibt der Aufrufer."""
+        b = self.blatt_hinzufuegen(name)
+        self.blaetter.remove(b)
+        b.bericht = typ
+        if position is None or position >= len(self.blaetter):
+            self.blaetter.append(b)
+        else:
+            self.blaetter.insert(max(0, position), b)
         return b
 
     def kopie_name(self, name):
@@ -256,4 +300,3 @@ class Projekt:
                 return False, sorted(os.listdir(self.ordner))
             except OSError:
                 return False, []
-
