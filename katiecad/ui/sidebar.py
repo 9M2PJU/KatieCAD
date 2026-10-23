@@ -1,18 +1,18 @@
 # -*- coding: utf-8 -*-
 """
-katiecad/ui/sidebar.py - Linke Seitenleiste von KatieCAD.
+katiecad/ui/sidebar.py - Left sidebar of KatieCAD.
 
-Oben:   Undo / Redo
-Mitte:  Blattliste des geoeffneten Projekts (mit Nummerierung)
-        bzw. Hinweis + Knoepfe, wenn kein Projekt offen ist.
-Rand:   Ziehgriff zum Veraendern der Breite.
+Top:    Undo / Redo
+Middle: sheet list of the open project (with numbering)
+        or a hint + buttons if no project is open.
+Edge:   drag handle to change the width.
 
-Die Leiste enthaelt keine Fachlogik; sie ruft nur Methoden der CadApp:
+The bar contains no domain logic; it only calls methods of CadApp:
     undo, redo, blatt_wechseln(i), blatt_neu, blatt_loeschen,
     blatt_umbenennen(index=None), blatt_verschieben(delta),
     projekt_erstellen, projekt_oeffnen, projekt_drucken,
     sidebar_breite_merken(px)
-und liest app.projekt (katiecad.model.project.Projekt oder None).
+and reads app.projekt (katiecad.model.project.Projekt or None).
 """
 
 import sys
@@ -31,7 +31,7 @@ class Seitenleiste(ttk.Frame):
     def __init__(self, parent, app, breite=None):
         super().__init__(parent, padding=(6, 6))
         self.app = app
-        self._sync = False          # unterdrueckt Auswahl-Ereignisse
+        self._sync = False          # suppresses selection events
         self._undo_ok = False
         self._redo_ok = False
         self._wrap_labels = []
@@ -39,7 +39,7 @@ class Seitenleiste(ttk.Frame):
         self.configure(width=self.breite)
         self.pack_propagate(False)
 
-        # Ziehgriff (Geschwister im Hauptfenster)
+        # Drag handle (sibling in the main window)
         self.griff = tk.Frame(parent, width=5, cursor="sb_h_double_arrow",
                               bg=FARBEN["bg_mittel"])
         self.griff.bind("<Enter>", lambda e: self.griff.config(bg=FARBEN["cyan"]))
@@ -50,13 +50,13 @@ class Seitenleiste(ttk.Frame):
         self._bauen()
 
     def einbauen(self):
-        """Packt Leiste und Griff links ins Hauptfenster."""
+        """Packs the bar and handle on the left of the main window."""
         self.pack(side=tk.LEFT, fill=tk.Y)
         self.griff.pack(side=tk.LEFT, fill=tk.Y)
         self._sichtbar = True
 
     # ---------------------------------------------------------
-    # Ein-/Ausblenden
+    # Show / hide
     # ---------------------------------------------------------
     def ist_sichtbar(self):
         return getattr(self, "_sichtbar", True)
@@ -67,14 +67,14 @@ class Seitenleiste(ttk.Frame):
         self._sichtbar = False
 
     def einblenden(self, vor=None):
-        """Zeigt die Leiste wieder an (links, vor dem Zeichenbereich `vor`)."""
+        """Shows the bar again (on the left, before the drawing area `vor`)."""
         kw = {"before": vor} if vor is not None else {}
         self.pack(side=tk.LEFT, fill=tk.Y, **kw)
         self.griff.pack(side=tk.LEFT, fill=tk.Y, **kw)
         self._sichtbar = True
 
     # ---------------------------------------------------------
-    # Groesse
+    # Size
     # ---------------------------------------------------------
     def _begrenzen(self, px):
         try:
@@ -111,7 +111,7 @@ class Seitenleiste(ttk.Frame):
         return lbl
 
     # ---------------------------------------------------------
-    # Aufbau
+    # Construction
     # ---------------------------------------------------------
     def _bauen(self):
         for w in self.winfo_children():
@@ -129,13 +129,13 @@ class Seitenleiste(ttk.Frame):
 
         ttk.Separator(self, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=8)
 
-        # --- Projektkopf ---
+        # --- Project header ---
         ttk.Label(self, text=tr("sb.projekt"),
                   style="Title.TLabel").pack(anchor=tk.W)
         self.lbl_projekt = self._wrap_label(self, text="", style="Hint.TLabel")
         self.lbl_projekt.pack(anchor=tk.W, pady=(0, 6))
 
-        # --- Ohne Projekt ---
+        # --- Without project ---
         self.f_leer = ttk.Frame(self)
         self._wrap_label(self.f_leer, text=tr("sb.kein_projekt")).pack(
             anchor=tk.W, pady=(0, 8))
@@ -144,7 +144,7 @@ class Seitenleiste(ttk.Frame):
         ttk.Button(self.f_leer, text=tr("sb.projekt_oeffnen"),
                    command=app.projekt_oeffnen).pack(fill=tk.X, pady=2)
 
-        # --- Mit Projekt: Blattliste ---
+        # --- With project: sheet list ---
         self.f_blaetter = ttk.Frame(self)
         ttk.Label(self.f_blaetter, text=tr("sb.blaetter"),
                   style="Title.TLabel").pack(anchor=tk.W, pady=(0, 3))
@@ -164,7 +164,7 @@ class Seitenleiste(ttk.Frame):
         self.tree.bind("<<TreeviewSelect>>", self._gewaehlt)
         self.tree.bind("<Double-Button-1>", self._doppelklick)
         self.tree.bind("<Button-3>", self._kontextmenue)
-        if sys.platform == "darwin":     # Mac: Rechtsklick = Button-2 / Ctrl+Klick
+        if sys.platform == "darwin":     # Mac: right click = Button-2 / Ctrl+click
             self.tree.bind("<Button-2>", self._kontextmenue)
             self.tree.bind("<Control-Button-1>", self._kontextmenue)
         self.tree.bind("<F2>", lambda e: app.blatt_umbenennen())
@@ -189,11 +189,11 @@ class Seitenleiste(ttk.Frame):
         self.undo_redo_setzen(self._undo_ok, self._redo_ok)
 
     def neu_beschriften(self):
-        """Nach Sprachwechsel: alles neu aufbauen."""
+        """After a language change: rebuild everything."""
         self._bauen()
 
     # ---------------------------------------------------------
-    # Zustand
+    # State
     # ---------------------------------------------------------
     def undo_redo_setzen(self, undo_ok, redo_ok):
         self._undo_ok, self._redo_ok = bool(undo_ok), bool(redo_ok)
@@ -201,11 +201,11 @@ class Seitenleiste(ttk.Frame):
         self.btn_redo.state(["!disabled"] if redo_ok else ["disabled"])
 
     def aktualisieren(self):
-        """Blattliste aus app.projekt aktualisieren.
+        """Update the sheet list from app.projekt.
 
-        Gleichbleibende Zeilenzahl: Zeilen werden NUR umbeschriftet (nicht
-        neu aufgebaut) - sonst gehen Doppelklicks verloren, weil bereits der
-        erste Klick einen Blattwechsel ausloest."""
+        With an unchanged row count rows are ONLY relabelled (not rebuilt) -
+        otherwise double clicks get lost, because the first click already
+        triggers a sheet change."""
         p = self.app.projekt
         self._sync = True
         try:
@@ -240,7 +240,7 @@ class Seitenleiste(ttk.Frame):
             self._sync = False
 
     # ---------------------------------------------------------
-    # Ereignisse
+    # Events
     # ---------------------------------------------------------
     def _gewaehlt(self, event=None):
         if self._sync:
@@ -253,7 +253,7 @@ class Seitenleiste(ttk.Frame):
         if p is None or index == p.aktiv:
             return
         if not self.app.blatt_wechseln(index):
-            self.aktualisieren()        # Auswahl zuruecksetzen
+            self.aktualisieren()        # Reset selection
 
     def _zeile_unter(self, event):
         iid = self.tree.identify_row(event.y)
