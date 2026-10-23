@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-katiecad/ui/dialogs.py - Alle Dialog-Klassen und das Lizenz-Fenster.
-Wird von CadApp genutzt; kennt CadApp, aber CadApp importiert dieses
-Modul nur fuer die Dialog-Klassen.
+katiecad/ui/dialogs.py - All dialog classes and the licence window.
+Used by CadApp; knows CadApp, but CadApp imports this module only
+for the dialog classes.
 
-NEU (Schritt 3): _BlockNameDialog, _BlockAuswahlDialog
-NEU (Elektro-Basis): ProjektNeuDialog, AttributDefinitionDialog,
+NEW (step 3): _BlockNameDialog, _BlockAuswahlDialog
+NEW (electrical base): ProjektNeuDialog, AttributDefinitionDialog,
                      BlockAttributeDialog
 """
 
@@ -27,10 +27,10 @@ from katiecad.ui.widgets import farb_swatch
 
 
 def _grab_versuchen(dlg, versuche=40):
-    """grab_set() schlaegt unter Linux (X11/Wayland, GNOME) mit
-    'window not viewable' fehl, solange das Fenster noch nicht angezeigt
-    wird. Die Ausnahme brach bisher den Dialogaufbau ab -> leeres graues
-    Fenster. Darum: erst warten, bis das Fenster sichtbar ist."""
+    """grab_set() fails on Linux (X11/Wayland, GNOME) with
+    'window not viewable' as long as the window is not yet displayed.
+    The exception used to abort building the dialog -> empty grey
+    window. Therefore: first wait until the window is visible."""
     try:
         if not dlg.winfo_exists():
             return
@@ -45,8 +45,42 @@ def _grab_versuchen(dlg, versuche=40):
                 pass
 
 
+_OFFENE_DIALOGE = []
+
+
+def _schliesse_andere_dialoge(dlg):
+    """Only one dialog at a time: opening a new dialog closes every other
+    open dialog - except the ones it was opened from (parent chain)."""
+    vorfahren = set()
+    w = getattr(dlg, "master", None)
+    while w is not None:
+        vorfahren.add(str(w))
+        w = getattr(w, "master", None)
+    uebrig = []
+    for d in _OFFENE_DIALOGE:
+        try:
+            lebt = bool(d.winfo_exists())
+        except tk.TclError:
+            lebt = False
+        if not lebt or d is dlg:
+            continue
+        if str(d) in vorfahren:
+            uebrig.append(d)
+            continue
+        try:
+            d.destroy()
+        except tk.TclError:
+            pass
+    _OFFENE_DIALOGE[:] = uebrig + [dlg]
+
+
 def _modal(dlg):
-    """Macht einen Dialog modal (siehe _grab_versuchen)."""
+    """Makes a dialog modal (see _grab_versuchen) and makes sure that only
+    one dialog is open at a time."""
+    try:
+        _schliesse_andere_dialoge(dlg)
+    except Exception as ex:
+        print(f"[KatieCAD] Dialog: {ex}")
     try:
         dlg.after(10, lambda: _grab_versuchen(dlg))
     except tk.TclError:
@@ -55,7 +89,7 @@ def _modal(dlg):
 
 
 # ============================================================
-# MIT-Lizenztext (fuer das separate Lizenz-Fenster)
+# MIT licence text (for the separate licence window)
 # ============================================================
 MIT_LICENSE_TEXT = """MIT License
 
@@ -81,7 +115,7 @@ SOFTWARE."""
 
 
 def zeige_lizenz_fenster(parent):
-    """Zeigt die MIT-Lizenz in einem eigenen, scrollbaren Fenster."""
+    """Shows the MIT licence in a separate, scrollable window."""
     win = tk.Toplevel(parent)
     win.title("License – KatieCAD")
     win.geometry("620x520")
@@ -139,7 +173,7 @@ def zeige_lizenz_fenster(parent):
 
 
 # ============================================================
-# Layout-Name-Dialog
+# Layout name dialog
 # ============================================================
 class _LayoutNameDialog(tk.Toplevel):
     def __init__(self, parent, titel, startname="", label=None):
@@ -522,7 +556,7 @@ class ViewportDialog(tk.Toplevel):
 
 
 # ============================================================
-# Layer-Dialoge
+# Layer dialogs
 # ============================================================
 class LayerDialog(tk.Toplevel):
     def __init__(self, parent, app):
@@ -681,7 +715,7 @@ class LayerEditDialog(tk.Toplevel):
 
 
 # ============================================================
-# Text-, Array- und Druck-Dialog
+# Text, array and print dialogs
 # ============================================================
 class TextDialog(tk.Toplevel):
     def __init__(self, parent, app):
@@ -891,18 +925,18 @@ class DruckDialog(tk.Toplevel):
 
 
 # ============================================================
-# NEU (Schritt 3): Block-Dialoge
+# NEW (step 3): block dialogs
 # ============================================================
 class _BlockNameDialog(tk.Toplevel):
-    """Fragt nach dem Namen fuer einen neu zu erzeugenden Block.
+    """Asks for the name of a block to be created.
 
-    Attribute:
-        result: der eingegebene Name (oder None bei Abbruch)
+    Attributes:
+        result: the entered name (or None on cancel)
 
-    Parameter:
-        parent          Elternfenster
-        bibliothek      BlockBibliothek (fuer Existenz-Pruefung)
-        startname       Vorschlag (z.B. "Block1")
+    Parameters:
+        parent          parent window
+        bibliothek      BlockBibliothek (for the existence check)
+        startname       suggestion (e.g. "Block1")
     """
 
     def __init__(self, parent, bibliothek, startname="Block1"):
@@ -978,12 +1012,12 @@ class _BlockNameDialog(tk.Toplevel):
 
 
 class _BlockAuswahlDialog(tk.Toplevel):
-    """Auswahl eines Blocks aus der Bibliothek zum Einfuegen.
+    """Selection of a block from the library for insertion.
 
-    Attribute:
-        result: der gewaehlte Blockname (oder None bei Abbruch)
-        geloescht: Liste der Namen, die der Nutzer ueber den
-                   Loeschen-Button entfernt hat (CadApp persistiert das).
+    Attributes:
+        result: the chosen block name (or None on cancel)
+        geloescht: list of names the user removed via the
+                   delete button (CadApp persists this).
     """
 
     def __init__(self, parent, bibliothek, titel=None, knopf=None,
@@ -1108,7 +1142,7 @@ class _BlockAuswahlDialog(tk.Toplevel):
 
 
 # ============================================================
-# NEU: Hilfsfunktion + Projekt- und Attribut-Dialoge
+# NEW: helper function + project and attribute dialogs
 # ============================================================
 def _zentrieren(dlg, parent):
     dlg.update_idletasks()
@@ -1118,10 +1152,10 @@ def _zentrieren(dlg, parent):
 
 
 class ProjektNeuDialog(tk.Toplevel):
-    """Projektname + frei waehlbarer Speicherort.
+    """Project name + freely selectable location.
 
-    result: (name, basis_ordner) oder None. Das Programm legt danach
-    <basis_ordner>/<name>/ an.
+    result: (name, base_folder) or None. The program then creates
+    <base_folder>/<name>/.
     """
 
     def __init__(self, parent, startordner=""):
@@ -1211,9 +1245,9 @@ class ProjektNeuDialog(tk.Toplevel):
 
 
 class AttributDefinitionDialog(tk.Toplevel):
-    """Definiert ein Blockattribut (Tag, Abfragetext, Vorgabe, Hoehe).
+    """Defines a block attribute (tag, prompt, default, height).
 
-    result: dict {tag, prompt, wert, hoehe, sichtbar} oder None.
+    result: dict {tag, prompt, wert, hoehe, sichtbar} or None.
     """
 
     def __init__(self, parent, hoehe=3.5, vorgabe=None):
@@ -1304,9 +1338,9 @@ class AttributDefinitionDialog(tk.Toplevel):
 
 
 class BlockAttributeDialog(tk.Toplevel):
-    """Werte der Attribute einer Blockreferenz abfragen / bearbeiten.
+    """Prompt for / edit the attributes of a block reference.
 
-    result: dict {TAG: Wert} oder None.
+    result: dict {TAG: value} or None.
     """
 
     def __init__(self, parent, ref, titel=None, ausschliessen=()):
@@ -1352,7 +1386,7 @@ class BlockAttributeDialog(tk.Toplevel):
             ttk.Label(f, text=tr("dlg.attedit.keine"),
                       style="Hint.TLabel").grid(row=0, column=0)
 
-        # Geraet (Block mit Elektro-Maske): Haupt- oder Hilfsgeraet
+        # Device (block with electrical mask): main or auxiliary device
         self.rolle = None
         self._v_rolle = None
         maske = ref.geraet_maske() if hasattr(ref, "geraet_maske") else None
@@ -1386,14 +1420,14 @@ class BlockAttributeDialog(tk.Toplevel):
         if self._v_rolle is not None:
             self.rolle = self._v_rolle.get()
         self.result = {t: v.get() for t, v in self._vars.items()}
-        # Tags, deren Text in dieser Instanz ausgeblendet werden soll
+        # Tags whose text is to be hidden in this instance
         self.ausgeblendet = {t for t, v in self._sicht.items() if not v.get()}
         self.destroy()
 
 
 class QuerverweisDialog(tk.Toplevel):
-    """Art (abgehend/ankommend), Richtung (N/O/S/W) und Text eines
-    Querverweises. result: dict {art, richtung, text} oder None."""
+    """Type (outgoing/incoming), direction (N/E/S/W) and text of a
+    cross reference. result: dict {art, richtung, text} or None."""
 
     def __init__(self, parent, vorgabe=None):
         super().__init__(parent)
@@ -1446,8 +1480,8 @@ class QuerverweisDialog(tk.Toplevel):
 
 
 class VerbindungspunkteDialog(tk.Toplevel):
-    """Nicht-modales Fenster 'Verbindungspunkte waehlen' fuer das
-    Leitungs-Werkzeug. Zeigt die gewaehlten Punkte; Schliessen = Abbruch."""
+    """Non-modal window 'Select connection points' for the wire tool.
+    Shows the selected points; closing = cancel."""
 
     def __init__(self, parent, on_close):
         super().__init__(parent)
@@ -1492,10 +1526,10 @@ class VerbindungspunkteDialog(tk.Toplevel):
 
 
 class ProjektDruckDialog(tk.Toplevel):
-    """Mehrere Blaetter eines Projekts fuer PDF/Druck auswaehlen.
+    """Select several sheets of a project for PDF/print.
 
-    result: (aktion, indizes, quelle, farbig, rahmen) oder None.
-    aktion: 'pdf' | 'vorschau' | 'druck'
+    result: (action, indices, source, colour, frame) or None.
+    action: 'pdf' | 'vorschau' | 'druck'
     """
 
     def __init__(self, parent, projekt):
@@ -1566,14 +1600,14 @@ class ProjektDruckDialog(tk.Toplevel):
 
 
 class DokumentationDialog(tk.Toplevel):
-    """Berichtsblaetter (Deckblatt, Inhaltsverzeichnis, Geraeteliste,
-    Klemmenplan, Kabelplan) und Projektdaten waehlen.
+    """Choose report sheets (cover sheet, table of contents, device list,
+    terminal diagram, cable plan) and project data.
 
-    vorlagen: [(Anzeigename, Pfad|None)] - None = ohne Schriftkopf
-    einst:    gespeicherte Einstellungen {"berichte", "vorlage", "klemmen_geraete"}
-    daten:    Projektdaten {"anlage", "kunde", ...}
-    result:   {"berichte": [...], "daten": {...}, "vorlage": Pfad|None,
-               "klemmen_geraete": bool} oder None"""
+    vorlagen: [(display_name, path|None)] - None = without title block
+    einst:    saved settings {"berichte", "vorlage", "klemmen_geraete"}
+    daten:    project data {"anlage", "kunde", ...}
+    result:   {"berichte": [...], "daten": {...}, "vorlage": path|None,
+               "klemmen_geraete": bool} or None"""
 
     FELDER = ("anlage", "kunde", "auftrag", "zeichnungsnummer", "firma",
               "gezeichnet", "geprueft", "revision", "datum")
@@ -1660,9 +1694,9 @@ class DokumentationDialog(tk.Toplevel):
 
 
 class VerbindungspunktDialog(tk.Toplevel):
-    """Bezeichnung eines Verbindungspunkts + Schalter 'Text anzeigen'.
+    """Designation of a connection point + switch 'Show text'.
     result: {'wert': str, 'sichtbar': bool, 'richtungen': [0|90|180|270]}
-    oder None."""
+    or None."""
 
     def __init__(self, parent, wert="", sichtbar=True, titel=None,
                  richtungen=(0, 90, 180, 270)):
@@ -1712,11 +1746,11 @@ class VerbindungspunktDialog(tk.Toplevel):
 
 
 # ============================================================
-# Block-Browser (Blockdateien direkt im Dateisystem) + Vorschau
+# Block browser (block files directly in the file system) + preview
 # ============================================================
 def zeichne_block_vorschau(canvas, geom, breite=320, hoehe=300):
-    """Zeichnet eine Vorschau-Geometrie (blocks.vorschau_geometrie) mittig
-    und massstabsgerecht auf einen Canvas."""
+    """Draws a preview geometry (blocks.vorschau_geometrie) centred
+    and to scale on a canvas."""
     canvas.delete("all")
     canvas.configure(bg=FARBEN["bg_dunkel"] if "bg_dunkel" in FARBEN
                      else "#1c132d")
@@ -1764,13 +1798,13 @@ def oeffne_im_dateimanager(pfad):
 
 
 class BlockBrowserDialog(tk.Toplevel):
-    """Durchsucht Ordner mit Blockdateien (*.katieblock), zeigt eine
-    Vorschau und fuegt den gewaehlten Block ein.
+    """Browses folders with block files (*.katieblock), shows a
+    preview and inserts the chosen block.
 
-    wurzeln: [(anzeigename, ordnerpfad)]
-    lader:   Funktion pfad -> BlockDefinition (wirft bei Fehlern)
-    result:  Pfad der gewaehlten Datei oder None
-    wurzeln: enthaelt nach dem Schliessen auch die hinzugefuegten Ordner"""
+    wurzeln: [(display_name, folder_path)]
+    lader:   function path -> BlockDefinition (raises on errors)
+    result:  path of the chosen file or None
+    wurzeln: after closing also contains the added folders"""
 
     def __init__(self, parent, wurzeln, lader, start=None):
         super().__init__(parent)
@@ -1838,7 +1872,7 @@ class BlockBrowserDialog(tk.Toplevel):
         _zentrieren(self, parent)
         self.wait_window(self)
 
-    # ---- Ordnerbaum
+    # Folder tree
     def _baum_aufbauen(self, auswahl=None):
         from katiecad.model.blocks import unterordner
         for i in self.baum.get_children():
@@ -1926,7 +1960,7 @@ class BlockBrowserDialog(tk.Toplevel):
         self.btn_ein.state(st)
         self.btn_del.state(st)
 
-    # ---- Aktionen
+    # Actions
     def _einfuegen(self):
         pf = self._datei()
         if not pf:
@@ -1989,9 +2023,9 @@ def name_sicher(name):
 
 
 class BlockSpeichernDialog(tk.Toplevel):
-    """Name und Zielordner eines neuen Blocks, mit Vorschau.
-    result: {'name': str, 'ordner': str|None} (ordner None = nur in der
-    Zeichnung) oder None bei Abbruch."""
+    """Name and target folder of a new block, with preview.
+    result: {'name': str, 'ordner': str|None} (ordner None = only in the
+    drawing) or None on cancel."""
 
     def __init__(self, parent, geom, name, ordner, dateiname_fn):
         super().__init__(parent)
@@ -2074,8 +2108,8 @@ class BlockSpeichernDialog(tk.Toplevel):
 
 
 class KoordinatenfeldDialog(tk.Toplevel):
-    """Spalten, Zeilen, Groesse und Rasterlinien des Koordinatenfeldes.
-    result: {'spalten', 'zeilen', 'breite', 'hoehe', 'raster'} oder None."""
+    """Columns, rows, size and grid lines of the coordinate field.
+    result: {'spalten', 'zeilen', 'breite', 'hoehe', 'raster'} or None."""
 
     def __init__(self, parent, vorgabe=None):
         super().__init__(parent)
@@ -2129,8 +2163,8 @@ class KoordinatenfeldDialog(tk.Toplevel):
 
 
 class VerbindungDialog(tk.Toplevel):
-    """Art (2/3/4 Anschluesse), Ausrichtung und Punkt einer Verbindung.
-    result: {'art': int, 'ausrichtung': 0..3, 'punkt': bool} oder None."""
+    """Type (2/3/4 connections), orientation and dot of a junction.
+    result: {'art': int, 'ausrichtung': 0..3, 'punkt': bool} or None."""
 
     def __init__(self, parent, vorgabe=None):
         super().__init__(parent)
@@ -2194,7 +2228,7 @@ class VerbindungDialog(tk.Toplevel):
         self._punkt_geaendert()
 
     def _punkt_geaendert(self):
-        # Kreuz mit Punkt hat keine Ausrichtung
+        # Cross with dot has no orientation
         sperre = self._art() == 4 and self.v_punkt.get()
         self.cb_aus.state(["disabled"] if sperre else ["!disabled"])
 
@@ -2207,11 +2241,11 @@ class VerbindungDialog(tk.Toplevel):
 
 
 class FestMaskeDialog(tk.Toplevel):
-    """Ausfuellen der festen Felder einer Elektro-Maske / Klemme.
+    """Filling in the fixed fields of an electrical mask / terminal.
 
-    felder: Liste von Tags (z. B. ['IND','TYP','PER']); werte: {tag: text}
-    rolle:  None oder 'haupt'/'hilfs' (nur Elektro-Maske)
-    result: {'werte': {...}, 'rolle': ...} oder None."""
+    felder: list of tags (e.g. ['IND','TYP','PER']); werte: {tag: text}
+    rolle:  None or 'haupt'/'hilfs' (electrical mask only)
+    result: {'werte': {...}, 'rolle': ...} or None."""
 
     def __init__(self, parent, titel, felder, werte=None, rolle=None, hinweis="",
                  zusatz=()):
@@ -2246,7 +2280,7 @@ class FestMaskeDialog(tk.Toplevel):
                             variable=self.v_rolle).pack(anchor=tk.W)
             row += 1
         self._zvars = {}
-        for key, label, wert in zusatz:       # weitere Eingabefelder (z. B. Adern)
+        for key, label, wert in zusatz:       # further input fields (e.g. cores)
             ttk.Label(f, text=label).grid(row=row, column=0, sticky=tk.W, pady=2, padx=(0, 10))
             var = tk.StringVar(value=wert)
             ttk.Entry(f, textvariable=var, width=30).grid(row=row, column=1, sticky=tk.EW, pady=2)
@@ -2331,4 +2365,3 @@ class TitleBlockDialog(tk.Toplevel):
         key = self._keys[sel[0]]
         self.result = "" if key is None else key
         self.destroy()
-
