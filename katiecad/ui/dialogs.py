@@ -9,6 +9,8 @@ NEU (Elektro-Basis): ProjektNeuDialog, AttributDefinitionDialog,
                      BlockAttributeDialog
 """
 
+import os
+import sys
 import tkinter as tk
 from tkinter import ttk, colorchooser, messagebox, filedialog
 
@@ -1615,6 +1617,368 @@ class VerbindungspunktDialog(tk.Toplevel):
         self.destroy()
 
 
+# ============================================================
+# Block-Browser (Blockdateien direkt im Dateisystem) + Vorschau
+# ============================================================
+def zeichne_block_vorschau(canvas, geom, breite=320, hoehe=300):
+    """Zeichnet eine Vorschau-Geometrie (blocks.vorschau_geometrie) mittig
+    und massstabsgerecht auf einen Canvas."""
+    canvas.delete("all")
+    canvas.configure(bg=FARBEN["bg_dunkel"] if "bg_dunkel" in FARBEN
+                     else "#1c132d")
+    bb = geom["bbox"] if geom else None
+    if not bb:
+        return
+    x1, y1, x2, y2 = bb
+    bw, bh = max(x2 - x1, 1e-6), max(y2 - y1, 1e-6)
+    rand = 16
+    sk = min((breite - 2 * rand) / bw, (hoehe - 2 * rand) / bh)
+    ox = (breite - bw * sk) / 2 - x1 * sk
+    oy = (hoehe + bh * sk) / 2 + y1 * sk
+
+    def px(x, y):
+        return ox + x * sk, oy - y * sk
+
+    for pts, farbe in geom["flaechen"]:
+        flach = [c for p in pts for c in px(*p)]
+        if len(flach) >= 6:
+            canvas.create_polygon(*flach, fill=farbe, outline=farbe)
+    for pts, geschlossen, farbe in geom["linien"]:
+        q = [px(*p) for p in pts]
+        if geschlossen and len(q) > 2:
+            q.append(q[0])
+        if len(q) >= 2:
+            canvas.create_line(*[c for p in q for c in p], fill=farbe, width=1)
+    for (x, y, text, h, farbe) in geom["texte"]:
+        gr = int(h * sk * 1.0)
+        if gr >= 4:
+            canvas.create_text(*px(x, y), text=text, fill=farbe,
+                               font=("Arial", min(gr, 40)))
+
+
+def oeffne_im_dateimanager(pfad):
+    import subprocess
+    try:
+        if sys.platform.startswith("win"):
+            os.startfile(pfad)
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", pfad])
+        else:
+            subprocess.Popen(["xdg-open", pfad])
+    except Exception as e:
+        print(f"[KatieCAD] Dateimanager: {e}")
+
+
+class BlockBrowserDialog(tk.Toplevel):
+    """Durchsucht Ordner mit Blockdateien (*.katieblock), zeigt eine
+    Vorschau und fuegt den gewaehlten Block ein.
+
+    wurzeln: [(anzeigename, ordnerpfad)]
+    lader:   Funktion pfad -> BlockDefinition (wirft bei Fehlern)
+    result:  Pfad der gewaehlten Datei oder None
+    wurzeln: enthaelt nach dem Schliessen auch die hinzugefuegten Ordner"""
+
+    def __init__(self, parent, wurzeln, lader, start=None):
+        super().__init__(parent)
+        self.result = None
+        self.wurzeln = list(wurzeln)
+        self._lader = lader
+        self._dateien = {}
+        self.title(tr("dlg.bb.titel"))
+        self.geometry("980x560")
+        self.transient(parent)
+        _modal(self)
+        self.configure(bg=FARBEN["bg_mittel"])
+
+        f = ttk.Frame(self, padding=10)
+        f.pack(fill=tk.BOTH, expand=True)
+        f.columnconfigure(1, weight=1)
+        f.rowconfigure(1, weight=1)
+
+        ttk.Label(f, text=tr("dlg.bb.ordner"), style="Title.TLabel").grid(row=0, column=0, sticky=tk.W)
+        ttk.Label(f, text=tr("dlg.bb.dateien"), style="Title.TLabel").grid(row=0, column=1, sticky=tk.W, padx=8)
+        ttk.Label(f, text=tr("dlg.bb.vorschau"), style="Title.TLabel").grid(row=0, column=2, sticky=tk.W)
+
+        self.baum = ttk.Treeview(f, show="tree", selectmode="browse", height=18)
+        self.baum.grid(row=1, column=0, sticky="ns")
+        self.baum.column("#0", width=230)
+        self.baum.bind("<<TreeviewSelect>>", lambda e: self._ordner_gewaehlt())
+
+        self.liste = ttk.Treeview(f, columns=("name", "datum"), show="headings",
+                                  selectmode="browse", height=18)
+        self.liste.heading("name", text=tr("dlg.block.auswahl.name"))
+        self.liste.heading("datum", text="")
+        self.liste.column("name", width=240, anchor=tk.W)
+        self.liste.column("datum", width=110, anchor=tk.CENTER)
+        self.liste.grid(row=1, column=1, sticky="nsew", padx=8)
+        self.liste.bind("<<TreeviewSelect>>", lambda e: self._datei_gewaehlt())
+        self.liste.bind("<Double-Button-1>", lambda e: self._einfuegen())
+
+        rf = ttk.Frame(f)
+        rf.grid(row=1, column=2, sticky="n")
+        self.vorschau = tk.Canvas(rf, width=320, height=300, highlightthickness=1)
+        self.vorschau.pack()
+        self.info = ttk.Label(rf, text="", style="Hint.TLabel", wraplength=320,
+                              justify=tk.LEFT)
+        self.info.pack(anchor=tk.W, pady=(6, 0))
+
+        ttk.Label(f, text=tr("dlg.bb.hinweis"), style="Hint.TLabel",
+                  wraplength=900, justify=tk.LEFT).grid(
+            row=2, column=0, columnspan=3, sticky=tk.W, pady=(8, 4))
+
+        bf = ttk.Frame(f)
+        bf.grid(row=3, column=0, columnspan=3, sticky=tk.EW, pady=(4, 0))
+        self.btn_ein = ttk.Button(bf, text=tr("dlg.bb.einfuegen"), command=self._einfuegen)
+        self.btn_ein.pack(side=tk.LEFT, padx=3)
+        ttk.Button(bf, text=tr("dlg.bb.neuer_ordner"), command=self._neuer_ordner).pack(side=tk.LEFT, padx=3)
+        ttk.Button(bf, text=tr("dlg.bb.ordner_hinzu"), command=self._ordner_hinzu).pack(side=tk.LEFT, padx=3)
+        ttk.Button(bf, text=tr("dlg.bb.dateimanager"), command=self._dateimanager).pack(side=tk.LEFT, padx=3)
+        self.btn_del = ttk.Button(bf, text=tr("dlg.bb.loeschen"), command=self._loeschen)
+        self.btn_del.pack(side=tk.LEFT, padx=3)
+        ttk.Button(bf, text=tr("dlg.bb.schliessen"), command=self.destroy).pack(side=tk.RIGHT, padx=3)
+
+        self._baum_aufbauen(start)
+        self.bind("<Escape>", lambda e: self.destroy())
+        self.bind("<Return>", lambda e: self._einfuegen())
+        self._knoepfe()
+        _zentrieren(self, parent)
+        self.wait_window(self)
+
+    # ---- Ordnerbaum
+    def _baum_aufbauen(self, auswahl=None):
+        from katiecad.model.blocks import unterordner
+        for i in self.baum.get_children():
+            self.baum.delete(i)
+
+        def fuelle(eltern, pfad, tiefe):
+            if tiefe > 5:
+                return
+            for n in unterordner(pfad):
+                p = os.path.join(pfad, n)
+                if not self.baum.exists(p):
+                    self.baum.insert(eltern, "end", iid=p, text=n, open=False)
+                    fuelle(p, p, tiefe + 1)
+
+        for name, pfad in self.wurzeln:
+            if not os.path.isdir(pfad) or self.baum.exists(pfad):
+                continue
+            self.baum.insert("", "end", iid=pfad, text=name, open=True)
+            fuelle(pfad, pfad, 0)
+        ziel = auswahl if auswahl and self.baum.exists(auswahl) else None
+        if ziel is None and self.baum.get_children():
+            ziel = self.baum.get_children()[0]
+        if ziel:
+            self.baum.selection_set(ziel)
+            self.baum.see(ziel)
+
+    def _ordner(self):
+        sel = self.baum.selection()
+        return sel[0] if sel else None
+
+    def _ordner_gewaehlt(self):
+        from katiecad.model.blocks import blockdateien
+        import time
+        for i in self.liste.get_children():
+            self.liste.delete(i)
+        self._dateien = {}
+        o = self._ordner()
+        if o:
+            for n, pf in blockdateien(o):
+                self._dateien[n] = pf
+                try:
+                    d = time.strftime("%d.%m.%Y", time.localtime(os.path.getmtime(pf)))
+                except OSError:
+                    d = ""
+                self.liste.insert("", "end", iid=n, values=(n[:-len(".katieblock")], d))
+        kids = self.liste.get_children()
+        if kids:
+            self.liste.selection_set(kids[0])
+        else:
+            zeichne_block_vorschau(self.vorschau, None)
+            self.info.config(text=tr("dlg.bb.keine"))
+        self._knoepfe()
+
+    def _datei(self):
+        sel = self.liste.selection()
+        return self._dateien.get(sel[0]) if sel else None
+
+    def _datei_gewaehlt(self):
+        from katiecad.model.blocks import vorschau_geometrie
+        pf = self._datei()
+        self._knoepfe()
+        if not pf:
+            return
+        try:
+            d = self._lader(pf)
+            geom = vorschau_geometrie(d)
+        except Exception as e:
+            zeichne_block_vorschau(self.vorschau, None)
+            self.info.config(text=tr("dlg.bb.fehler", fehler=e))
+            return
+        zeichne_block_vorschau(self.vorschau, geom)
+        bb = geom["bbox"] or (0, 0, 0, 0)
+        text = tr("dlg.bb.info", n=len(d.elemente), b=round(bb[2] - bb[0], 1),
+                  h=round(bb[3] - bb[1], 1))
+        try:
+            tags = [a.tag for a in d.attribut_definitionen()]
+        except Exception:
+            tags = []
+        if tags:
+            text += "\n" + tr("dlg.bb.attribute", liste=", ".join(tags))
+        self.info.config(text=text)
+
+    def _knoepfe(self):
+        st = ["!disabled"] if self._datei() else ["disabled"]
+        self.btn_ein.state(st)
+        self.btn_del.state(st)
+
+    # ---- Aktionen
+    def _einfuegen(self):
+        pf = self._datei()
+        if not pf:
+            return
+        self.result = pf
+        self.destroy()
+
+    def _neuer_ordner(self):
+        o = self._ordner()
+        if not o:
+            return
+        from tkinter import simpledialog
+        name = simpledialog.askstring(tr("dlg.bb.neuer_ordner"),
+                                      tr("dlg.bb.ordnername"), parent=self)
+        if not name or not name.strip():
+            return
+        neu = os.path.join(o, name_sicher(name.strip()))
+        try:
+            os.makedirs(neu, exist_ok=True)
+        except OSError as e:
+            messagebox.showerror(tr("dlg.bb.titel"),
+                                 tr("dlg.bb.ordner_fehler", fehler=e), parent=self)
+            return
+        self._baum_aufbauen(neu)
+
+    def _ordner_hinzu(self):
+        pf = filedialog.askdirectory(parent=self, title=tr("dlg.bb.ordner_hinzu"))
+        if not pf:
+            return
+        pf = os.path.normpath(pf)
+        if all(os.path.normpath(p) != pf for _n, p in self.wurzeln):
+            self.wurzeln.append((os.path.basename(pf) or pf, pf))
+        self._baum_aufbauen(pf)
+
+    def _dateimanager(self):
+        o = self._ordner()
+        if o:
+            oeffne_im_dateimanager(o)
+
+    def _loeschen(self):
+        pf = self._datei()
+        if not pf:
+            return
+        if not messagebox.askyesno(
+                tr("dlg.bb.loeschen"),
+                tr("dlg.bb.loeschen_frage", name=os.path.basename(pf)), parent=self):
+            return
+        try:
+            os.remove(pf)
+        except OSError as e:
+            messagebox.showerror(tr("dlg.bb.titel"), str(e), parent=self)
+            return
+        self._ordner_gewaehlt()
+
+
+def name_sicher(name):
+    import re
+    n = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", name).strip().rstrip(". ")
+    return n or "Ordner"
+
+
+class BlockSpeichernDialog(tk.Toplevel):
+    """Name und Zielordner eines neuen Blocks, mit Vorschau.
+    result: {'name': str, 'ordner': str|None} (ordner None = nur in der
+    Zeichnung) oder None bei Abbruch."""
+
+    def __init__(self, parent, geom, name, ordner, dateiname_fn):
+        super().__init__(parent)
+        self.result = None
+        self._fn = dateiname_fn
+        self.title(tr("dlg.bs.titel"))
+        self.transient(parent)
+        _modal(self)
+        self.configure(bg=FARBEN["bg_mittel"])
+        f = ttk.Frame(self, padding=14)
+        f.pack(fill=tk.BOTH, expand=True)
+        links = ttk.Frame(f)
+        links.grid(row=0, column=0, sticky="nw", padx=(0, 12))
+        ttk.Label(links, text=tr("dlg.bs.name")).pack(anchor=tk.W)
+        self.v_name = tk.StringVar(value=name)
+        ttk.Entry(links, textvariable=self.v_name, width=40).pack(fill=tk.X, pady=(2, 8))
+        self.v_datei = tk.BooleanVar(value=True)
+        ttk.Checkbutton(links, text=tr("dlg.bs.datei"), variable=self.v_datei,
+                        command=self._pruefen).pack(anchor=tk.W)
+        ttk.Label(links, text=tr("dlg.bs.ordner")).pack(anchor=tk.W, pady=(8, 0))
+        zeile = ttk.Frame(links)
+        zeile.pack(fill=tk.X)
+        self.v_ordner = tk.StringVar(value=ordner or "")
+        ttk.Entry(zeile, textvariable=self.v_ordner, width=34).pack(side=tk.LEFT, fill=tk.X, expand=True)
+        ttk.Button(zeile, text=tr("dlg.bs.durchsuchen"), command=self._suchen).pack(side=tk.LEFT, padx=(4, 0))
+        self.hinweis = ttk.Label(links, text="", style="Hint.TLabel", wraplength=340, justify=tk.LEFT)
+        self.hinweis.pack(anchor=tk.W, pady=8)
+        bf = ttk.Frame(links)
+        bf.pack(pady=(4, 0))
+        self.btn_ok = ttk.Button(bf, text=tr("dlg.ok"), command=self._ok)
+        self.btn_ok.pack(side=tk.LEFT, padx=4)
+        ttk.Button(bf, text=tr("dlg.abbrechen"), command=self.destroy).pack(side=tk.LEFT, padx=4)
+        self.vorschau = tk.Canvas(f, width=260, height=240, highlightthickness=1)
+        self.vorschau.grid(row=0, column=1)
+        zeichne_block_vorschau(self.vorschau, geom, 260, 240)
+        self.v_name.trace_add("write", lambda *_: self._pruefen())
+        self.v_ordner.trace_add("write", lambda *_: self._pruefen())
+        self._pruefen()
+        self.bind("<Return>", lambda e: self._ok())
+        self.bind("<Escape>", lambda e: self.destroy())
+        _zentrieren(self, parent)
+        self.wait_window(self)
+
+    def _suchen(self):
+        pf = filedialog.askdirectory(parent=self, title=tr("dlg.bs.ordner"),
+                                     initialdir=self.v_ordner.get() or None)
+        if pf:
+            self.v_ordner.set(os.path.normpath(pf))
+
+    def _pruefen(self):
+        name = self.v_name.get().strip()
+        if not name:
+            self.hinweis.config(text=tr("dlg.bs.name_leer"), foreground=FARBEN["rot"])
+            self.btn_ok.state(["disabled"])
+            return
+        if not self.v_datei.get() or not self.v_ordner.get().strip():
+            self.hinweis.config(text=tr("dlg.bs.nur_zeichnung"), foreground=FARBEN["gelb"] if "gelb" in FARBEN else FARBEN["cyan"])
+            self.btn_ok.state(["!disabled"])
+            return
+        datei = self._fn(name)
+        pfad = os.path.join(self.v_ordner.get().strip(), datei)
+        if os.path.exists(pfad):
+            self.hinweis.config(text=tr("dlg.bs.existiert", datei=datei), foreground=FARBEN["rot"])
+            self.btn_ok.state(["disabled"])
+        else:
+            self.hinweis.config(text=tr("dlg.bs.ok", pfad=pfad), foreground=FARBEN["gruen"])
+            self.btn_ok.state(["!disabled"])
+
+    def _ok(self):
+        if "disabled" in self.btn_ok.state():
+            return
+        name = self.v_name.get().strip()
+        if not name:
+            return
+        ordner = (self.v_ordner.get().strip()
+                  if self.v_datei.get() and self.v_ordner.get().strip() else None)
+        self.result = {"name": name, "ordner": ordner}
+        self.destroy()
+
+
+
 class KoordinatenfeldDialog(tk.Toplevel):
     """Spalten, Zeilen, Groesse und Rasterlinien des Koordinatenfeldes.
     result: {'spalten', 'zeilen', 'breite', 'hoehe', 'raster'} oder None."""
@@ -1864,4 +2228,3 @@ class TitleBlockDialog(tk.Toplevel):
         key = self._keys[sel[0]]
         self.result = "" if key is None else key
         self.destroy()
-
