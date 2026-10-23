@@ -13,7 +13,10 @@ Attributdefinitionen (AttributDefinition), siehe katiecad.model.core.
 import json
 import os
 
-from katiecad.model.core import BlockDefinition
+from katiecad.model.core import (
+    BlockDefinition, BlockReferenz, ZUSAMMENGESETZT, Linie, Kreis, Bogen,
+    Rechteck, Polylinie, Text, Schraffur, Verbindungspunkt, bogen_punkte,
+    _FestMaske)
 from katiecad.model.project import _UNGUELTIG, BLOCK_ENDUNG
 
 FORMAT_KENNUNG = "katiecad-block"
@@ -64,3 +67,116 @@ def block_laden(pfad, element_factory):
     if not d.elemente:
         raise BlockDateiFehler("leer")
     return d
+
+
+# ------------------------------------------------------------
+# Ordner (Blockdateien direkt im Dateisystem)
+# ------------------------------------------------------------
+def standard_ordner():
+    """Standardordner fuer eigene Bloecke: <Benutzerordner>/KatieCAD/Blocks."""
+    return os.path.join(os.path.expanduser("~"), "KatieCAD", "Blocks")
+
+
+def unterordner(pfad):
+    """Sortierte Unterordner (ohne versteckte)."""
+    try:
+        return sorted((n for n in os.listdir(pfad)
+                       if not n.startswith(".")
+                       and os.path.isdir(os.path.join(pfad, n))),
+                      key=str.lower)
+    except OSError:
+        return []
+
+
+def blockdateien(pfad):
+    """Sortierte Blockdateien eines Ordners: [(dateiname, voller_pfad)]."""
+    try:
+        return sorted(((n, os.path.join(pfad, n)) for n in os.listdir(pfad)
+                       if n.lower().endswith(BLOCK_ENDUNG)
+                       and os.path.isfile(os.path.join(pfad, n))),
+                      key=lambda t: t[0].lower())
+    except OSError:
+        return []
+
+
+# ------------------------------------------------------------
+# Vorschau-Geometrie (ohne Tk)
+# ------------------------------------------------------------
+def _farbe(el):
+    f = getattr(el, "farbe", None) if getattr(el, "eig_farbe", False) else None
+    if not f or not isinstance(f, str) or not f.startswith("#") or len(f) != 7:
+        return "#e8e0ff"
+    try:
+        r, g, b = int(f[1:3], 16), int(f[3:5], 16), int(f[5:7], 16)
+    except ValueError:
+        return "#e8e0ff"
+    if 0.3 * r + 0.59 * g + 0.11 * b < 70:       # zu dunkel fuer dunklen Grund
+        return "#e8e0ff"
+    return f
+
+
+def _flach(el, out):
+    if isinstance(el, _FestMaske):
+        for k in el.aufgeloest(True):
+            _flach(k, out)
+    elif isinstance(el, ZUSAMMENGESETZT):
+        for k in el.aufgeloest():
+            _flach(k, out)
+    else:
+        out.append(el)
+
+
+def vorschau_geometrie(definition):
+    """Zeichenbare Darstellung einer BlockDefinition:
+    {"linien": [(punkte, geschlossen, farbe)], "texte": [(x, y, text, hoehe,
+    farbe)], "flaechen": [(punkte, farbe)], "bbox": (x1, y1, x2, y2) oder None}."""
+    ref = BlockReferenz(0.0, 0.0, definition.name, definition.elemente)
+    flach = []
+    for k in ref.aufgeloest():
+        _flach(k, flach)
+    linien, texte, flaechen = [], [], []
+    xs, ys = [], []
+
+    def punkte(pts):
+        for x, y in pts:
+            xs.append(x); ys.append(y)
+
+    for el in flach:
+        f = _farbe(el)
+        if isinstance(el, Linie):
+            pts = [(el.x1, el.y1), (el.x2, el.y2)]
+            linien.append((pts, False, f)); punkte(pts)
+        elif isinstance(el, Kreis):
+            pts = bogen_punkte(el.cx, el.cy, el.r, 0.0, 360.0, 36)
+            linien.append((pts, True, f)); punkte(pts)
+        elif isinstance(el, Bogen):
+            pts = bogen_punkte(el.cx, el.cy, el.r, el.start, el.ende, 36)
+            linien.append((pts, False, f)); punkte(pts)
+        elif isinstance(el, Rechteck):
+            pts = [(el.x1, el.y1), (el.x2, el.y1), (el.x2, el.y2), (el.x1, el.y2)]
+            linien.append((pts, True, f)); punkte(pts)
+        elif isinstance(el, Polylinie):
+            pts = list(el.punkte)
+            linien.append((pts, bool(el.geschlossen), f)); punkte(pts)
+        elif isinstance(el, Schraffur):
+            pts = list(el.punkte)
+            if getattr(el, "muster", "") == "solid":
+                flaechen.append((pts, f))
+            else:
+                linien.append((pts, True, f))
+            punkte(pts)
+        elif isinstance(el, Verbindungspunkt):
+            pts = bogen_punkte(el.x, el.y, el.radius, 0.0, 360.0, 16)
+            linien.append((pts, True, "#ff6bd6")); punkte(pts)
+            t = el.text_element()
+            if t is not None:
+                b = t.bbox()
+                texte.append(((b[0] + b[2]) / 2, (b[1] + b[3]) / 2, t.inhalt,
+                              t.hoehe, f)); punkte([(b[0], b[1]), (b[2], b[3])])
+        elif isinstance(el, Text):
+            b = el.bbox()
+            texte.append(((b[0] + b[2]) / 2, (b[1] + b[3]) / 2, el.inhalt,
+                          el.hoehe, f)); punkte([(b[0], b[1]), (b[2], b[3])])
+    bbox = (min(xs), min(ys), max(xs), max(ys)) if xs else None
+    return {"linien": linien, "texte": texte, "flaechen": flaechen, "bbox": bbox}
+
