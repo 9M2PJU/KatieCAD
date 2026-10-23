@@ -1,0 +1,12 @@
+{
+  "spalten": [
+    {"key": "pos",    "titel": "Pos.",              "breite": 6,  "ausrichtung": "r"},
+    {"key": "ind",    "titel": "Kennzeichen",       "breite": 18, "ausrichtung": "l"},
+    {"key": "typ",    "titel": "Typ",               "breite": 40, "ausrichtung": "l"},
+    {"key": "per",    "titel": "Benennung",         "breite": 40, "ausrichtung": "l"},
+    {"key": "anzahl", "titel": "Stk.",              "breite": 7,  "ausrichtung": "r"},
+    {"key": "ort",    "titel": "Fundstellen",       "breite": 50, "ausrichtung": "l"}
+  ],
+  "textgroesse": 2.5,
+  "zeilenhoehe": 6.0
+}
