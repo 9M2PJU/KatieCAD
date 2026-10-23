@@ -49,7 +49,8 @@ from katiecad.model import titleblock as TB
 from katiecad.model.project import (Projekt, ProjektFehler, PROJEKT_ENDUNG,
                               BLOCK_ENDUNG)
 from katiecad.model.blocks import (block_speichern, block_laden,
-                              vorschlag_dateiname, BlockDateiFehler)
+                              vorschlag_dateiname, BlockDateiFehler,
+                              vorschau_geometrie, standard_ordner)
 from katiecad.ui.sidebar import Seitenleiste
 from katiecad.ui.widgets import FlatButton, farb_swatch
 from katiecad.model.core import (
@@ -77,7 +78,8 @@ from katiecad.ui.dialogs import (
     MIT_LICENSE_TEXT, zeige_lizenz_fenster,
     _LayoutNameDialog, PropertiesDialog, ViewportDialog,
     LayerDialog, LayerEditDialog, TextDialog, ArrayDialog, DruckDialog,
-    _BlockNameDialog, _BlockAuswahlDialog,
+    _BlockNameDialog, _BlockAuswahlDialog, BlockBrowserDialog,
+    BlockSpeichernDialog,
     ProjektNeuDialog, AttributDefinitionDialog, BlockAttributeDialog,
     QuerverweisDialog, VerbindungspunkteDialog, ProjektDruckDialog,
     VerbindungspunktDialog, VerbindungDialog, FestMaskeDialog,
@@ -1109,8 +1111,6 @@ class CadApp:
         m_bloecke.add_separator()
         m_bloecke.add_command(label=tr("menu.bloecke.speichern"),
                               command=self.block_speichern_datei)
-        m_bloecke.add_command(label=tr("menu.bloecke.laden"),
-                              command=self.block_laden_datei)
         m_bloecke.add_separator()
         m_bloecke.add_command(label=tr("menu.einfuegen.block_aufloesen"),
                               command=self.block_aufloesen)
@@ -1140,7 +1140,7 @@ class CadApp:
         m_elektro.add_command(label=tr("menu.elektro.geraet_speichern"),
                               command=self.block_speichern_datei)
         m_elektro.add_command(label=tr("menu.elektro.geraet_laden"),
-                              command=self.block_laden_datei)
+                              command=self.block_einfuegen)
         menubar.add_cascade(label=tr("menu.elektro"), menu=m_elektro)
 
         # Sprache
@@ -7732,15 +7732,6 @@ class CadApp:
         self._clear_temp()
         self.redraw()
 
-        vorschlag = self._naechster_block_name()
-        name = _BlockNameDialog(self.root, self.block_bibliothek,
-                                vorschlag).result
-        if not name:
-            self.status.set(("Block-Erzeugen abgebrochen." if de
-                             else "Block creation cancelled."))
-            self._update_eingabe_hinweis()
-            return
-
         bx, by = basispunkt
         relativ = []
         for el in auswahl:
@@ -7754,6 +7745,22 @@ class CadApp:
                              else "Block is empty - cancelled."))
             self._update_eingabe_hinweis()
             return
+
+        vorschlag = self._naechster_block_name()
+        try:
+            geom = vorschau_geometrie(BlockDefinition(vorschlag, (0.0, 0.0), relativ))
+        except Exception as ex:
+            print(f"[KatieCAD] Vorschau: {ex}")
+            geom = None
+        ergebnis = BlockSpeichernDialog(
+            self.root, geom, vorschlag, self._block_speicherordner(),
+            vorschlag_dateiname).result
+        if not ergebnis:
+            self.status.set(("Block-Erzeugen abgebrochen." if de
+                             else "Block creation cancelled."))
+            self._update_eingabe_hinweis()
+            return
+        name = ergebnis["name"]
 
         if getattr(self, "_geraet_modus", False):
             self._geraet_modus = False
@@ -7771,7 +7778,19 @@ class CadApp:
 
         vp_tags_eindeutig(relativ)
         definition = BlockDefinition(name, (0.0, 0.0), relativ)
-        self.block_bibliothek.setze(definition)
+        self.block_bibliothek.setze(definition, persistieren=False)
+        gespeichert = None
+        if ergebnis["ordner"]:
+            pfad = os.path.join(ergebnis["ordner"], vorschlag_dateiname(name))
+            try:
+                block_speichern(pfad, definition)
+                gespeichert = pfad
+                self._config_setzen("block_ordner", ergebnis["ordner"])
+            except BlockDateiFehler as ex:
+                messagebox.showerror(
+                    tr("msg.blockdatei.titel"),
+                    tr("msg.blockdatei.fehler", pfad=pfad, fehler=ex),
+                    parent=self.root)
 
         self._snapshot()
         liste = self._aktuelle_elemente_liste()
@@ -7790,8 +7809,75 @@ class CadApp:
         self.auswahl = [ref]
         self.redraw()
         self._update_eingabe_hinweis()
-        self.status.set(tr("msg.block.erzeugt", name=name,
-                           n=len(definition.elemente)))
+        if gespeichert:
+            self.status.set(tr("msg.bs.gespeichert", name=name, pfad=gespeichert))
+        else:
+            self.status.set(tr("msg.block.erzeugt", name=name,
+                               n=len(definition.elemente)))
+
+    def _config_setzen(self, schluessel, wert):
+        try:
+            cfg = lade_konfiguration()
+            cfg[schluessel] = wert
+            speichere_konfiguration(cfg)
+        except Exception as ex:
+            print(f"[KatieCAD] Konfiguration: {ex}")
+
+    def _block_speicherordner(self):
+        """Vorschlag fuer den Speicherordner neuer Bloecke."""
+        p = self.projekt
+        if p is not None:
+            return p.bloecke_ordner
+        try:
+            cfg = lade_konfiguration()
+        except Exception:
+            cfg = {}
+        return cfg.get("block_ordner") or standard_ordner()
+
+    def _block_wurzeln(self):
+        wurzeln = []
+        p = self.projekt
+        if p is not None:
+            wurzeln.append((tr("dlg.bb.wurzel_projekt"), p.bloecke_ordner))
+        try:
+            cfg = lade_konfiguration()
+        except Exception:
+            cfg = {}
+        eigene = cfg.get("block_ordner") or standard_ordner()
+        try:
+            os.makedirs(standard_ordner(), exist_ok=True)
+        except OSError:
+            pass
+        wurzeln.append((tr("dlg.bb.wurzel_eigene"), standard_ordner()))
+        if os.path.normpath(eigene) != os.path.normpath(standard_ordner()):
+            wurzeln.append((os.path.basename(eigene) or eigene, eigene))
+        for pf in cfg.get("block_wurzeln", []) or []:
+            if all(os.path.normpath(pf) != os.path.normpath(w[1]) for w in wurzeln):
+                wurzeln.append((os.path.basename(pf) or pf, pf))
+        return wurzeln
+
+    def _block_bibliothek_migrieren(self):
+        """Einmalig: Bloecke der alten internen Bibliothek als Dateien ablegen."""
+        try:
+            cfg = lade_konfiguration()
+        except Exception:
+            return
+        if cfg.get("block_migriert") or len(self.block_bibliothek) == 0:
+            return
+        ziel = standard_ordner()
+        n = len(self.block_bibliothek)
+        if messagebox.askyesno(tr("dlg.bb.titel"),
+                               tr("dlg.bb.migration", n=n, ordner=ziel),
+                               parent=self.root):
+            for name in self.block_bibliothek.namen():
+                d = self.block_bibliothek.get(name)
+                pf = os.path.join(ziel, vorschlag_dateiname(name))
+                if d is not None and not os.path.exists(pf):
+                    try:
+                        block_speichern(pf, d)
+                    except BlockDateiFehler as ex:
+                        print(f"[KatieCAD] Block-Migration: {ex}")
+        self._config_setzen("block_migriert", True)
 
     def _naechster_block_name(self):
         i = 1
@@ -7805,16 +7891,32 @@ class CadApp:
             self.status.set(("Bitte in die Modell-Ansicht wechseln." if de
                              else "Please switch to model view."))
             return
-        if len(self.block_bibliothek) == 0:
-            messagebox.showinfo(
-                tr("dlg.block.auswahl.titel"),
-                tr("dlg.block.auswahl.leer"),
-                parent=self.root)
+        self._block_bibliothek_migrieren()
+        dlg = BlockBrowserDialog(
+            self.root, self._block_wurzeln(),
+            lambda pf: block_laden(pf, self._dict_zu_element))
+        standard = {os.path.normpath(w[1]) for w in self._block_wurzeln()}
+        neu = [w[1] for w in dlg.wurzeln]
+        try:
+            cfg = lade_konfiguration()
+            cfg["block_wurzeln"] = [pf for pf in neu if os.path.normpath(pf) not in
+                                    {os.path.normpath(standard_ordner())}
+                                    and (self.projekt is None or os.path.normpath(pf)
+                                         != os.path.normpath(self.projekt.bloecke_ordner))]
+            speichere_konfiguration(cfg)
+        except Exception as ex:
+            print(f"[KatieCAD] Konfiguration: {ex}")
+        if not dlg.result:
             return
-        dlg = _BlockAuswahlDialog(self.root, self.block_bibliothek)
-        name = dlg.result
-        if not name:
+        try:
+            d = block_laden(dlg.result, self._dict_zu_element)
+        except Exception as ex:
+            messagebox.showerror(tr("msg.blockdatei.titel"),
+                                 tr("msg.blockdatei.fehler", pfad=dlg.result, fehler=ex),
+                                 parent=self.root)
             return
+        self.block_bibliothek.setze(d, persistieren=False)
+        name = d.name
         self._block_einfuege_name = name
         self._warte_auf_blockpunkt = True
         self.letzter_punkt = None
@@ -7855,13 +7957,7 @@ class CadApp:
 
     def block_liste(self):
         de = SPRACHE["aktuell"] == "de"
-        if len(self.block_bibliothek) == 0:
-            messagebox.showinfo(
-                tr("dlg.block.auswahl.titel"),
-                tr("dlg.block.auswahl.leer"),
-                parent=self.root)
-            return
-        _BlockAuswahlDialog(self.root, self.block_bibliothek)
+        self.block_einfuegen()
 
     def block_aufloesen(self):
         """EXPLODE: markierte Blockreferenzen in ihre Kind-Elemente zerlegen.
@@ -7993,3 +8089,4 @@ def main():
 if __name__ == "__main__":
     main()
 
+ 
