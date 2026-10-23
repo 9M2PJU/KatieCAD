@@ -16,7 +16,7 @@ from katiecad.model.core import (
     Text, Bemassung, Viewport,
     Linie, Rechteck, Polylinie, Kreis, Bogen,
     BlockReferenz, Schraffur, Querverweis, Verbindungspunkt,
-    Verbindung, ElektroMaske, Klemme,
+    Verbindung, ElektroMaske, Klemme, Koordinatenfeld,
     pdf_mehrseitig,
     bogen_sweep, bogen_punkte,
     normmassstab_unter, massstab_text,
@@ -90,7 +90,7 @@ def _pdf_element(seite, el, tf, zs, farbig, layers, einh_faktor, dezimalkomma):
             _pdf_element(seite, kind, tf, zs, farbig, layers,
                          einh_faktor, dezimalkomma)
         return
-    if isinstance(el, (BlockReferenz, Querverweis, Verbindung)):
+    if isinstance(el, (BlockReferenz, Querverweis, Verbindung, Koordinatenfeld)):
         for kind in el.aufgeloest():
             _pdf_element(seite, kind, tf, zs, farbig, layers,
                          einh_faktor, dezimalkomma)
@@ -288,3 +288,4 @@ def pdf_senden(pfad, drucken):
              f"({ex}).\nDie PDF liegt hier:\n{pfad}" if de else
              f"The file could not be opened/printed automatically ({ex}).\n"
              f"The PDF is here:\n{pfad}"))
+
