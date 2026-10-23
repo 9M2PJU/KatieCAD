@@ -16,6 +16,8 @@ Rules for a template drawing
         SHEET  sheet name            PROJECT project name
         DATE   today                 SCALE  scale of the first viewport
         FORMAT paper format (e.g. A3)
+    Aliases (German / other templates): SEITE = PAGE, SEITEN = PAGES,
+    SIZE = FORMAT.
 """
 
 import json
@@ -30,7 +32,8 @@ from katiecad.model.core import (
 
 PREFIX = "TITLEBLOCK:"
 FOLDER_NAME = "title_blocks"
-RESERVED = ("PAGE", "PAGES", "SHEET", "PROJECT", "DATE", "SCALE", "FORMAT")
+RESERVED = ("PAGE", "PAGES", "SHEET", "PROJECT", "DATE", "SCALE", "FORMAT",
+            "SEITE", "SEITEN", "SIZE")
 
 MARGIN_LEFT = 20.0        # mm, binding margin (A3 and larger)
 MARGIN_OTHER = 5.0        # mm, top / right / bottom
@@ -181,9 +184,18 @@ def make_block(name, elements, width, height, **style):
     return BlockReferenz(x, y, PREFIX + name, elements, **style)
 
 
+def info_values(nr, total, sheet, project, lang="en", paper_format="", today=None):
+    """Values for the reserved tags from plain numbers / names."""
+    today = today or datetime.date.today()
+    date = today.strftime("%d.%m.%Y") if lang == "de" else today.strftime("%Y-%m-%d")
+    short = (paper_format or "").split(" ")[0]
+    return {"PAGE": str(nr), "PAGES": str(total), "SHEET": sheet,
+            "PROJECT": project, "DATE": date, "FORMAT": short,
+            "SEITE": str(nr), "SEITEN": str(total), "SIZE": short}
+
+
 def make_info(project, sheet_index, lang="en", paper_format="", today=None):
     """Values for the reserved tags (SCALE is determined per layout)."""
-    today = today or datetime.date.today()
     if project is not None:
         nr = sheet_index + 1
         total = len(project.blaetter)
@@ -191,10 +203,7 @@ def make_info(project, sheet_index, lang="en", paper_format="", today=None):
         proj = project.name
     else:
         nr, total, sheet, proj = 1, 1, "", ""
-    date = today.strftime("%d.%m.%Y") if lang == "de" else today.strftime("%Y-%m-%d")
-    short = (paper_format or "").split(" ")[0]
-    return {"PAGE": str(nr), "PAGES": str(total), "SHEET": sheet,
-            "PROJECT": proj, "DATE": date, "FORMAT": short}
+    return info_values(nr, total, sheet, proj, lang, paper_format, today)
 
 
 def refresh_fields(layout_elements, info, fallback_scale=""):
