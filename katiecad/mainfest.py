@@ -4,7 +4,7 @@ katiecad/manifest.py - Central list of all modules + version.
 Used for a start-up self-check: are all modules present?
 """
 
-VERSION = "0.1.0"
+VERSION = "1.0.0"
 
 MODULE = {
     "katiecad.ui.app":            "CadApp: UI, events, tools, state, main()",
@@ -24,8 +24,8 @@ MODULE = {
 
 
 def fehlende_module():
-    """Gibt die in MODULE gelisteten, aber nicht importierbaren Module zurueck.
-    Nuetzlich fuer einen Selbstcheck beim Start."""
+    """Returns the modules listed in MODULE that cannot be imported.
+    Useful for a self-check at start-up."""
     import importlib.util
     fehlend = []
     for name in MODULE:
