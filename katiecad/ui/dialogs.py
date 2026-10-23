@@ -1618,7 +1618,7 @@ class KoordinatenfeldDialog(tk.Toplevel):
         f.pack(fill=tk.BOTH, expand=True)
         self._vars = {}
         felder = (("spalten", "dlg.kf.spalten", 6), ("zeilen", "dlg.kf.zeilen", 4),
-                  ("breite", "dlg.kf.breite", 287), ("hoehe", "dlg.kf.hoehe", 150))
+                  ("breite", "dlg.kf.breite", 287), ("hoehe", "dlg.kf.hoehe", 164))
         for i, (key, label, std) in enumerate(felder):
             self._vars[key] = tk.StringVar(value=str(v.get(key, std)))
             ttk.Label(f, text=tr(label)).grid(row=i, column=0, sticky=tk.W,
@@ -1850,3 +1850,4 @@ class TitleBlockDialog(tk.Toplevel):
         key = self._keys[sel[0]]
         self.result = "" if key is None else key
         self.destroy()
+
