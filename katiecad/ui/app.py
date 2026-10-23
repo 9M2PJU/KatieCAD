@@ -333,6 +333,7 @@ class CadApp:
         self._qv_cache = {}
         self._ge_cache = {}
         self._vb_vorgabe = None
+        self._vp_vorgabe = None
         self._mk_werte = {}
         self._mk_rolle = "haupt"
         self._kl_werte = {}
@@ -2224,6 +2225,8 @@ class CadApp:
                 self._querverweis_starten()
             elif wz == "verbindung":
                 self._verbindung_starten()
+            elif wz == "vpunkt":
+                self._vp_starten()
             elif wz == "maske":
                 self._maske_starten()
             elif wz == "klemme":
@@ -7540,15 +7543,34 @@ class CadApp:
     # ========================================================
     # NEW (electrical): connection points
     # ========================================================
-    def _vp_platzieren(self, x, y):
+    def _vp_starten(self):
+        """Configure the pin first (dialog), then place it by clicking."""
+        self._vp_vorgabe = None
         dlg = VerbindungspunktDialog(
             self.root, naechste_bezeichnung(self._vp_letzte_bez),
-            self._vp_text_anzeigen, richtungen=getattr(self, "_vp_richtungen", (0, 90, 180, 270)))
+            self._vp_text_anzeigen,
+            richtungen=getattr(self, "_vp_richtungen", (0, 90, 180, 270)))
         if dlg.result is None:
+            self.aktives_werkzeug.set("auswahl")
+            self._werkzeug_gewechselt()
             return
+        self._vp_vorgabe = dlg.result
         self._vp_richtungen = tuple(dlg.result.get("richtungen", (0, 90, 180, 270)))
-        self._vp_letzte_bez = dlg.result["wert"]
         self._vp_text_anzeigen = dlg.result["sichtbar"]
+        self.status.set(tr("msg.vp.platzieren", name=dlg.result["wert"] or "-"))
+
+    def _vp_platzieren(self, x, y):
+        if not getattr(self, "_vp_vorgabe", None):
+            self._vp_starten()
+            if not getattr(self, "_vp_vorgabe", None):
+                return
+        class _R:                      # result holder (keeps the code below)
+            pass
+        dlg = _R()
+        dlg.result = dict(self._vp_vorgabe)
+        self._vp_letzte_bez = dlg.result["wert"]
+        # Next pin gets the next number automatically
+        self._vp_vorgabe["wert"] = naechste_bezeichnung(dlg.result["wert"])
         self._snapshot()
         x, y = self._auf_leitung_einrasten(x, y)
         daten = self._layer_daten()
@@ -8389,4 +8411,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
