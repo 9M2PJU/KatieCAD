@@ -1,15 +1,15 @@
 # -*- coding: utf-8 -*-
 """
-katiecad/model/project.py - Projektverwaltung (KEIN Tkinter).
+katiecad/model/project.py - Project management (NO Tkinter).
 
-Ein Projekt ist ein Ordner mit
-    <Projektname>.katieprj     Projektdatei (JSON: Name, Blattliste)
-    Blatt_001.cadjson ...      je Blatt eine Zeichnungsdatei
-    Bloecke/                   Blockdateien (*.katieblock) des Projekts
+A project is a folder containing
+    <project name>.katieprj    project file (JSON: name, sheet list)
+    Blatt_001.cadjson ...      one drawing file per sheet
+    Bloecke/                   block files (*.katieblock) of the project
 
-Jedes Blatt ist eine normale KatieCAD-Zeichnung (Modell + Layouts).
-Die angezeigte Blattnummer ergibt sich aus der Reihenfolge in der Liste
-(001, 002, ...); die Dateinamen bleiben beim Umsortieren unveraendert.
+Each sheet is an ordinary KatieCAD drawing (model + layouts).
+The displayed sheet number results from the order in the list
+(001, 002, ...); the file names stay unchanged when re-ordering.
 """
 
 import json
@@ -30,12 +30,12 @@ _RESERVIERT = {"CON", "PRN", "AUX", "NUL",
 
 
 class ProjektFehler(Exception):
-    """Fehler mit anwenderlesbarer Meldung."""
+    """Error with a user-readable message."""
 
 
 def name_pruefen(name):
-    """Gibt None zurueck, wenn der Name als Ordner-/Dateiname taugt,
-    sonst einen Fehlercode: 'leer' | 'zeichen' | 'ende' | 'reserviert'."""
+    """Returns None if the name is usable as a folder/file name,
+    otherwise an error code: 'leer' | 'zeichen' | 'ende' | 'reserviert'."""
     n = (name or "").strip()
     if not n:
         return "leer"
@@ -58,8 +58,8 @@ def _json_schreiben(pfad, daten):
 class Blatt:
     def __init__(self, name, datei, bericht=None):
         self.name = name
-        self.datei = datei          # Dateiname relativ zum Projektordner
-        # None = Zeichnungsblatt; sonst Typ eines erzeugten Berichtsblatts
+        self.datei = datei          # File name relative to the project folder
+        # None = drawing sheet; otherwise type of a generated report sheet
         # ("deckblatt", "inhalt", "geraete", "klemmen", "kabel")
         self.bericht = bericht
 
@@ -78,12 +78,12 @@ class Projekt:
         self.blaetter = list(blaetter) if blaetter else []
         self.aktiv = aktiv
         self.naechste_id = naechste_id
-        # Projektdaten fuer Deckblatt/Schriftkopf (Kunde, Auftrag, ...)
+        # Project data for cover sheet / title block (customer, order, ...)
         self.daten = dict(daten) if isinstance(daten, dict) else {}
-        # Einstellungen der Dokumentation (gewaehlte Berichte, Vorlage, ...)
+        # Documentation settings (selected reports, template, ...)
         self.doku = dict(doku) if isinstance(doku, dict) else {}
 
-    # ---- Pfade --------------------------------------------------
+    # ---- Paths --------------------------------------------------
     @property
     def projektdatei(self):
         return os.path.join(self.ordner, self.name + PROJEKT_ENDUNG)
@@ -101,11 +101,11 @@ class Projekt:
     def nummer(index):
         return f"{index + 1:03d}"
 
-    # ---- Anlegen / Laden / Speichern ---------------------------
+    # ---- Create / load / save ----------------------------------
     @classmethod
     def erstellen(cls, name, basis_ordner):
-        """Legt <basis_ordner>/<name>/ an und schreibt die Projektdatei
-        (mit leerer Blattliste). Das erste Blatt legt der Aufrufer an."""
+        """Creates <basis_ordner>/<name>/ and writes the project file
+        (with an empty sheet list). The caller creates the first sheet."""
         name = (name or "").strip()
         fehler = name_pruefen(name)
         if fehler:
@@ -144,8 +144,8 @@ class Projekt:
                 aktiv=int(d.get("aktiv", 0) or 0),
                 naechste_id=int(d.get("naechste_id", len(blaetter) + 1)),
                 daten=d.get("daten"), doku=d.get("doku"))
-        # Die Projektdatei heisst evtl. anders als im JSON (umkopiert):
-        # der Dateiname hat Vorrang, damit speichern() am selben Ort schreibt.
+        # The project file may be named differently than in the JSON (copied):
+        # the file name takes precedence so that speichern() writes to the same place.
         p.name = os.path.splitext(os.path.basename(pfad))[0]
         if not (0 <= p.aktiv < len(p.blaetter)):
             p.aktiv = 0
@@ -165,9 +165,9 @@ class Projekt:
         })
 
     def umbenennen(self, neuer_name):
-        """Benennt das Projekt um: Projektdatei und - falls der Ordner bisher
-        genauso hiess wie das Projekt - auch den Projektordner.
-        -> True, wenn der Ordner mitumbenannt wurde. Wirft ProjektFehler
+        """Renames the project: project file and - if the folder was previously
+        named exactly like the project - the project folder too.
+        -> True if the folder was renamed as well. Raises ProjektFehler
         ('leer'|'zeichen'|'ende'|'reserviert'|'existiert')."""
         neu = (neuer_name or "").strip()
         fehler = name_pruefen(neu)
@@ -196,12 +196,12 @@ class Projekt:
                 return True
         except OSError as e:
             if ordner_neu is None or self.ordner != ordner_neu:
-                # Ordner blieb unveraendert; Projekt ist trotzdem umbenannt
+                # Folder stayed unchanged; the project is renamed anyway
                 return False
             raise ProjektFehler(str(e))
         return False
 
-    # ---- Blaetter ----------------------------------------------
+    # ---- Sheets ------------------------------------------------
     def neuer_blattname(self):
         i = len(self.blaetter) + 1
         namen = {b.name for b in self.blaetter}
@@ -210,7 +210,7 @@ class Projekt:
         return f"Blatt {i}"
 
     def blatt_hinzufuegen(self, name=None, nach_index=None):
-        """Registriert ein neues Blatt (Datei schreibt der Aufrufer)."""
+        """Registers a new sheet (the caller writes the file)."""
         name = (name or "").strip() or self.neuer_blattname()
         while True:
             datei = f"Blatt_{self.naechste_id:03d}{BLATT_ENDUNG}"
@@ -224,13 +224,13 @@ class Projekt:
             self.blaetter.insert(nach_index + 1, b)
         return b
 
-    # ---- Berichtsblaetter (erzeugte Listen, Deckblatt, ...) -----
+    # ---- Report sheets (generated lists, cover sheet, ...) -----
     def zeichnungsblaetter(self):
-        """Indizes der Blaetter, die KEINE erzeugten Berichtsblaetter sind."""
+        """Indices of the sheets that are NOT generated report sheets."""
         return [i for i, b in enumerate(self.blaetter) if not b.bericht]
 
     def berichte_entfernen(self):
-        """Entfernt alle Berichtsblaetter samt Dateien. -> Anzahl."""
+        """Removes all report sheets including their files. -> count."""
         weg = [b for b in self.blaetter if b.bericht]
         for b in weg:
             self.blaetter.remove(b)
@@ -243,8 +243,8 @@ class Projekt:
         return len(weg)
 
     def bericht_einfuegen(self, name, typ, position=None):
-        """Registriert ein Berichtsblatt an `position` (None = am Ende).
-        Die Datei schreibt der Aufrufer."""
+        """Registers a report sheet at `position` (None = at the end).
+        The caller writes the file."""
         b = self.blatt_hinzufuegen(name)
         self.blaetter.remove(b)
         b.bericht = typ
@@ -295,7 +295,7 @@ class Projekt:
         return b
 
     def blatt_verschieben(self, index, delta):
-        """Gibt den neuen Index zurueck (oder den alten, wenn nicht moeglich)."""
+        """Returns the new index (or the old one if not possible)."""
         neu = index + delta
         if not (0 <= index < len(self.blaetter)) or \
                 not (0 <= neu < len(self.blaetter)):
@@ -304,12 +304,12 @@ class Projekt:
             self.blaetter[neu], self.blaetter[index]
         return neu
 
-    # ---- Loeschen ----------------------------------------------
+    # ---- Deletion ----------------------------------------------
     def loeschen(self):
-        """Loescht Projektdatei, Blattdateien und Blockdateien des Projekts.
-        Fremde Dateien im Ordner bleiben unangetastet. Der Ordner wird nur
-        entfernt, wenn er danach leer ist.
-        Rueckgabe: (ordner_entfernt: bool, uebrig: list[str])"""
+        """Deletes the project file, sheet files and block files of the project.
+        Foreign files in the folder are left untouched. The folder is only
+        removed if it is empty afterwards.
+        Returns: (folder_removed: bool, remaining: list[str])"""
         ziele = [self.projektdatei, self.projektdatei + ".tmp"]
         ziele += [self.blatt_pfad(b) for b in self.blaetter]
         for z in ziele:
@@ -337,4 +337,3 @@ class Projekt:
                 return False, sorted(os.listdir(self.ordner))
             except OSError:
                 return False, []
-
