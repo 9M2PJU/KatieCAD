@@ -304,6 +304,15 @@ def parse_massstab(text):
     return a / b
 
 
+def ort_text(o):
+    """Anzeige eines Verweisziels. o = Blattnummer oder (Blatt, "Spalte/Zeile").
+    Beispiel: (1, "3/B") -> "1/3/B"; (2, "") -> "2"."""
+    if isinstance(o, (tuple, list)):
+        blatt, feld = o[0], (o[1] if len(o) > 1 else "")
+        return f"{blatt}/{feld}" if feld else str(blatt)
+    return str(o)
+
+
 def massstab_text(zoom):
     if zoom <= 0:
         return "?"
@@ -1624,7 +1633,7 @@ class BlockReferenz(Element):
             el.punkte = [self._welt_pts(x, y) for (x, y) in el.punkte]
             el.winkel = (el.winkel + self.winkel) % 360.0
             el.abstand *= self.skalierung
-        elif isinstance(el, _FestMaske):
+        elif isinstance(el, (_FestMaske, Koordinatenfeld)):
             el.x, el.y = self._welt_pts(el.x, el.y)      # Texte bleiben waagerecht
         elif isinstance(el, Verbindung):
             el.x, el.y = self._welt_pts(el.x, el.y)
@@ -2149,7 +2158,7 @@ class Querverweis(Element):
     def ziel_text(self):
         if not self.ziel or not self.text.strip():
             return ""
-        return "(" + tr("qv.blatt") + " " + ", ".join(str(n) for n in self.ziel) + ")"
+        return "(" + tr("qv.blatt") + " " + ", ".join(ort_text(o) for o in self.ziel) + ")"
 
     def basis_punkt(self):
         """Anschluss an der Pfeilbasis (= Einfuegepunkt)."""
@@ -2442,7 +2451,7 @@ class ElektroMaske(_FestMaske):
         es Verweise gibt."""
         ph = self.platzhalter if platzhalter is None else platzhalter
         st = self._stil()
-        refs = ["(%s %s)" % (tr("qv.blatt"), n) for n in self.refs]
+        refs = ["(%s %s)" % (tr("qv.blatt"), ort_text(o)) for o in self.refs]
         ref = Text(self.x, self.y, "\n".join(refs) if refs else "REF",
                    self.REF_HOEHE, 0.0, "Arial",
                    einfuegepunkt="unten_rechts", **st)
@@ -2493,4 +2502,137 @@ class Klemme(_FestMaske):
 
 
 # Elemente, die sich aus einfachen Elementen zusammensetzen (aufgeloest())
-ZUSAMMENGESETZT = (BlockReferenz, Querverweis, Verbindung, ElektroMaske, Klemme)
+class Koordinatenfeld(Element):
+    """Zonenraster (Koordinatensystem) eines Schaltplan-Blattes.
+
+    (x, y) ist die linke untere Ecke des Zeichenbereichs `breite` x `hoehe`
+    (Standard: DIN-A4-Blattrahmen ohne Schriftkopf = Viewport-Groesse bei 1:1).
+    Oben stehen die Spaltennummern 1..spalten, links die Zeilenbuchstaben
+    A.. (A = oben). Der gestrichelte Umriss (nur in der Modellansicht) zeigt
+    die Viewport-Flaeche; er erscheint weder im Layout noch im Druck/DXF.
+    Das Feld wird nur per Klick auf seinen Rahmen markiert, nie durch ein
+    Auswahlrechteck (NUR_KLICK)."""
+    NUR_KLICK = True
+    INSET = 1.0                       # Abstand Rahmen <-> Viewport-Umriss
+    UMRISS_FARBE = "#8b7ea8"
+
+    def __init__(self, x, y, breite=287.0, hoehe=150.0, spalten=6, zeilen=4,
+                 rand=5.0, text_hoehe=3.5, raster=False, **kw):
+        kw.setdefault("staerke", 0.35)
+        super().__init__("koordinatenfeld", **kw)
+        self.x, self.y = float(x), float(y)
+        self.breite, self.hoehe = float(breite), float(hoehe)
+        self.spalten = max(1, min(int(spalten), 99))
+        self.zeilen = max(1, min(int(zeilen), 26))
+        self.rand = float(rand)
+        self.text_hoehe = float(text_hoehe)
+        self.raster = bool(raster)
+
+    # ---- Geometrie
+    def umriss_rect(self):
+        return (self.x, self.y, self.x + self.breite, self.y + self.hoehe)
+
+    def rahmen_rect(self):
+        i = self.INSET
+        return (self.x + i, self.y + i,
+                self.x + self.breite - i, self.y + self.hoehe - i)
+
+    def zellen_rect(self):
+        x1, y1, x2, y2 = self.rahmen_rect()
+        return (x1 + self.rand, y1, x2, y2 - self.rand)
+
+    def spalten_name(self, i):
+        return str(i + 1)
+
+    def zeilen_name(self, j):
+        return chr(ord("A") + j)
+
+    def zone(self, px, py):
+        """-> "Spalte/Zeile" (z.B. "2/B") oder None ausserhalb des Feldes."""
+        ux1, uy1, ux2, uy2 = self.umriss_rect()
+        if not (ux1 <= px <= ux2 and uy1 <= py <= uy2):
+            return None
+        cx1, cy1, cx2, cy2 = self.zellen_rect()
+        bw = (cx2 - cx1) / self.spalten
+        bh = (cy2 - cy1) / self.zeilen
+        if bw <= 0 or bh <= 0:
+            return None
+        i = int(math.floor((px - cx1) / bw))
+        j = int(math.floor((cy2 - py) / bh))
+        i = max(0, min(self.spalten - 1, i))
+        j = max(0, min(self.zeilen - 1, j))
+        return f"{self.spalten_name(i)}/{self.zeilen_name(j)}"
+
+    # ---- Darstellung
+    def aufgeloest(self, umriss=False):
+        st = dict(layer=self.layer, farbe=self.farbe,
+                  linientyp="Volllinie (schmal)", eig_farbe=self.eig_farbe,
+                  staerke=self.staerke)
+        out = []
+
+        def linie(a, b, c, d):
+            out.append(Linie(a, b, c, d, **st))
+
+        x1, y1, x2, y2 = self.rahmen_rect()
+        cx1, cy1, cx2, cy2 = self.zellen_rect()
+        linie(x1, y1, x2, y1); linie(x2, y1, x2, y2)
+        linie(x2, y2, x1, y2); linie(x1, y2, x1, y1)
+        linie(cx1, y1, cx1, y2)             # Trennung Zeilen-Beschriftung
+        linie(x1, cy2, x2, cy2)             # Trennung Spalten-Beschriftung
+        bw = (cx2 - cx1) / self.spalten
+        bh = (cy2 - cy1) / self.zeilen
+        for k in range(1, self.spalten):
+            xx = cx1 + k * bw
+            linie(xx, y1 if self.raster else cy2, xx, y2)
+        for k in range(1, self.zeilen):
+            yy = cy2 - k * bh
+            linie(x1, yy, x2 if self.raster else cx1, yy)
+        tst = dict(layer=self.layer, farbe=self.farbe,
+                   eig_farbe=self.eig_farbe)
+        for i in range(self.spalten):
+            out.append(Text(cx1 + (i + 0.5) * bw, (cy2 + y2) / 2.0,
+                            self.spalten_name(i), self.text_hoehe, 0.0, "Arial",
+                            einfuegepunkt="mitte_zentriert", **tst))
+        for j in range(self.zeilen):
+            out.append(Text((x1 + cx1) / 2.0, cy2 - (j + 0.5) * bh,
+                            self.zeilen_name(j), self.text_hoehe, 0.0, "Arial",
+                            einfuegepunkt="mitte_zentriert", **tst))
+        if umriss:
+            ust = dict(layer=self.layer, farbe=self.UMRISS_FARBE,
+                       linientyp="Strichlinie (verdeckt)", eig_farbe=True,
+                       staerke=0.18)
+            a, b, c, d = self.umriss_rect()
+            for (p, q, r, t) in ((a, b, c, b), (c, b, c, d),
+                                 (c, d, a, d), (a, d, a, b)):
+                out.append(Linie(p, q, r, t, **ust))
+        return out
+
+    def auswahl_linien(self):
+        """Linienzuege, auf denen ein Klick das Feld markiert (Rahmen und
+        Umriss, nicht das Innere)."""
+        out = []
+        for rect in (self.umriss_rect(), self.rahmen_rect()):
+            a, b, c, d = rect
+            out.append([(a, b), (c, b), (c, d), (a, d), (a, b)])
+        return out
+
+    def bbox(self):
+        return self.umriss_rect()
+
+    def verschieben(self, dx, dy):
+        self.x += dx
+        self.y += dy
+
+    def griffe(self):
+        return [("p", self.x, self.y)]
+
+    def griff_bewegen(self, griff_id, x, y):
+        if griff_id == "p":
+            self.x, self.y = x, y
+
+    def drehen(self, cx, cy, winkel_deg):
+        self.x, self.y = punkte_drehen(self.x, self.y, cx, cy, winkel_deg)
+
+
+ZUSAMMENGESETZT = (BlockReferenz, Querverweis, Verbindung, ElektroMaske, Klemme,
+                   Koordinatenfeld)
