@@ -7324,18 +7324,18 @@ class CadApp:
 
     # Junction
     def _verbindung_starten(self):
-        vor = self._vb_vorgabe or {"art": 2, "ausrichtung": 0, "punkt": True}
+        vor = self._vb_vorgabe or {"arme": [0, 90, 180], "punkt": True}
         dlg = VerbindungDialog(self.root, vor)
         if dlg.result is None:
             self.aktives_werkzeug.set("auswahl")
             self._werkzeug_gewechselt()
             return
         self._vb_vorgabe = dlg.result
-        self.status.set(tr("msg.verb.platzieren", art=dlg.result["art"]))
+        self.status.set(tr("msg.verb.platzieren", art=len(dlg.result["arme"])))
 
     def _neue_verbindung(self, x, y):
         v = self._vb_vorgabe
-        return Verbindung(x, y, v["art"], v["ausrichtung"], v["punkt"],
+        return Verbindung(x, y, arme=v["arme"], punkt=v["punkt"],
                           layer=self.aktiver_layer.get())
 
     def _verbindung_platzieren(self, x, y):
@@ -7348,16 +7348,14 @@ class CadApp:
         self.status.set(tr("msg.verb.gesetzt"))
 
     def _verbindung_bearbeiten(self, el):
-        dlg = VerbindungDialog(self.root, {"art": el.art,
-                                           "ausrichtung": el.ausrichtung,
+        dlg = VerbindungDialog(self.root, {"arme": el.arme,
                                            "punkt": el.punkt})
         if dlg.result is None:
             return
         liste = self._aktuelle_elemente_liste()
         vorher = vollstaendige_verbindungen(liste)
         self._snapshot()
-        el.art = dlg.result["art"]
-        el.ausrichtung = dlg.result["ausrichtung"]
+        el.arme = Verbindung.arme_normieren(dlg.result["arme"])
         el.punkt = dlg.result["punkt"]
         verbindungen_bereinigen(liste, vorher - {id(el)})
         self.redraw()
