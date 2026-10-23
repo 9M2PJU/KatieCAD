@@ -13,7 +13,7 @@ from copy import deepcopy
 
 from katiecad.model.core import (Querverweis, Verbindungspunkt, BlockReferenz,
                            Verbindung, Klemme, ElektroMaske, Leitung,
-                           Koordinatenfeld, Text)
+                           Koordinatenfeld, Text, Kabel)
 from katiecad.common.i18n import tr
 
 
@@ -240,6 +240,10 @@ def geraete(elemente, blatt_nr):
             out.append({"obj": el, "per": w.get(REF_FELD, "").strip(),
                         "ind": w.get("IND", ""), "rolle": el.rolle,
                         "blatt": blatt_nr, "feld": feld_an(felder, *_pos(el))})
+        elif isinstance(el, Kabel):
+            out.append({"obj": el, "per": el.werte.get("CAB", "").strip(),
+                        "ind": "", "rolle": "kabel", "blatt": blatt_nr,
+                        "feld": feld_an(felder, *_pos(el))})
         elif isinstance(el, BlockReferenz):
             m = el.geraet_maske()
             if m is not None:
@@ -272,6 +276,9 @@ def geraete_aus_blattdaten(daten):
             w = d.get("werte", {}) or {}
             res.append((str(w.get(REF_FELD, "")).strip(), d.get("rolle", "haupt"),
                         str(w.get("IND", "")), feld_von(d)))
+        elif d.get("typ") == "kabel":
+            w = d.get("werte", {}) or {}
+            res.append((str(w.get("CAB", "")).strip(), "kabel", "", feld_von(d)))
         elif d.get("typ") == "block":
             for k in d.get("elemente", []) or []:
                 if isinstance(k, dict) and k.get("typ") == "maske":
@@ -304,7 +311,8 @@ def geraete_referenzen(eigene, blatt_nr, andere_blaetter):
         if not g["per"]:
             g["obj"].refs = []
             continue
-        gesucht = "hilfs" if g["rolle"] == "haupt" else "haupt"
+        gesucht = ("kabel" if g["rolle"] == "kabel"
+                   else "hilfs" if g["rolle"] == "haupt" else "haupt")
         g["obj"].refs = sorted({blatt for per, rolle, blatt, oid in kandidaten
                                 if per == g["per"] and rolle == gesucht
                                 and oid != id(g["obj"])})
@@ -664,3 +672,21 @@ def leitungen_automatisch(elemente):
                                 layer=getattr(bes, "layer", "0")))
         neu += 1
     return neu, len(weg), weg
+
+
+def kabel_kreuzungen(elemente):
+    """Setzt `kreuzungen` an allen Kabeln: x-Positionen, an denen eine
+    senkrechte Leitung die Kabellinie echt kreuzt (Leitungen, die auf der
+    Linie enden, zaehlen nicht)."""
+    kabel = [k for k in elemente if isinstance(k, Kabel)]
+    if not kabel:
+        return
+    senkrecht = [l for l in elemente
+                 if isinstance(l, Leitung) and abs(l.x1 - l.x2) <= TOL]
+    for k in kabel:
+        xs = set()
+        for l in senkrecht:
+            lo, hi = sorted((l.y1, l.y2))
+            if lo + TOL < k.y < hi - TOL and k.x + TOL < l.x1 <= k.x + k.laenge + TOL:
+                xs.add(round(l.x1, 2))
+        k.kreuzungen = sorted(xs)
