@@ -334,6 +334,7 @@ class CadApp:
         self._mk_werte = {}
         self._mk_rolle = "haupt"
         self._kl_werte = {}
+        self._vp_richtungen = (0, 90, 180, 270)
         self._kf_werte = {"spalten": 6, "zeilen": 4, "breite": 287.0,
                           "hoehe": 164.0, "raster": False}
         self._geraet_modus = False
@@ -7375,9 +7376,10 @@ class CadApp:
     def _vp_platzieren(self, x, y):
         dlg = VerbindungspunktDialog(
             self.root, naechste_bezeichnung(self._vp_letzte_bez),
-            self._vp_text_anzeigen)
+            self._vp_text_anzeigen, richtungen=getattr(self, "_vp_richtungen", (0, 90, 180, 270)))
         if dlg.result is None:
             return
+        self._vp_richtungen = tuple(dlg.result.get("richtungen", (0, 90, 180, 270)))
         self._vp_letzte_bez = dlg.result["wert"]
         self._vp_text_anzeigen = dlg.result["sichtbar"]
         self._snapshot()
@@ -7387,17 +7389,21 @@ class CadApp:
         vp = Verbindungspunkt(x, y, None, Verbindungspunkt.TEXT_HOEHE, 0.0,
                               self.text_schriftart.get(), tag="VP",
                               wert=dlg.result["wert"],
-                              sichtbar=dlg.result["sichtbar"], **daten)
+                              sichtbar=dlg.result["sichtbar"],
+                              richtungen=dlg.result.get("richtungen", (0, 90, 180, 270)), **daten)
         self._ziel_liste().append(vp)
         self.redraw()
         self.status.set(tr("msg.vp.gesetzt", name=dlg.result["wert"] or "-"))
 
     def _vp_bearbeiten(self, el):
-        dlg = VerbindungspunktDialog(self.root, el.wert, el.sichtbar,
-                                     titel=tr("msg.vp.bearbeiten"))
+        dlg = VerbindungspunktDialog(
+            self.root, el.wert, el.sichtbar, titel=tr("msg.vp.bearbeiten"),
+            richtungen=(el.richtungen if el.richtungen is not None
+                        else (0, 90, 180, 270)))
         if dlg.result is None:
             return
         self._snapshot()
+        el.richtungen = dlg.result.get("richtungen", el.richtungen)
         el.wert = dlg.result["wert"]
         el.inhalt = el.wert
         el.sichtbar = dlg.result["sichtbar"]
@@ -7986,3 +7992,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
