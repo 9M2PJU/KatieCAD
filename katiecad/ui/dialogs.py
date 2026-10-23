@@ -2119,7 +2119,8 @@ class FestMaskeDialog(tk.Toplevel):
     rolle:  None oder 'haupt'/'hilfs' (nur Elektro-Maske)
     result: {'werte': {...}, 'rolle': ...} oder None."""
 
-    def __init__(self, parent, titel, felder, werte=None, rolle=None, hinweis=""):
+    def __init__(self, parent, titel, felder, werte=None, rolle=None, hinweis="",
+                 zusatz=()):
         super().__init__(parent)
         self.result = None
         werte = werte or {}
@@ -2150,6 +2151,13 @@ class FestMaskeDialog(tk.Toplevel):
             ttk.Radiobutton(rf, text=tr("dlg.maske.rolle.hilfs"), value="hilfs",
                             variable=self.v_rolle).pack(anchor=tk.W)
             row += 1
+        self._zvars = {}
+        for key, label, wert in zusatz:       # weitere Eingabefelder (z. B. Adern)
+            ttk.Label(f, text=label).grid(row=row, column=0, sticky=tk.W, pady=2, padx=(0, 10))
+            var = tk.StringVar(value=wert)
+            ttk.Entry(f, textvariable=var, width=30).grid(row=row, column=1, sticky=tk.EW, pady=2)
+            self._zvars[key] = var
+            row += 1
         if hinweis:
             ttk.Label(f, text=hinweis, style="Hint.TLabel", wraplength=360,
                       justify=tk.LEFT).grid(row=row, column=0, columnspan=2,
@@ -2169,7 +2177,8 @@ class FestMaskeDialog(tk.Toplevel):
 
     def _ok(self):
         self.result = {"werte": {t: v.get().strip() for t, v in self._vars.items()},
-                       "rolle": self.v_rolle.get() if self._rolle else None}
+                       "rolle": self.v_rolle.get() if self._rolle else None,
+                       "zusatz": {k: v.get().strip() for k, v in self._zvars.items()}}
         self.destroy()
 
 
@@ -2228,3 +2237,4 @@ class TitleBlockDialog(tk.Toplevel):
         key = self._keys[sel[0]]
         self.result = "" if key is None else key
         self.destroy()
+
