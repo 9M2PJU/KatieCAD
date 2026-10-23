@@ -1,19 +1,18 @@
 # -*- coding: utf-8 -*-
 """
-katiecad/ui/app.py - GUI von KatieCAD (CadApp, main()).
-Enthaelt die Tkinter-UI, Events, Werkzeuge und den App-State.
-Dialoge liegen in katiecad/ui/dialogs.py, PDF-Ausgabe in katiecad/fileio/pdf.py.
+katiecad/ui/app.py - GUI of KatieCAD (CadApp, main()).
+Contains the Tkinter UI, events, tools and the app state.
+Dialogs are in katiecad/ui/dialogs.py, PDF output in katiecad/fileio/pdf.py.
 
-NEU (Schritt 7 - EXPLODE):
-  - Befehl EXPLODE/X/AUFLOESEN loest markierte Bloecke in ihre
-    Kind-Elemente auf.
-  - Kontextmenue bietet "Block aufloesen" an, wenn ein Block
-    markiert ist.
-NEU (Elektro-Basis): Redo + Seitenleiste, Projekte mit Blaettern,
-  Blockattribute (ATTDEF/ATTEDIT) und Blockdateien (*.katieblock).
-NEU (Schritt 8 - SCHRAFFUR):
-  - Neues Element Schraffur (Solid und Linien).
-  - Menuepunkt "Schraffur auf Auswahl" unter Einfuegen.
+NEW (step 7 - EXPLODE):
+  - The EXPLODE/X/AUFLOESEN command explodes selected blocks into their
+    child elements.
+  - The context menu offers "Explode block" when a block is selected.
+NEW (electrical base): redo + sidebar, projects with sheets,
+  block attributes (ATTDEF/ATTEDIT) and block files (*.katieblock).
+NEW (step 8 - HATCHING):
+  - New element hatching (solid and lines).
+  - Menu item "Hatch selection" under Insert.
 """
 
 import tkinter as tk
@@ -104,9 +103,9 @@ ELEKTRO_WERKZEUGE = ("vpunkt", "verbindung", "leitung", "querverweis",
 
 
 # ============================================================
-# Style-Setup (tkinter-abhängig, daher hier)
+# Style setup (tkinter-dependent, therefore here)
 # ============================================================
-# macOS: rechte Maustaste = Button-2, mittlere = Button-3 (bei X11/Windows umgekehrt)
+# macOS: right mouse button = Button-2, middle = Button-3 (reversed on X11/Windows)
 _MAC = sys.platform == "darwin"
 BTN_MITTE, BTN_RECHTS = ("3", "2") if _MAC else ("2", "3")
 
@@ -197,11 +196,11 @@ def _style_setup(root):
 
 
 # ============================================================
-# Hauptanwendung
+# Main application
 # ============================================================
 def geraete_aus_blattdaten_liste(app, j):
-    """Geraete (per, rolle, ind) des Blattes j - aktives Blatt aus dem
-    Speicher, die uebrigen aus der Datei (mit Cache)."""
+    """Devices (per, role, ind) of sheet j - the active sheet from memory,
+    the others from the file (with cache)."""
     p = app.projekt
     if j == p.aktiv:
         return [(g["per"], g["rolle"], g["ind"])
@@ -213,7 +212,7 @@ class CadApp:
     def __init__(self, root):
         self.root = root
         if _MAC:
-            # Jedes <Control-...>-Kuerzel gilt auf dem Mac auch mit Cmd
+            # Every <Control-...> shortcut also applies with Cmd on the Mac
             _orig_bind = self.root.bind
 
             def _bind_mac(seq=None, func=None, add=None):
@@ -324,11 +323,11 @@ class CadApp:
         self._redo_stack = []
         self._undo_max = 50
         self._undo_pro_blatt = {}
-        self.projekt = None             # aktuelles Projekt (oder None)
-        self._attdef_wartend = None     # Attributdefinition wartet auf Platzierung
-        self._leitung_p1 = None         # Leitungs-Werkzeug: erster Punkt
+        self.projekt = None             # current project (or None)
+        self._attdef_wartend = None     # Attribute definition waiting to be placed
+        self._leitung_p1 = None         # Wire tool: first point
         self._leitung_dialog = None
-        self._qv_vorgabe = None         # Querverweis-Einstellungen
+        self._qv_vorgabe = None         # Cross-reference settings
         self._vp_letzte_bez = ""
         self._vp_text_anzeigen = True
         self._qv_cache = {}
@@ -503,7 +502,7 @@ class CadApp:
         self.root.destroy()
 
     # --------------------------------------------------------
-    # Sprachumschaltung
+    # Language switching
     # --------------------------------------------------------
     def sprache_wechseln(self, code):
         if code not in TEXTE or code == SPRACHE["aktuell"]:
@@ -550,9 +549,9 @@ class CadApp:
             return 0
 
     def _snap_pack(self, st):
-        """Grosse Zeichnungen: Zustand komprimiert ablegen (Faktor ~10-20).
-        Ohne das belegt jeder der bis zu 50 Undo-Schritte eine volle Kopie
-        aller Elemente (bei DXF-Importen schnell mehrere GB)."""
+        """Large drawings: store the state compressed (factor ~10-20).
+        Without it every one of the up to 50 undo steps occupies a full copy
+        of all elements (quickly several GB with DXF imports)."""
         if self._snap_groesse(st) < 1500:
             return st
         raw = json.dumps(st, separators=(",", ":")).encode("utf-8")
@@ -565,7 +564,7 @@ class CadApp:
         return snap
 
     def _historie_limit(self, n_elemente):
-        """Max. Schritte je Stapel; bei grossen Zeichnungen weniger."""
+        """Max. steps per stack; fewer for large drawings."""
         if n_elemente < 3000:
             return self._undo_max
         return max(8, min(self._undo_max, 150000 // max(1, n_elemente)))
@@ -576,16 +575,16 @@ class CadApp:
             stapel.pop(0)
 
     def _stacks_merken(self, pfad):
-        """Undo/Redo eines Blattes fuer den Wiederaufruf merken - aber nur
-        fuer die zuletzt besuchten Blaetter (Speicher)."""
+        """Remember the undo/redo of a sheet for later return - but only
+        for the most recently visited sheets (memory)."""
         self._undo_pro_blatt.pop(pfad, None)
         self._undo_pro_blatt[pfad] = (self._undo_stack, self._redo_stack)
         while len(self._undo_pro_blatt) > 4:
             self._undo_pro_blatt.pop(next(iter(self._undo_pro_blatt)))
 
     def _push_undo(self, vorher):
-        """Legt einen Zustand VOR einer Aenderung auf den Undo-Stack.
-        Jede neue Aenderung macht die Redo-Historie ungueltig."""
+        """Puts a state onto the undo stack BEFORE a change.
+        Every new change invalidates the redo history."""
         n = self._snap_groesse(vorher)
         self._undo_stack.append(self._snap_pack(vorher))
         self._stapel_begrenzen(self._undo_stack, n)
@@ -881,7 +880,7 @@ class CadApp:
         self._clear_temp()
 
     # --------------------------------------------------------
-    # UI-Aufbau
+    # UI construction
     # --------------------------------------------------------
     def _build_ui(self):
         self._build_menu()
@@ -923,12 +922,12 @@ class CadApp:
         koord_bar.pack(side=tk.BOTTOM, fill=tk.X, before=self.seitenleiste)
 
     def _build_menu(self):
-        # Erzwingt die dunkle Farbe für das Menü
+        # Forces the dark colour for the menu
         self.root.option_add('*Menu.background', FARBEN["bg_mittel"])
         self.root.option_add('*Menu.foreground', FARBEN["cyan"])
         self.root.option_add('*Menu.activeBackground', FARBEN["cyan"])
         self.root.option_add('*Menu.activeForeground', FARBEN["bg_dunkel"])
-        # Ausklapplisten der Comboboxen (sonst unter Linux/Mac hell/uneinheitlich)
+        # Drop-down lists of the comboboxes (otherwise light/inconsistent on Linux/Mac)
         self.root.option_add('*TCombobox*Listbox.background', FARBEN["bg_hell"])
         self.root.option_add('*TCombobox*Listbox.foreground', FARBEN["cyan"])
         self.root.option_add('*TCombobox*Listbox.selectBackground', FARBEN["select_bg"])
@@ -939,7 +938,7 @@ class CadApp:
                           activebackground=FARBEN["cyan"],
                           activeforeground=FARBEN["bg_dunkel"], bd=0)
 
-        # Datei
+        # File
         m_datei = tk.Menu(menubar, tearoff=0,
                           bg=FARBEN["bg_mittel"], fg=FARBEN["cyan"],
                           activebackground=FARBEN["cyan"],
@@ -958,7 +957,7 @@ class CadApp:
         m_datei.add_command(label=tr("menu.datei.beenden"), command=self.beenden)
         menubar.add_cascade(label=tr("menu.datei"), menu=m_datei)
 
-        # Projekt
+        # Project
         m_projekt = tk.Menu(menubar, tearoff=0,
                             bg=FARBEN["bg_mittel"], fg=FARBEN["cyan"],
                             activebackground=FARBEN["cyan"],
@@ -995,7 +994,7 @@ class CadApp:
                               command=self.projekt_loeschen)
         menubar.add_cascade(label=tr("menu.projekt"), menu=m_projekt)
 
-        # Bearbeiten
+        # Edit
         m_bearb = tk.Menu(menubar, tearoff=0,
                           bg=FARBEN["bg_mittel"], fg=FARBEN["cyan"],
                           activebackground=FARBEN["cyan"],
@@ -1029,7 +1028,7 @@ class CadApp:
                             command=self.alle_markieren)
         menubar.add_cascade(label=tr("menu.bearbeiten"), menu=m_bearb)
 
-        # Einfügen
+        # Insert
         m_einf = tk.Menu(menubar, tearoff=0,
                          bg=FARBEN["bg_mittel"], fg=FARBEN["cyan"],
                          activebackground=FARBEN["cyan"],
@@ -1073,7 +1072,7 @@ class CadApp:
                            command=self.schraffur_anwenden)
         menubar.add_cascade(label=tr("menu.einfuegen"), menu=m_einf)
 
-        # Ansicht
+        # View
         m_ansicht = tk.Menu(menubar, tearoff=0,
                             bg=FARBEN["bg_mittel"], fg=FARBEN["cyan"],
                             activebackground=FARBEN["cyan"],
@@ -1102,7 +1101,7 @@ class CadApp:
                               command=self._reset_view)
         menubar.add_cascade(label=tr("menu.ansicht"), menu=m_ansicht)
 
-        # Blöcke
+        # Blocks
         m_bloecke = tk.Menu(menubar, tearoff=0,
                             bg=FARBEN["bg_mittel"], fg=FARBEN["cyan"],
                             activebackground=FARBEN["cyan"],
@@ -1126,7 +1125,7 @@ class CadApp:
                               command=self.block_aufloesen)
         menubar.add_cascade(label=tr("menu.bloecke"), menu=m_bloecke)
 
-        # Elektro
+        # Electrical
         m_elektro = tk.Menu(menubar, tearoff=0,
                             bg=FARBEN["bg_mittel"], fg=FARBEN["cyan"],
                             activebackground=FARBEN["cyan"],
@@ -1155,7 +1154,7 @@ class CadApp:
                               command=self.block_einfuegen)
         menubar.add_cascade(label=tr("menu.elektro"), menu=m_elektro)
 
-        # Sprache
+        # Language
         m_sprache = tk.Menu(menubar, tearoff=0,
                             bg=FARBEN["bg_mittel"], fg=FARBEN["cyan"],
                             activebackground=FARBEN["cyan"],
@@ -1168,7 +1167,7 @@ class CadApp:
                                   command=lambda: self.sprache_wechseln("en"))
         menubar.add_cascade(label=tr("menu.sprache"), menu=m_sprache)
 
-        # Hilfe
+        # Help
         m_hilfe = tk.Menu(menubar, tearoff=0,
                           bg=FARBEN["bg_mittel"], fg=FARBEN["cyan"],
                           activebackground=FARBEN["cyan"],
@@ -1178,6 +1177,7 @@ class CadApp:
 
         self.root.config(menu=menubar)
         self._menubar = menubar
+        self._menues_schliessen_binden()
 
     def _build_toolbars(self):
         for attr in ("tb1", "tb2", "tb3"):
@@ -1380,7 +1380,7 @@ class CadApp:
             self.lbl_eingabe.config(text=tr("eingabe.label"))
 
     # --------------------------------------------------------
-    # Layout-Switcher (unten)
+    # Layout switcher (bottom)
     # --------------------------------------------------------
     def _build_layout_switcher(self):
         self.layout_switcher_frame = ttk.Frame(self.root, padding=(6, 3))
@@ -1593,13 +1593,13 @@ class CadApp:
         self._werkzeug_toolbar()
 
     def _werkzeug_toolbar(self):
-        """Werkzeugwahl durch den Benutzer: "Auswahl" hebt die Markierung auf."""
+        """Tool selection by the user: "Selection" clears the selection."""
         if self.aktives_werkzeug.get() == "auswahl":
             self.auswahl = []
         self._werkzeug_gewechselt()
 
     def _bem_art_starten(self, art):
-        """Aktiviert das Bemaßungswerkzeug mit vorgewähltem Radius/Durchmesser."""
+        """Activates the dimension tool with radius/diameter preselected."""
         if art not in ("radius", "durchmesser"):
             return
         self.bem_art.set(art)
@@ -1674,7 +1674,7 @@ class CadApp:
             zeige(self.bem_widgets)
 
     # --------------------------------------------------------
-    # Viewport-Leiste
+    # Viewport bar
     # --------------------------------------------------------
     def _build_viewport_leiste(self):
         self.viewport_leiste = ttk.Frame(self.root, padding=(6, 3))
@@ -2058,7 +2058,7 @@ class CadApp:
         c.bind(f"<Button-{r}>", self.on_rechtsklick_start)
         c.bind(f"<B{r}-Motion>", self.on_pan)
         c.bind(f"<ButtonRelease-{r}>", self.on_rechtsklick_end)
-        if _MAC:       # Ctrl+Klick = Rechtsklick (Trackpad / Einknopf-Maus)
+        if _MAC:       # Ctrl+click = right click (trackpad / one-button mouse)
             c.bind("<Control-Button-1>", self.on_rechtsklick_start)
             c.bind("<Control-ButtonRelease-1>", self.on_rechtsklick_end)
         c.bind("<Motion>", self.on_move)
@@ -2156,7 +2156,7 @@ class CadApp:
         self._trim_abbrechen()
         self._break_abbrechen()
         self._warte_auf_basispunkt = False
-        # (Basispunkt der Zwischenablage bleibt bei ESC erhalten)
+        # (the base point of the clipboard is kept on ESC)
         if self._vp_aktion != "none":
             self._vp_reset_drag()
         self._vp_fenster = None
@@ -2281,9 +2281,9 @@ class CadApp:
         while step_px < 12:
             step_px *= 5
         if self.raster_punktiert.get():
-            # Jeder Punkt ist ein Canvas-Element und wird bei JEDEM Neuzeichnen
-            # neu erzeugt (Zoomen/Schwenken). Begrenzung verhindert zehntausende
-            # Elemente auf grossen Bildschirmen (Speicher/CPU).
+            # Every dot is a canvas item and is re-created on EVERY redraw
+            # (zoom/pan). The limit prevents tens of thousands of items on
+            # large screens (memory/CPU).
             while (w / step_px + 1) * (h / step_px + 1) > 6000:
                 step_px *= 5
         haupt_step = step_px * 5
@@ -2638,7 +2638,7 @@ class CadApp:
                          else "Viewport aligned to selection."))
 
     # --------------------------------------------------------
-    # Objektfang
+    # Object snap
     # --------------------------------------------------------
     def _finde_snap_in_liste(self, liste, mx, my, tol, ref=None):
         modi = self.osnap_modi
@@ -2696,10 +2696,10 @@ class CadApp:
                 sammle(el.x, el.y, "endpunkt", 0)
                 continue
             if isinstance(el, (Verbindungspunkt, Querverweis)):
-                sammle(el.x, el.y, "endpunkt", 0)     # Anschlusspunkt / Basis
+                sammle(el.x, el.y, "endpunkt", 0)     # Connection point / base
                 if isinstance(el, Querverweis):
                     sx, sy = el.spitze_punkt()
-                    sammle(sx, sy, "endpunkt", 0)     # Pfeilspitze
+                    sammle(sx, sy, "endpunkt", 0)     # Arrow tip
                 continue
             if isinstance(el, BlockReferenz):
                 kinder = el.aufgeloest()
@@ -3060,7 +3060,7 @@ class CadApp:
 
     def _punkt_auf_element(self, el, x_mm, y_mm, tol):
         if isinstance(el, Koordinatenfeld):
-            # nur Rahmen/Umriss treffen, nicht das Innere (darin wird gezeichnet)
+            # hit only frame/outline, not the interior (drawing happens inside)
             for zug in el.auswahl_linien():
                 for a, b in zip(zug, zug[1:]):
                     if abstand_punkt_segment(x_mm, y_mm, a[0], a[1],
@@ -3180,7 +3180,7 @@ class CadApp:
             if l and not l.sichtbar:
                 continue
             if getattr(el, "NUR_KLICK", False):
-                continue                 # Koordinatenfeld: nur per Klick
+                continue                 # Coordinate field: click only
             el_bbox = el.bbox()
             if richtung == "links":
                 if bbox_enthalten(bbox, el_bbox):
@@ -3427,7 +3427,7 @@ class CadApp:
             self._kabel_klick(x_mm, y_mm)
 
     # --------------------------------------------------------
-    # Stutzen (TRIM)
+    # Trim (TRIM)
     # --------------------------------------------------------
     def _trim_grenzen_bestaetigen(self):
         de = SPRACHE["aktuell"] == "de"
@@ -3659,7 +3659,7 @@ class CadApp:
         self.status.set(tr("msg.stutzen.fertig", n=self._trim_anzahl))
 
     # --------------------------------------------------------
-    # Brechen (BREAK)
+    # Break (BREAK)
     # --------------------------------------------------------
     def _break_klick(self, pt):
         de = SPRACHE["aktuell"] == "de"
@@ -3986,8 +3986,8 @@ class CadApp:
             self._op_hinweis()
             return
         if abs(x1_px - x0_px) < 4 and abs(y1_px - y0_px) < 4:
-            # Additive Auswahl: ein Klick ins Leere behaelt die Markierung
-            # (Aufheben nur mit ESC oder ueber das Werkzeug "Auswahl").
+            # Additive selection: a click on empty space keeps the selection
+            # (deselect only with ESC or via the "Selection" tool).
             pass
         else:
             bbox = (min(x0_mm, x1_mm), min(y0_mm, y1_mm),
@@ -4023,7 +4023,7 @@ class CadApp:
         self.redraw()
 
     def _leitungen_automatisch(self):
-        """Leitungen entstehen/verschwinden von selbst (wie Eplan P8)."""
+        """Wires appear/disappear on their own (like Eplan P8)."""
         if self._ist_layout():
             return
         neu, weg, entfernt = leitungen_automatisch(self.elemente)
@@ -4056,8 +4056,8 @@ class CadApp:
             c.delete(tag)
         self._clear_temp()
         if len(self._font_cache) > 40:
-            # Es existieren keine Canvas-Elemente mehr (siehe delete oben):
-            # Schriftobjekte freigeben, sonst wachsen sie mit jeder Zoomstufe.
+            # No canvas items exist any more (see delete above):
+            # release font objects, otherwise they grow with every zoom level.
             self._font_cache.clear()
         if not self._ist_layout():
             for el in self.elemente:
@@ -4112,7 +4112,7 @@ class CadApp:
                          clip=None, stil=None):
         if isinstance(el, ZUSAMMENGESETZT):
             if isinstance(el, Koordinatenfeld):
-                # gestrichelter Viewport-Umriss nur in der Modellansicht
+                # dashed viewport outline only in the model view
                 kinder = el.aufgeloest(umriss=(tf is None and tags == ("element",)
                                                and not self._ist_layout()))
             else:
@@ -4157,7 +4157,7 @@ class CadApp:
         self._zeichne_prims(self._prims(el, sk), farbe, w, dash, tf, sk, tags, clip)
 
     def _zeichne_vp(self, el, tags, tf, skala, clip, stil):
-        """Verbindungspunkt: Kreis nur im Modell, Beschriftung ueberall."""
+        """Connection point: circle only in the model, label everywhere."""
         tf = tf or self.mm_to_px
         sk = skala if skala is not None else self.view["zoom"]
         if not self._ist_layout():
@@ -4211,11 +4211,11 @@ class CadApp:
             self._zeichne_element(me, tags=("layout",), tf=tf, skala=skala, clip=clip)
 
     def _attr_ausschluss(self, ref):
-        """Tags, die nicht abgefragt werden (Schriftkopf: automatische Felder)."""
+        """Tags that are not prompted for (title block: automatic fields)."""
         return TB.RESERVED if TB.is_title_block(ref) else ()
 
     def _titelfelder_aktualisieren(self):
-        """Automatische Schriftkopf-Felder (Seite, Datum, ...) aller Layouts."""
+        """Automatic title block fields (page, date, ...) of all layouts."""
         if not any(TB.is_title_block(e) for lay in self.layouts for e in lay.elemente):
             return
         p = self.projekt
@@ -4238,9 +4238,9 @@ class CadApp:
             print(f"[KatieCAD] Ordner konnte nicht geoeffnet werden: {e}")
 
     def rahmen_einfuegen(self):
-        """Blattrand (links 20 mm, sonst 5 mm) und Schriftkopf aus einer
-        Vorlagen-Zeichnung (Ordner title_blocks). Ein vorhandener Schriftkopf
-        wird dabei ersetzt."""
+        """Sheet margin (left 20 mm, otherwise 5 mm) and title block from a
+        template drawing (folder title_blocks). An existing title block
+        is replaced."""
         if not self._ist_layout():
             self.status.set(tr("msg.tb.nur_layout"))
             return
@@ -4255,7 +4255,7 @@ class CadApp:
             folders_text=tr("dlg.tb.ordner_zeile", pfad=ordner[0]))
         if dlg.result is None:
             return
-        wahl = dlg.result                       # "" = nur Rahmen
+        wahl = dlg.result                       # "" = frame only
         elemente, name = [], ""
         if wahl == "builtin":
             elemente, name = TB.default_elements(SPRACHE["aktuell"]), "Standard"
@@ -4309,7 +4309,7 @@ class CadApp:
         self.redraw()
 
     def schriftkopf_vorlage_speichern(self):
-        """Speichert die Modell-Zeichnung als Schriftkopf-Vorlage."""
+        """Saves the model drawing as a title block template."""
         if not self.elemente:
             self.status.set(tr("msg.tb.leer"))
             return
@@ -4333,7 +4333,7 @@ class CadApp:
         self.status.set(tr("msg.tb.gespeichert", pfad=pfad))
 
     # --------------------------------------------------------
-    # Seitenleiste ein-/ausblenden
+    # Show/hide sidebar
     # --------------------------------------------------------
     def seitenleiste_umschalten(self):
         sl = self.seitenleiste
@@ -4371,7 +4371,7 @@ class CadApp:
             self._viewport_modus_anzeige_aktualisieren()
 
     # --------------------------------------------------------
-    # Info-Fenster
+    # Info window
     # --------------------------------------------------------
     def zeige_info_fenster(self):
         info_win = tk.Toplevel(self.root)
@@ -4497,7 +4497,7 @@ class CadApp:
         self.bg_btn.config(bg=bg)
         self._mark_clean()
         if self.projekt is not None:
-            self._mark_dirty()   # Blattdatei muss neu geschrieben werden
+            self._mark_dirty()   # Sheet file must be rewritten
         self.redraw()
         self._zeichne_raster()
         self._viewport_modus_anzeige_aktualisieren()
@@ -4559,8 +4559,8 @@ class CadApp:
     def _dict_zu_element(self, d):
         d = dict(d)
         typ = d.pop("typ")
-        if typ in ("solid", "linien"):      # Altformat: Schraffur, deren
-            d["muster"] = typ               # Elementtyp ueberschrieben wurde
+        if typ in ("solid", "linien"):      # Legacy format: hatching whose
+            d["muster"] = typ               # element type was overwritten
             typ = "schraffur"
         if typ == "viewport":
             if "zoom" not in d and "massstab" in d:
@@ -4733,7 +4733,7 @@ class CadApp:
         t.set_placement((x, y))
 
     def _cad_import(self, art):
-        """Gemeinsamer Import fuer DXF und DWG (art = 'dxf' | 'dwg')."""
+        """Common import for DXF and DWG (art = 'dxf' | 'dwg')."""
         de = SPRACHE["aktuell"] == "de"
         titel = art.upper()
         if not CADIMPORT_VERFUEGBAR or not EZDXF_VERFUEGBAR:
@@ -5301,9 +5301,9 @@ class CadApp:
 
         em = max(4, min(600, int(round(h_px / CAD_VERSALHOEHE))))
         f = self._font(fam, em)
-        # Die Schrift des Systems kann breiter/schmaler als Arial sein (z. B.
-        # DejaVu unter Linux). Groesse so anpassen, dass die Breite der
-        # Modellbreite entspricht -> Anker (rechts/zentriert) stimmen.
+        # The system font may be wider/narrower than Arial (e.g.
+        # DejaVu on Linux). Adjust the size so that the width matches the
+        # model width -> anchors (right/centred) are correct.
         w_soll = w_mm * skala
         w_px = max(f.measure(z) for z in zeilen)
         if w_px > 0 and w_soll > 0 and abs(w_px - w_soll) > 1.0:
@@ -6348,7 +6348,7 @@ class CadApp:
                    for e in self.auswahl):
                 m.add_command(label=tr("menu.bloecke.attedit"),
                               command=self.attribute_bearbeiten)
-            # NEU: Block aufloesen, wenn ein Block in der Auswahl ist
+            # NEW: explode block if a block is in the selection
             if any(isinstance(e, BlockReferenz) for e in self.auswahl):
                 m.add_command(label=tr("menu.einfuegen.block_aufloesen"),
                               command=self.block_aufloesen)
@@ -6367,8 +6367,8 @@ class CadApp:
             m.grab_release()
 
     def _zeichnung_anwenden(self, daten, layer_zuruecksetzen=False):
-        """Ersetzt die Arbeitsflaeche durch den Inhalt von `daten`
-        (Format wie in _zeichnung_daten)."""
+        """Replaces the work area with the contents of `daten`
+        (format as in _zeichnung_daten)."""
         if layer_zuruecksetzen:
             self.layers = self._standard_layers()
         self.einheit.set(daten.get("einheit", "mm"))
@@ -6389,9 +6389,9 @@ class CadApp:
             if el:
                 self.elemente.append(el)
 
-        # Blockdefinitionen der Datei in die Bibliothek uebernehmen -
-        # bereits vorhandene Namen bleiben unveraendert (platzierte Bloecke
-        # tragen ihre Geometrie ohnehin selbst). Ein einziges Schreiben.
+        # Take over the block definitions of the file into the library -
+        # names that already exist stay unchanged (placed blocks
+        # carry their geometry themselves anyway). A single write.
         neue_bloecke = False
         for bd in daten.get("block_definitionen", []):
             try:
@@ -6474,8 +6474,8 @@ class CadApp:
             self._update_titel()
 
     # ========================================================
-    # NEU: Zeichnung <-> Dict/Datei (genutzt von Speichern/Oeffnen
-    #      und von der Projektverwaltung)
+    # NEW: drawing <-> dict/file (used by save/open
+    #      and by project management)
     # ========================================================
     def _standard_layers(self):
         return {
@@ -6509,9 +6509,9 @@ class CadApp:
         }
 
     def _leere_zeichnung_daten(self, einstellungen_uebernehmen=True):
-        """Daten fuer ein leeres Blatt. Einheit, Format, Hintergrund und
-        Layer werden vom aktuellen Blatt uebernommen (neues Blatt im
-        Projekt), bzw. auf Standard gesetzt (erstes Blatt)."""
+        """Data for an empty sheet. Unit, format, background and layers are
+        taken from the current sheet (new sheet in a project) or set to
+        defaults (first sheet)."""
         if einstellungen_uebernehmen:
             fmt, bg_l = self.layout_format, self.bg_layout
             layers = [l.to_dict() for l in self.layers.values()]
@@ -6543,14 +6543,14 @@ class CadApp:
         os.replace(tmp, pfad)
 
     def _zeichnung_in_datei(self, pfad):
-        """Schreibt die aktuelle Zeichnung (wirft OSError bei Fehlern)."""
+        """Writes the current drawing (raises OSError on errors)."""
         self._json_atomar_schreiben(pfad, self._zeichnung_daten())
 
     # ========================================================
-    # NEU: Projektverwaltung
+    # NEW: project management
     # ========================================================
     def _projekt_aenderungen_klaeren(self):
-        """Fragt bei ungespeicherten Aenderungen. True = weitermachen."""
+        """Asks about unsaved changes. True = continue."""
         if not self._dirty:
             return True
         antwort = messagebox.askyesnocancel(
@@ -6571,7 +6571,7 @@ class CadApp:
             print(f"[KatieCAD] Konfiguration: {e}")
 
     def _blatt_sichern(self):
-        """Speichert das aktuelle Blatt still, falls geaendert."""
+        """Silently saves the current sheet if it was changed."""
         p = self.projekt
         if p is None or not self._dirty:
             return True
@@ -6586,7 +6586,7 @@ class CadApp:
         return True
 
     def _blatt_laden(self, index):
-        """Laedt Blatt `index` des Projekts in die Arbeitsflaeche."""
+        """Loads sheet `index` of the project into the work area."""
         p = self.projekt
         pfad = p.blatt_pfad(index)
         try:
@@ -6720,7 +6720,7 @@ class CadApp:
         return True
 
     def _projekt_zuruecksetzen(self):
-        """Projekt ohne Rueckfrage verlassen; Arbeitsflaeche wird leer."""
+        """Leave the project without asking; the work area becomes empty."""
         self.projekt = None
         self._undo_pro_blatt = {}
         self._zeichnung_anwenden(
@@ -6731,8 +6731,41 @@ class CadApp:
         self.seitenleiste.aktualisieren()
         self._update_titel()
 
+    def _menues_schliessen_binden(self):
+        """Linux/X11: a menu opened from the menu bar can stay on screen when
+        the window loses focus or when the user clicks elsewhere. Close all
+        open menus in these cases."""
+        def alle_menues(w):
+            for c in w.winfo_children():
+                if isinstance(c, tk.Menu):
+                    yield c
+                yield from alle_menues(c)
+
+        def schliessen(event=None):
+            try:
+                for m in alle_menues(self.root):
+                    try:
+                        m.unpost()
+                    except tk.TclError:
+                        pass
+            except Exception:
+                pass
+
+        def fokus_weg(event):
+            if event.widget is self.root:
+                schliessen()
+
+        def klick(event):
+            if not isinstance(event.widget, tk.Menu):
+                schliessen()
+
+        self._menues_schliessen = schliessen
+        self.root.bind("<FocusOut>", fokus_weg, add="+")
+        self.root.bind("<Unmap>", fokus_weg, add="+")
+        self.root.bind_all("<ButtonPress>", klick, add="+")
+
     def projekt_umbenennen(self):
-        """Projekt umbenennen (Projektdatei, wenn moeglich auch der Ordner)."""
+        """Rename project (project file and, if possible, the folder too)."""
         p = self.projekt
         if p is None:
             self.status.set(tr("msg.projekt.kein_projekt"))
@@ -6742,7 +6775,7 @@ class CadApp:
         if name is None or name.strip() == p.name:
             return
         try:
-            self._zeichnung_in_datei(p.blatt_pfad(p.aktiv))   # offene Aenderungen sichern
+            self._zeichnung_in_datei(p.blatt_pfad(p.aktiv))   # save open changes
             ordner_alt = p.ordner
             alt = p.name
             mit_ordner = p.umbenennen(name)
@@ -6815,10 +6848,10 @@ class CadApp:
                    liste="\n".join(uebrig[:15])), parent=self.root)
             self.status.set(tr("msg.projekt.geloescht", name=p.name))
 
-    # ---- Blaetter ------------------------------------------------
+    # ---- Sheets --------------------------------------------------
     def blatt_wechseln(self, index):
-        """Wechselt zu Blatt `index`; speichert das aktuelle still.
-        Rueckgabe: True bei Erfolg."""
+        """Switches to sheet `index`; silently saves the current one.
+        Returns: True on success."""
         p = self.projekt
         if p is None or not (0 <= index < len(p.blaetter)):
             return False
@@ -6867,7 +6900,7 @@ class CadApp:
         self.status.set(tr("msg.blatt.neu", name=b.name))
 
     def blatt_duplizieren(self):
-        """Dupliziert das aktive Blatt vollstaendig (Modell, Layouts, Blocks)."""
+        """Duplicates the active sheet completely (model, layouts, blocks)."""
         p = self.projekt
         if p is None:
             self.status.set(tr("msg.projekt.kein_projekt"))
@@ -6918,7 +6951,7 @@ class CadApp:
             pass
 
     def blatt_umbenennen(self, index=None):
-        """Benennt ein Blatt um (Standard: das aktive); jederzeit moeglich."""
+        """Renames a sheet (default: the active one); possible at any time."""
         p = self.projekt
         if p is None:
             self.status.set(tr("msg.projekt.kein_projekt"))
@@ -6960,10 +6993,10 @@ class CadApp:
         self._update_titel()
 
     # ========================================================
-    # NEU: Blockattribute (Funktionstexte)
+    # NEW: block attributes (function texts)
     # ========================================================
     def attdef_erstellen(self):
-        """ATTDEF: Attribut definieren und im Modell platzieren."""
+        """ATTDEF: define an attribute and place it in the model."""
         if self._ist_layout():
             self.status.set(("Bitte in die Modell-Ansicht wechseln."
                              if SPRACHE["aktuell"] == "de"
@@ -7018,8 +7051,8 @@ class CadApp:
         self.redraw()
 
     def _attribute_abfragen(self, ref):
-        """Fragt beim Einfuegen die Attributwerte ab (falls vorhanden).
-        Abbrechen behaelt die Vorgabewerte."""
+        """Prompts for the attribute values on insertion (if any).
+        Cancelling keeps the default values."""
         aus = self._attr_ausschluss(ref)
         if not [ad for ad in ref.attribut_definitionen() if ad.tag not in aus]:
             return
@@ -7032,7 +7065,7 @@ class CadApp:
                 m.rolle = dlg.rolle
 
     def attribute_bearbeiten(self, ref=None):
-        """ATTEDIT: Attributwerte eines markierten Blocks bearbeiten."""
+        """ATTEDIT: edit the attribute values of a selected block."""
         if ref is None:
             kandidaten = [e for e in self.auswahl
                           if isinstance(e, BlockReferenz)]
@@ -7058,7 +7091,7 @@ class CadApp:
         self.status.set(tr("msg.attedit.fertig", name=ref.block_name))
 
     # ========================================================
-    # NEU: Blockdateien (*.katieblock)
+    # NEW: block files (*.katieblock)
     # ========================================================
     def _block_dateiordner(self):
         p = self.projekt
@@ -7067,7 +7100,7 @@ class CadApp:
         return p.bloecke_ordner if os.path.isdir(p.bloecke_ordner) else p.ordner
 
     def block_speichern_datei(self):
-        """Speichert einen Block als eigene Datei (wie WBLOCK)."""
+        """Saves a block as a separate file (like WBLOCK)."""
         d = None
         refs = [e for e in self.auswahl if isinstance(e, BlockReferenz)]
         if refs:
@@ -7112,7 +7145,7 @@ class CadApp:
                            pfad=pfad))
 
     def block_laden_datei(self):
-        """Laedt eine oder mehrere Blockdateien in die Bibliothek."""
+        """Loads one or more block files into the library."""
         kw = {}
         start = self._block_dateiordner()
         if start:
@@ -7165,10 +7198,10 @@ class CadApp:
             self.entry_eingabe.focus_set()
 
     # ========================================================
-    # NEU (Elektro): Querverweis-Ziele
+    # NEW (electrical): cross-reference targets
     # ========================================================
     def _qv_texte_blatt(self, pfad):
-        """Querverweis-Texte eines (nicht aktiven) Blattes, mit Cache."""
+        """Cross-reference texts of a (non-active) sheet, with cache."""
         try:
             st = os.stat(pfad)
             key = (st.st_mtime_ns, st.st_size)
@@ -7186,7 +7219,7 @@ class CadApp:
         return texte
 
     def _querverweise_aktualisieren(self):
-        """Berechnet das Ziel aller Querverweise des aktuellen Blattes."""
+        """Computes the target of all cross references of the current sheet."""
         if not any(isinstance(e, Querverweis) for e in self.elemente):
             return
         p = self.projekt
@@ -7208,11 +7241,11 @@ class CadApp:
 
 
     # ========================================================
-    # NEU (Elektro): Geraete-Verweise, Pin/Verbindung auf Leitungen,
-    # Verbindung, Elektro-Maske, Klemme
+    # NEW (electrical): device references, pin/junction on wires,
+    # junction, electrical mask, terminal
     # ========================================================
     def _geraete_blatt(self, pfad):
-        """(per, rolle, ind) aller Geraete eines nicht aktiven Blattes."""
+        """(per, role, ind) of all devices of a non-active sheet."""
         try:
             st = os.stat(pfad)
             key = (st.st_mtime_ns, st.st_size)
@@ -7248,8 +7281,8 @@ class CadApp:
         geraete_referenzen(eigene, nr, andere)
 
     def _einrasten(self, neue):
-        """Aufgesetzte Pins/Verbindungen/Klemmen/Geraete unterbrechen die
-        Leitungen, auf denen sie liegen."""
+        """Pins/junctions/terminals/devices placed on top interrupt the
+        wires they lie on."""
         if self._ist_layout() or not neue:
             return 0
         zoom = self.view["zoom"] if self.view["zoom"] else 1.0
@@ -7260,8 +7293,8 @@ class CadApp:
         return n
 
     def geraet_erzeugen(self):
-        """Elektro > Geraet aus Auswahl: Maske + Pins + Symbol markieren,
-        Einfuegepunkt waehlen, Name und Haupt-/Hilfsgeraet festlegen."""
+        """Electrical > Device from selection: select mask + pins + symbol,
+        choose the insertion point, set name and main/auxiliary device."""
         if self._ist_layout():
             self.status.set(tr("msg.modell_noetig"))
             return
@@ -7278,8 +7311,8 @@ class CadApp:
         self.block_erzeugen(geraet=True)
 
     def _auf_leitung_einrasten(self, x, y):
-        """Liegt (x,y) auf einer Leitung, wird auf diese projiziert und die
-        Leitung geteilt (Pin / Verbindung wurde darauf gesetzt)."""
+        """If (x,y) lies on a wire, it is projected onto it and the
+        wire is split (a pin / junction was placed on it)."""
         liste = self._ziel_liste()
         tol = 6.0 / self.view["zoom"]
         hit = naechster_leitungspunkt(liste, x, y, tol)
@@ -7289,7 +7322,7 @@ class CadApp:
         leitung_teilen(liste, px, py)
         return px, py
 
-    # ---- Verbindung
+    # Junction
     def _verbindung_starten(self):
         vor = self._vb_vorgabe or {"art": 2, "ausrichtung": 0, "punkt": True}
         dlg = VerbindungDialog(self.root, vor)
@@ -7329,7 +7362,7 @@ class CadApp:
         verbindungen_bereinigen(liste, vorher - {id(el)})
         self.redraw()
 
-    # ---- Elektro-Maske / Klemme
+    # ---- Electrical mask / terminal
     def _maske_starten(self):
         self.status.set(tr("msg.maske.platzieren"))
 
@@ -7466,7 +7499,7 @@ class CadApp:
         self.redraw()
 
     def _geister_vorschau(self, event, wz):
-        """Vorschau (Geisterbild) fuer Verbindung / Maske / Klemme."""
+        """Preview (ghost image) for junction / mask / terminal."""
         pt = self._eingabepunkt(event)
         if wz == "verbindung":
             if not self._vb_vorgabe:
@@ -7504,7 +7537,7 @@ class CadApp:
         self._werkzeug_gewechselt()
 
     # ========================================================
-    # NEU (Elektro): Verbindungspunkte
+    # NEW (electrical): connection points
     # ========================================================
     def _vp_platzieren(self, x, y):
         dlg = VerbindungspunktDialog(
@@ -7551,7 +7584,7 @@ class CadApp:
         return (f"{vp.wert or '-'}   ({vp.x / einh:.1f} / {vp.y / einh:.1f})")
 
     # ========================================================
-    # NEU (Elektro): Leitung
+    # NEW (electrical): wire
     # ========================================================
     def _leitung_starten(self):
         self._leitung_p1 = None
@@ -7569,7 +7602,7 @@ class CadApp:
                 pass
 
     def _leitung_dialog_geschlossen(self):
-        """Fenster wurde vom Anwender geschlossen -> Werkzeug beenden."""
+        """Window was closed by the user -> end the tool."""
         self._leitung_dialog = None
         self._leitung_p1 = None
         self.aktives_werkzeug.set("auswahl")
@@ -7617,7 +7650,7 @@ class CadApp:
                 ap, bd = a, d
         self._clear_temp()
         c = self.canvas
-        # alle moeglichen Anschlusspunkte dezent markieren
+        # discreetly mark all possible connection points
         for a in aps[:800]:
             q = self.mm_to_px(a.x, a.y)
             c.create_rectangle(q[0] - 3, q[1] - 3, q[0] + 3, q[1] + 3,
@@ -7640,7 +7673,7 @@ class CadApp:
                         + (f"   [{ap.name}]" if ap else ""))
 
     # ========================================================
-    # NEU (Elektro): Querverweis
+    # NEW (electrical): cross reference
     # ========================================================
     def _querverweis_starten(self):
         vor = self._qv_vorgabe or {"art": "abgehend", "richtung": 0, "text": "L1"}
@@ -7697,12 +7730,12 @@ class CadApp:
         self.redraw()
 
     # ========================================================
-    # NEU (Elektro): mehrere Blaetter drucken
+    # NEW (electrical): print several sheets
     # ========================================================
     def _blatt_druckkontext(self, index):
-        """Liefert ein Objekt mit den Attributen, die pdf_erzeugen braucht."""
+        """Returns an object with the attributes that pdf_erzeugen needs."""
         p = self.projekt
-        if index == p.aktiv:            # ungespeicherte Aenderungen inklusive
+        if index == p.aktiv:            # including unsaved changes
             return SimpleNamespace(
                 elemente=self.elemente, layers=self.layers,
                 layouts=self.layouts, aktives_layout=self.aktives_layout,
@@ -7759,7 +7792,7 @@ class CadApp:
                 nicht_lesbar.append(name)
             else:
                 kontexte.append((i, name, ctx))
-        # Querverweis-Ziele ueber ALLE Blaetter des Projekts berechnen
+        # Compute cross-reference targets across ALL sheets of the project
         texte = {}
         for j in range(len(p.blaetter)):
             if j == p.aktiv:
@@ -7810,11 +7843,11 @@ class CadApp:
                 parent=self.root)
 
     # ========================================================
-    # Dokumentation: Deckblatt, Inhaltsverzeichnis, Listen
+    # Documentation: cover sheet, table of contents, lists
     # ========================================================
     def _zeichnungsblaetter_einlesen(self):
-        """[BlattInfo] aller Zeichnungsblaetter (ohne Berichtsblaetter) oder
-        None, wenn ein Blatt nicht lesbar ist."""
+        """[BlattInfo] of all drawing sheets (without report sheets) or
+        None if a sheet is not readable."""
         p = self.projekt
         infos, indizes = [], []
         for i in p.zeichnungsblaetter():
@@ -7884,7 +7917,7 @@ class CadApp:
         self.status.set(tr("msg.doku.fertig", vorn=len(vorne), hinten=len(hinten)))
 
     def dokumentation_csv(self):
-        """Geraeteliste, Klemmenplan und Kabelplan als CSV-Dateien."""
+        """Device list, terminal diagram and cable plan as CSV files."""
         p = self.projekt
         if p is None:
             self.status.set(tr("msg.projekt.kein_projekt"))
@@ -7943,7 +7976,7 @@ class CadApp:
                             ("Vorschau geöffnet." if de else "Preview opened."))
 
     # --------------------------------------------------------
-    # Block-Befehle
+    # Block commands
     # --------------------------------------------------------
     def block_erzeugen(self, geraet=False):
         self._geraet_modus = bool(geraet)
@@ -8079,7 +8112,7 @@ class CadApp:
             print(f"[KatieCAD] Konfiguration: {ex}")
 
     def _block_speicherordner(self):
-        """Vorschlag fuer den Speicherordner neuer Bloecke."""
+        """Suggestion for the save folder of new blocks."""
         p = self.projekt
         if p is not None:
             return p.bloecke_ordner
@@ -8112,7 +8145,7 @@ class CadApp:
         return wurzeln
 
     def _block_bibliothek_migrieren(self):
-        """Einmalig: Bloecke der alten internen Bibliothek als Dateien ablegen."""
+        """One-time: store the blocks of the old internal library as files."""
         try:
             cfg = lade_konfiguration()
         except Exception:
@@ -8225,11 +8258,11 @@ class CadApp:
         self.block_einfuegen()
 
     def block_aufloesen(self):
-        """EXPLODE: markierte Blockreferenzen in ihre Kind-Elemente zerlegen.
+        """EXPLODE: break selected block references into their child elements.
 
-        - Andere markierte Elemente bleiben unveraendert (und markiert).
-        - Die aufgeloesten Kinder werden nach dem Aufloesen markiert.
-        - Liegt keine Auswahl vor, wird ein Hinweis ausgegeben.
+        - Other selected elements stay unchanged (and selected).
+        - The exploded children are selected after exploding.
+        - If nothing is selected, a hint is shown.
         """
         de = SPRACHE["aktuell"] == "de"
         if self._ist_layout():
@@ -8250,7 +8283,7 @@ class CadApp:
         neue_auswahl = []
         anzahl_kinder = 0
 
-        # andere markierte Elemente bleiben markiert
+        # other selected elements stay selected
         for el in self.auswahl:
             if not isinstance(el, BlockReferenz):
                 neue_auswahl.append(el)
@@ -8274,12 +8307,12 @@ class CadApp:
                            elemente=anzahl_kinder))
 
     # --------------------------------------------------------
-    # Schraffur
+    # Hatching
     # --------------------------------------------------------
     def schraffur_anwenden(self):
-        """Schraffur auf Auswahl: Kreise, Rechtecke, geschlossene Polylinien
-        sowie aus Linien/Bogen/offenen Polylinien gebildete geschlossene
-        Konturen (Endpunkte muessen sich treffen)."""
+        """Hatch selection: circles, rectangles, closed polylines as well as
+        closed contours formed from lines/arcs/open polylines (end points
+        must meet)."""
         de = SPRACHE["aktuell"] == "de"
         kandidaten = [e for e in self.auswahl
                       if isinstance(e, (Polylinie, Rechteck, Kreis, Linie, Bogen))]
