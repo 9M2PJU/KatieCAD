@@ -1,23 +1,23 @@
 # -*- coding: utf-8 -*-
 """
-katiecad/reports/netz.py - Netzverfolgung ueber alle Blaetter (KEIN Tkinter).
+katiecad/reports/netz.py - Net tracing across all sheets (NO Tkinter).
 
-Aus den Anschlusspunkten (Pins, Klemmen, Verbindungen, Querverweise) und den
-Leitungen aller Blaetter entsteht ein Graph. Von einer Klemmenseite oder
-einem Kabelende aus laesst sich so feststellen, WOHIN eine Leitung fuehrt
-(Geraet:Pin, Klemme, Potentialverweis) - auch ueber Verbindungen, Kabel und
-Blattgrenzen hinweg.
+A graph is built from the connection points (pins, terminals, junctions,
+cross references) and the wires of all sheets. From a terminal side or a
+cable end it can then be determined WHERE a wire leads to
+(device:pin, terminal, potential reference) - also across junctions, cables
+and sheet boundaries.
 
-Regeln
-  * Pins und Klemmen sind Endpunkte: die Suche geht nicht durch sie hindurch.
-  * Eine Verbindung verbindet alle ihre Arme; eine Kreuzung (4 Arme) ohne
-    Punkt verbindet nur gegenueberliegende Arme.
-  * Zwei Anschlusspunkte verschiedener Objekte, die genau aufeinander liegen
-    (< 0,1 mm), gelten als verbunden.
-  * Querverweise mit gleichem Text setzen die Leitung auf einem anderen Blatt
-    fort, wenn es genau EINEN abgehenden und mindestens einen ankommenden
-    (oder umgekehrt) gibt. Sonst bleibt der Querverweis ein Endpunkt
-    (z. B. ein Potential wie L1, das an vielen Stellen vorkommt).
+Rules
+  * Pins and terminals are end points: the search does not pass through them.
+  * A junction connects all its arms; a crossing (4 arms) without a
+    dot connects only opposite arms.
+  * Two connection points of different objects that lie exactly on top of
+    each other (< 0.1 mm) count as connected.
+  * Cross references with the same text continue the wire on another sheet
+    if there is exactly ONE outgoing and at least one incoming one
+    (or vice versa). Otherwise the cross reference stays an end point
+    (e.g. a potential like L1 that occurs in many places).
 """
 
 import math
@@ -26,10 +26,10 @@ from collections import defaultdict
 from katiecad.model.core import (BlockReferenz, Verbindungspunkt, Verbindung,
                                  Klemme, Querverweis, Leitung, Kabel)
 
-SUCH_TOL = 0.4          # mm: Leitungsende -> Anschlusspunkt
-BERUEHRUNG = 0.1        # mm: aufeinanderliegende Anschlusspunkte
-ZELLE = 1.0             # mm: Rastergroesse fuer die Nachbarschaftssuche
-ADER_TOL = 1.0          # mm: Leitung -> naechste Aderkreuzung des Kabels
+SUCH_TOL = 0.4          # mm: wire end -> connection point
+BERUEHRUNG = 0.1        # mm: coinciding connection points
+ZELLE = 1.0             # mm: grid size for the neighbourhood search
+ADER_TOL = 1.0          # mm: wire -> nearest core crossing of the cable
 
 
 class Knoten:
@@ -39,21 +39,21 @@ class Knoten:
     def __init__(self, blatt, x, y, art, bes=None, kennz="", name="",
                  seite="", text="", qv_art=""):
         self.blatt, self.x, self.y, self.art = blatt, x, y, art
-        self.bes = bes                  # Besitzer (Element), zum Vergleich
-        self.kennz = kennz              # Geraet / Klemmleiste
-        self.name = name                # Pin- bzw. Klemmennummer
-        self.seite = seite              # Klemme: "oben" | "unten"
+        self.bes = bes                  # Owner (element), for comparison
+        self.kennz = kennz              # Device / terminal strip
+        self.name = name                # Pin or terminal number
+        self.seite = seite              # Terminal: "oben" | "unten"
         self.kanten = []
-        self.text = text                # Querverweis-Text
+        self.text = text                # Cross-reference text
         self.qv_art = qv_art
-        self.partner = []               # Querverweis-Gegenstuecke
+        self.partner = []               # Cross-reference counterparts
 
 
 class Kante:
     __slots__ = ("a", "b", "kabel")
 
     def __init__(self, a, b, kabel=None):
-        self.a, self.b, self.kabel = a, b, kabel   # kabel: (CAB, Ader) | None
+        self.a, self.b, self.kabel = a, b, kabel   # cable: (CAB, core) | None
 
 
 def _verbinden(a, b, kabel=None):
@@ -66,9 +66,8 @@ def _verbinden(a, b, kabel=None):
 
 
 def wert_gesetzt(wert, tag):
-    """Feldwert ohne Platzhalter: leer oder gleich dem Feldnamen ('IND' im
-    Feld IND, wie ihn die Vorlage eines Symbols anzeigt) gilt als nicht
-    ausgefuellt."""
+    """Field value without placeholder: empty or equal to the field name ('IND'
+    in field IND, as shown by a symbol's template) counts as not filled in."""
     w = ("" if wert is None else str(wert)).strip()
     return "" if w.upper() == str(tag).upper() else w
 
@@ -79,9 +78,9 @@ class Netz:
         self._raster = defaultdict(list)
         self.klemmen = []        # {"obj", "blatt", "oben", "unten"}
         self.kabel = []          # {"obj", "blatt", "adern": [{"name","kanten"}]}
-        self._leitung = {}       # id(Leitung) -> Kante
+        self._leitung = {}       # id(wire) -> edge
 
-    # ---- Aufbau ---------------------------------------------------
+    # ---- Construction ---------------------------------------------
     def _neu(self, blatt, x, y, art, **kw):
         n = Knoten(blatt, x, y, art, **kw)
         self.knoten.append(n)
@@ -136,9 +135,9 @@ class Netz:
                       qv_art=k.art)
 
     def _leisten_erben(self, klemmen):
-        """Klemmen ohne Klemmleiste uebernehmen die der naechsten Klemme links
-        davon in derselben Reihe (die Leiste wird meist nur an der ersten
-        Klemme eingetragen)."""
+        """Terminals without a terminal strip inherit that of the nearest terminal to
+        their left in the same row (the strip is usually entered only at the
+        first terminal)."""
         reihen = []
         for kl in sorted(klemmen, key=lambda c: (c["obj"].y, c["obj"].x)):
             if reihen and abs(reihen[-1][0] - kl["obj"].y) <= 0.5:
@@ -156,7 +155,7 @@ class Netz:
                     kl["oben"].kennz = kl["unten"].kennz = aktuell
 
     def blatt_hinzufuegen(self, blatt, elemente):
-        """`blatt`: beliebiger Schluessel (z. B. 0-basierter Index)."""
+        """`blatt`: arbitrary key (e.g. 0-based index)."""
         start = len(self.knoten)
         start_kl = len(self.klemmen)
         for el in elemente:
@@ -169,12 +168,12 @@ class Netz:
                 self._anker(blatt, el, el, "")
         self._leisten_erben(self.klemmen[start_kl:])
         neue = self.knoten[start:]
-        # aufeinanderliegende Anschluesse verschiedener Objekte
+        # coinciding connections of different objects
         for n in neue:
             for _d, m in self._naehe(blatt, n.x, n.y, BERUEHRUNG):
                 if m is not n and m.bes is not n.bes and id(m) > id(n):
                     _verbinden(n, m)
-        # Leitungen
+        # Wires
         for l in elemente:
             if not isinstance(l, Leitung):
                 continue
@@ -213,7 +212,7 @@ class Netz:
             self.kabel.append({"obj": kb, "blatt": blatt, "adern": adern})
 
     def abschliessen(self):
-        """Querverweis-Gegenstuecke bestimmen (nach dem letzten Blatt)."""
+        """Determine cross-reference counterparts (after the last sheet)."""
         gruppen = defaultdict(list)
         for n in self.knoten:
             if n.art == "qv" and n.text:
@@ -232,18 +231,18 @@ class Netz:
 
     @classmethod
     def aufbauen(cls, blaetter):
-        """blaetter: [(schluessel, elemente), ...]"""
+        """blaetter: [(key, elements), ...]"""
         netz = cls()
         for schluessel, elemente in blaetter:
             netz.blatt_hinzufuegen(schluessel, elemente)
         netz.abschliessen()
         return netz
 
-    # ---- Abfragen ---------------------------------------------------
+    # ---- Queries ----------------------------------------------------
     def ziele(self, start, ohne=()):
-        """Alle Endpunkte, die von `start` aus erreichbar sind.
-        -> [(knoten, kabel_infos)], kabel_infos = ((CAB, Ader), ...)
-        `ohne`: Kanten, die nicht benutzt werden duerfen."""
+        """All end points reachable from `start`.
+        -> [(node, cable_infos)], cable_infos = ((CAB, core), ...)
+        `ohne`: edges that must not be used."""
         verboten = {id(k) for k in ohne}
         out = []
         gesehen = {id(start)}
@@ -274,9 +273,9 @@ class Netz:
 
 
 def ende_ziele(netz, knoten, kante):
-    """Ziele am Ende einer Ader/Leitung `kante` bei `knoten`: der Endpunkt
-    selbst (Pin, Klemme, Querverweis) oder, wenn dort eine Verbindung sitzt,
-    alles, was dahinter hängt."""
+    """Targets at the end of a core/wire `kante` at `knoten`: the end point
+    itself (pin, terminal, cross reference) or, if a junction sits there,
+    everything attached behind it."""
     if knoten.art in ("pin", "klemme") or (knoten.art == "qv" and not knoten.partner):
         return [(knoten, ())]
     if knoten.art == "qv":
@@ -288,7 +287,7 @@ def ende_ziele(netz, knoten, kante):
 
 
 def knoten_text(n):
-    """Lesbarer Name eines Endpunkts: 'K1:13', 'X1:3', '→ L1'."""
+    """Readable name of an end point: 'K1:13', 'X1:3', '→ L1'."""
     if n.art == "qv":
         return "→ " + n.text
     if n.kennz and n.name:
@@ -297,8 +296,8 @@ def knoten_text(n):
 
 
 def ziele_texte(treffer, eigener_besitzer=None):
-    """Sortierte, eindeutige Texte; Kabel, die der Weg durchquert, stehen
-    in Klammern: 'K1:13 (W1/L1)'."""
+    """Sorted, unique texts; cables the path passes through are given
+    in brackets: 'K1:13 (W1/L1)'."""
     gesehen = {}
     for n, via in treffer:
         if eigener_besitzer is not None and n.bes is eigener_besitzer:
@@ -311,7 +310,7 @@ def ziele_texte(treffer, eigener_besitzer=None):
 
 
 def natuerlich(s):
-    """Sortierschluessel: 'X10' hinter 'X2'."""
+    """Sort key: 'X10' after 'X2'."""
     import re
     return tuple((0, int(t)) if t.isdigit() else (1, t.lower())
                  for t in re.split(r"(\d+)", str(s)) if t != "")
