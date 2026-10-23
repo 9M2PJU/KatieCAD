@@ -13,7 +13,7 @@ from copy import deepcopy
 
 from katiecad.model.core import (Querverweis, Verbindungspunkt, BlockReferenz,
                            Verbindung, Klemme, ElektroMaske, Leitung,
-                           Koordinatenfeld)
+                           Koordinatenfeld, Text)
 from katiecad.common.i18n import tr
 
 
@@ -515,3 +515,148 @@ def leitungen_einrasten(elemente, neue, tol=0.5):
             n += 1
     return n
 
+
+# ============================================================
+# Automatische Leitungen (wie Eplan P8)
+# ============================================================
+def _block_kanten(kinder):
+    xs, ys = [], []
+    for k in kinder:
+        if isinstance(k, (Text, Verbindungspunkt)):
+            if not isinstance(k, Verbindungspunkt):
+                continue
+        b = k.bbox()
+        xs += [b[0], b[2]]
+        ys += [b[1], b[3]]
+    if not xs:
+        return None
+    return min(xs), min(ys), max(xs), max(ys)
+
+
+def _pin_richtung(x, y, kanten):
+    """Erlaubte Richtung eines Pins in einem Geraet: die naechstgelegene
+    Aussenkante des Symbols (bei Gleichstand senkrecht vor waagerecht).
+    Ohne Kanten (freier Pin): alle Richtungen."""
+    if kanten is None:
+        return None
+    x1, y1, x2, y2 = kanten
+    d = [(y2 - y, 0, 90), (y - y1, 0, 270), (x2 - x, 1, 0), (x - x1, 1, 180)]
+    d.sort()
+    return {d[0][2]}
+
+
+def _auto_anker(elemente):
+    """[(x, y, erlaubte_richtungen|None, besitzer_id, besitzer, bindet_ein)]"""
+    out = []
+
+    def sammle(k, besitzer, kanten):
+        bid = id(besitzer)
+        if isinstance(k, Verbindungspunkt):
+            out.append((k.x, k.y, _pin_richtung(k.x, k.y, kanten), bid, besitzer))
+        elif isinstance(k, Verbindung):
+            for (ax, ay, d) in k.anschluesse():
+                out.append((ax, ay, {d}, bid, besitzer))
+        elif isinstance(k, Klemme):
+            ox, oy = k.anschluss_oben()
+            ux, uy = k.anschluss_unten()
+            out.append((ox, oy, {90}, bid, besitzer))
+            out.append((ux, uy, {270}, bid, besitzer))
+        elif isinstance(k, Querverweis):
+            # Anschluss liegt auf der vom Text abgewandten Seite
+            if k.art == "abgehend":
+                bx, by = k.basis_punkt()
+                out.append((bx, by, {(k.richtung + 180) % 360}, bid, besitzer))
+            else:
+                sx, sy = k.spitze_punkt()
+                out.append((sx, sy, {k.richtung}, bid, besitzer))
+
+    for el in elemente:
+        if isinstance(el, BlockReferenz):
+            kinder = el.aufgeloest()
+            kanten = _block_kanten(kinder)
+            for k in kinder:
+                sammle(k, el, kanten)
+        else:
+            sammle(el, el, None)
+    return out
+
+
+def _cluster(werte, key):
+    """Gruppiert Eintraege mit (fast) gleichem key(eintrag)."""
+    werte = sorted(werte, key=key)
+    gruppen, akt = [], []
+    for w in werte:
+        if akt and abs(key(w) - key(akt[-1])) > TOL:
+            gruppen.append(akt)
+            akt = []
+        akt.append(w)
+    if akt:
+        gruppen.append(akt)
+    return gruppen
+
+
+def gewuenschte_leitungen(elemente):
+    """Alle Leitungsstuecke, die es automatisch geben muss:
+    [(x1, y1, x2, y2, besitzer)]. Zwei benachbarte Anschlusspunkte auf einer
+    waagerechten/senkrechten Linie werden verbunden, wenn sie zu
+    verschiedenen Objekten gehoeren und ihre Richtungen zueinander passen.
+    Ein dazwischenliegender Anschluss (auch eines Geraetes) unterbricht."""
+    anker = _auto_anker(elemente)
+    soll = []
+    for gr in _cluster(anker, key=lambda a: a[0]):          # senkrecht
+        gr.sort(key=lambda a: a[1])
+        for lo, hi in zip(gr, gr[1:]):
+            if lo[3] == hi[3] or hi[1] - lo[1] < TOL:
+                continue
+            if (lo[2] is None or 90 in lo[2]) and (hi[2] is None or 270 in hi[2]):
+                soll.append((lo[0], lo[1], lo[0], hi[1], lo[4]))
+    for gr in _cluster(anker, key=lambda a: a[1]):          # waagerecht
+        gr.sort(key=lambda a: a[0])
+        for lo, hi in zip(gr, gr[1:]):
+            if lo[3] == hi[3] or hi[0] - lo[0] < TOL:
+                continue
+            if (lo[2] is None or 0 in lo[2]) and (hi[2] is None or 180 in hi[2]):
+                soll.append((lo[0], lo[1], hi[0], lo[1], lo[4]))
+    return soll
+
+
+def _seg_key(x1, y1, x2, y2):
+    a, b = (round(x1, 2), round(y1, 2)), (round(x2, 2), round(y2, 2))
+    return (a, b) if a <= b else (b, a)
+
+
+def leitungen_automatisch(elemente):
+    """Gleicht die automatischen Leitungen mit den Anschlusspunkten ab (in
+    place): fehlende werden erzeugt, nicht mehr moegliche entfernt. Von Hand
+    gezeichnete Leitungen (aeltere Dateien), die genau einem gewuenschten
+    Stueck entsprechen, werden zu automatischen Leitungen. Bestehende
+    Leitungen bleiben (gleiche Objekte), solange sie noch gelten.
+    Rueckgabe: (erzeugt, entfernt, entfernte_objekte)."""
+    soll = {}
+    for (x1, y1, x2, y2, bes) in gewuenschte_leitungen(elemente):
+        soll.setdefault(_seg_key(x1, y1, x2, y2), (x1, y1, x2, y2, bes))
+    vorhanden = {}
+    weg = []
+    for l in elemente:
+        if not isinstance(l, Leitung):
+            continue
+        k = _seg_key(l.x1, l.y1, l.x2, l.y2)
+        if k in soll:
+            if k in vorhanden:                   # doppelt
+                if l.auto:
+                    weg.append(l)
+                continue
+            l.auto = True
+            vorhanden[k] = l
+        elif l.auto:
+            weg.append(l)                        # nicht mehr moeglich
+    for l in weg:
+        elemente.remove(l)
+    neu = 0
+    for k, (x1, y1, x2, y2, bes) in soll.items():
+        if k in vorhanden:
+            continue
+        elemente.append(Leitung(x1, y1, x2, y2, auto=True,
+                                layer=getattr(bes, "layer", "0")))
+        neu += 1
+    return neu, len(weg), weg
