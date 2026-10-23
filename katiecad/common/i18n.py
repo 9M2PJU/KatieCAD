@@ -1,15 +1,15 @@
 # -*- coding: utf-8 -*-
 """
-katiecad/common/i18n.py - Sprachumschaltung Deutsch / Englisch
-Enthaelt alle UI-Texte und die tr()-Funktion.
+katiecad/common/i18n.py - Language switching German / English
+Contains all UI texts and the tr() function.
 
-NEU (Schritt 6): Texte fuer Blockbefehle und -dialoge.
-NEU (Schritt 8): Texte fuer Schraffur.
-NEU: Texte fuer Radius- / Durchmesser-Bemaßung.
+NEW (step 6): texts for block commands and dialogs.
+NEW (step 8): texts for hatching.
+NEW: texts for radius / diameter dimensioning.
 """
 
-SPRACHE = {"aktuell": "en"}     # <-- Erststart Englisch; wird beim Start aus
-                                #     katiecad/common/config.py ueberschrieben.
+SPRACHE = {"aktuell": "en"}     # <-- first start: English; read from the
+                                #     katiecad/common/config.py.
 
 TEXTE = {
     "de": {
@@ -247,7 +247,7 @@ TEXTE = {
         "dlg.block.speichern.titel": "Block als Datei speichern",
         "dlg.block.speichern.knopf": "Speichern...",
         "dlg.block.speichern.hinweis": "Wähle den Block, der als eigene Datei (*.katieblock) gespeichert werden soll.",
-        # --- NEU: Projekte, Seitenleiste, Attribute, Blockdateien ---
+        # --- NEW: projects, sidebar, attributes, block files ---
         "menu.bearbeiten.redo": "Wiederholen (Strg+Y)",
         "menu.projekt": "Projekt",
         "menu.projekt.erstellen": "Projekt erstellen...",
@@ -635,7 +635,7 @@ TEXTE = {
         "info.untertitel": "Ein leichtgewichtiges 2D-CAD-System auf Python/Tkinter-Basis mit vollständigen Konstruktions-, Bearbeitungs- und Bemaßungsfunktionen sowie DXF-Unterstützung.",
         "info.gebaut_mit": "Entwickelt mit Python und ein wenig Hilfe von KI.",
         "info.copyright": "(c) 2026 Merecete",
-        "info.version": "Version 0.1.0",
+        "info.version": "Version 1.0.0",
         "info.lizenz": "Veröffentlicht unter der MIT-Lizenz.",
         "info.btn_lizenz": "Lizenz",
     },
@@ -1262,7 +1262,7 @@ TEXTE = {
         "info.untertitel": "A lightweight 2D CAD system powered by Python/Tkinter featuring essential drafting, editing, dimensioning, and full DXF support.",
         "info.gebaut_mit": "Built with Python and a little help from AI.",
         "info.copyright": "(c) 2026 Merecete",
-        "info.version": "Version 0.1.0",
+        "info.version": "Version 1.0.0",
         "info.lizenz": "Released under the MIT License.",
         "info.btn_lizenz": "License",
     },
@@ -1284,3 +1284,4 @@ def tr(schluessel, **kwargs):
 def setze_sprache(code):
     if code in TEXTE:
         SPRACHE["aktuell"] = code
+
