@@ -1,12 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-katiecad/reports/daten.py - Zeilendaten der Berichte (KEIN Tkinter).
+katiecad/reports/daten.py - Row data of the reports (NO Tkinter).
 
-Jede Funktion liefert eine Liste von Dicts (eine Zeile je Dict). Werte sind
-Strings oder Listen von Strings (mehrere Ziele in einer Zelle). Blattschluessel
-sind 0-basierte Indizes der Zeichnungsblaetter; `nummer(idx)` liefert die
-angezeigte Blattnummer (sie haengt davon ab, wie viele Berichtsblaetter
-davor stehen).
+Each function returns a list of dicts (one dict per row). Values are
+strings or lists of strings (several targets in one cell). Sheet keys
+are 0-based indices of the drawing sheets; `nummer(idx)` returns the
+displayed sheet number (it depends on how many report sheets precede it).
 """
 
 from collections import defaultdict
@@ -27,7 +26,7 @@ def _felder(blaetter):
 
 
 # ------------------------------------------------------------------
-# Geraeteliste
+# Device list
 # ------------------------------------------------------------------
 def _typ_per(obj):
     if isinstance(obj, ElektroMaske):
@@ -39,9 +38,9 @@ def _typ_per(obj):
 
 
 def geraeteliste(blaetter, nummer, netz=None, klemmenleisten=True):
-    """Eine Zeile je Betriebsmittel-Kennzeichen (IND). Hauptsymbol und
-    Hilfsbausteine mit gleichem IND zaehlen als ein Geraet.
-    Zeilen: pos, ind, typ, per, anzahl, orte (Liste), ort (Text)."""
+    """One row per equipment identifier (IND). Main symbol and auxiliary
+    parts with the same IND count as one device.
+    Rows: pos, ind, typ, per, anzahl, orte (list), ort (text)."""
     gruppen = {}
     reihenfolge = []
     for idx, el in blaetter:
@@ -94,7 +93,7 @@ def geraeteliste(blaetter, nummer, netz=None, klemmenleisten=True):
             zeilen.append({"ind": kz, "typ": z["typ"], "per": z["per"],
                            "anzahl": str(z["anzahl"]), "orte": orte,
                            "ort": ", ".join(orte)})
-    # Geraete ohne Kennzeichen ans Ende, sonst natuerlich sortiert
+    # Devices without identifier at the end, otherwise naturally sorted
     zeilen.sort(key=lambda r: (r["ind"] == "", natuerlich(r["ind"])))
     for i, z in enumerate(zeilen, 1):
         z["pos"] = str(i)
@@ -102,11 +101,11 @@ def geraeteliste(blaetter, nummer, netz=None, klemmenleisten=True):
 
 
 # ------------------------------------------------------------------
-# Klemmenplan
+# Terminal diagram
 # ------------------------------------------------------------------
 def klemmenplan(netz, blaetter, nummer):
-    """Eine Zeile je Klemme, sortiert nach Klemmleiste (IND) und Nummer (NUM).
-    Zeilen: leiste, num, typ, per, oben (Liste), unten (Liste), ort."""
+    """One row per terminal, sorted by terminal strip (IND) and number (NUM).
+    Rows: leiste, num, typ, per, oben (list), unten (list), ort."""
     felder = _felder(blaetter)
     zeilen = []
     for kl in netz.klemmen:
@@ -129,12 +128,12 @@ def klemmenplan(netz, blaetter, nummer):
 
 
 # ------------------------------------------------------------------
-# Kabelplan
+# Cable plan
 # ------------------------------------------------------------------
 def kabelplan(netz, blaetter, nummer):
-    """Eine Zeile je Ader (bzw. je Kabel ohne erkannte Adern).
-    Von = Ende oberhalb des Kabels (Einspeisung), Nach = Ende darunter.
-    Zeilen: cab, typ, ader, von (Liste), nach (Liste), ort."""
+    """One row per core (or per cable without detected cores).
+    Von = end above the cable (supply), Nach = end below.
+    Rows: cab, typ, ader, von (list), nach (list), ort."""
     felder = _felder(blaetter)
     nach_cab = defaultdict(list)
     for kb in netz.kabel:
@@ -166,10 +165,10 @@ def kabelplan(netz, blaetter, nummer):
 
 
 # ------------------------------------------------------------------
-# Inhaltsverzeichnis
+# Table of contents
 # ------------------------------------------------------------------
 def inhaltsverzeichnis(eintraege):
-    """eintraege: [{"nr", "name", "beschreibung", "typ"}] -> Zeilen."""
+    """eintraege: [{"nr", "name", "beschreibung", "typ"}] -> rows."""
     return [{"nr": str(e["nr"]), "name": e.get("name", ""),
              "beschreibung": e.get("beschreibung", ""), "typ": e.get("typ", "")}
             for e in eintraege]
