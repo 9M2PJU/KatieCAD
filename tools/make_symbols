@@ -1,0 +1,400 @@
+# -*- coding: utf-8 -*-
+"""Generator for the basic symbol library (symbols/<category>/*.katieblock).
+
+Run from the project root:   python tools/make_symbols.py
+
+All symbols follow the same conventions as the hand-drawn fuse blocks:
+  * vertical orientation, 5 mm pole pitch, pins at +-7.5 mm (2-pin symbols),
+  * line weight 0.35 mm, pin radius 0.5 mm, text height 2 mm,
+  * one electrical mask per device (main device or auxiliary device),
+    anchored at its lower right corner and placed to the left of the symbol.
+Edit the SYMBOLS section to add or change symbols, then run the script again.
+"""
+import math
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from katiecad.model.core import (BlockDefinition, Linie, Kreis, Bogen, Rechteck,
+                                 Polylinie, Text, Verbindungspunkt, ElektroMaske,
+                                 Schraffur, vp_tags_eindeutig)
+from katiecad.model.blocks import block_speichern, vorschlag_dateiname
+
+OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "symbols")
+STYLE = dict(layer="0", farbe="#c29bff", linientyp="Volllinie (schmal)", eig_farbe=True)
+DASH = dict(STYLE, linientyp="Strichlinie (verdeckt)")
+W = 0.35
+
+
+class Sym:
+    """Collects the elements of one symbol."""
+
+    def __init__(self, name, category, de):
+        self.name, self.category, self.de = name, category, de
+        self.el = []
+        self.pin_names = []
+
+    # --- geometry ------------------------------------------------
+    def line(self, x1, y1, x2, y2, dash=False):
+        self.el.append(Linie(x1, y1, x2, y2, staerke=W, **(DASH if dash else STYLE)))
+
+    def poly(self, pts, closed=False, dash=False):
+        self.el.append(Polylinie([tuple(p) for p in pts], geschlossen=closed,
+                                 staerke=W, **(DASH if dash else STYLE)))
+
+    def rect(self, x1, y1, x2, y2):
+        self.el.append(Rechteck(x1, y1, x2, y2, staerke=W, **STYLE))
+
+    def circle(self, cx, cy, r):
+        self.el.append(Kreis(cx, cy, r, staerke=W, **STYLE))
+
+    def arc(self, cx, cy, r, a1, a2):
+        self.el.append(Bogen(cx, cy, r, a1, a2, staerke=W, **STYLE))
+
+    def text(self, x, y, s, h=2.5, anchor="mitte_zentriert"):
+        self.el.append(Text(x, y, s, h, 0.0, "Arial", anchor, staerke=None, **STYLE))
+
+    def dot(self, x, y, r=0.8):
+        pts = [(x + r * math.cos(math.radians(a)), y + r * math.sin(math.radians(a)))
+               for a in range(0, 360, 30)]
+        self.el.append(Schraffur(pts, muster="solid", staerke=None, **STYLE))
+
+    def pin(self, x, y, name):
+        n = len(self.pin_names) + 1
+        self.pin_names.append(name)
+        self.el.append(Verbindungspunkt(x, y, name, 2.0, 0.0, "Arial", None,
+                                        tag="VP%d" % n, prompt="Pin %d" % n,
+                                        wert=name, sichtbar=True, radius=0.5,
+                                        staerke=0.25, **STYLE))
+
+    def mask(self, x, y, rolle="haupt"):
+        self.el.append(ElektroMaske(x, y, {"IND": "IND", "TYP": "TYP", "PER": "PER"},
+                                    rolle=rolle, staerke=None, **STYLE))
+
+    # --- output --------------------------------------------------
+    def save(self):
+        vp_tags_eindeutig(self.el)
+        d = BlockDefinition(self.name, (0.0, 0.0), self.el)
+        ordner = os.path.join(OUT, self.category)
+        os.makedirs(ordner, exist_ok=True)
+        block_speichern(os.path.join(ordner, vorschlag_dateiname(self.name)), d)
+        return d
+
+
+# ---------------------------------------------------------------
+# building blocks
+# ---------------------------------------------------------------
+def contact_pole(s, x, top, bot, nc=False):
+    """One switching pole: pins at y = +-7.5, blade pivot at the bottom."""
+    s.line(x, 7.5, x, 2.5)
+    s.line(x, -7.5, x, -2.5)
+    s.line(x, -2.5, x - 2.5, 2.5)            # blade
+    if nc:
+        s.line(x - 2.5, 2.5, x, 2.5)         # hook = closed at rest
+    s.pin(x, 7.5, top)
+    s.pin(x, -7.5, bot)
+
+
+def gang(s, x_first, x_last):
+    if x_last > x_first:
+        s.line(x_first - 1.25, 0, x_last - 1.25, 0, dash=True)
+
+
+def poles(s, n, names, nc=False):
+    for i in range(n):
+        contact_pole(s, 5.0 * i, names[2 * i], names[2 * i + 1], nc)
+    gang(s, 0, 5.0 * (n - 1))
+
+
+def head(s, xs, kind):
+    """Actuator on the left of the first pole."""
+    s.line(-1.25, 0, -5.0, 0, dash=True)
+    if kind == "push":
+        s.line(-5.0, -1.5, -5.0, 1.5)
+    else:                                      # general hand operation
+        s.line(-5.0, -1.5, -5.0, 1.5)
+        s.line(-5.0, 1.5, -6.5, 1.5)
+        s.line(-5.0, -1.5, -6.5, -1.5)
+
+
+def fuse_pole(s, x, top, bot):
+    s.line(x, 7.5, x, -7.5)
+    s.rect(x - 1.5, 4.0, x + 1.5, -4.0)
+    s.pin(x, 7.5, top)
+    s.pin(x, -7.5, bot)
+
+
+def mask_left(s, n_poles_width=0.0, rolle="haupt", y=-5.0, x=-3.5):
+    s.mask(x, y, rolle)
+
+
+def two_pin(s, top="1", bot="2"):
+    s.pin(0, 7.5, top)
+    s.pin(0, -7.5, bot)
+
+
+SYMBOLS = []
+
+
+def sym(name, category, de):
+    s = Sym(name, category, de)
+    SYMBOLS.append(s)
+    return s
+
+
+# ===============================================================
+# 01 Connections
+# ===============================================================
+s = sym("Earth", "01 Connections", "Erde")
+s.line(0, 5, 0, 0); s.line(-3, 0, 3, 0); s.line(-2, -1.5, 2, -1.5); s.line(-1, -3, 1, -3)
+s.pin(0, 5, "PE")
+
+s = sym("Chassis", "01 Connections", "Masse / Gehäuse")
+s.line(0, 5, 0, 0); s.line(-3, 0, 3, 0)
+for x in (-2.0, 0.0, 2.0):
+    s.line(x, 0, x - 1.5, -2.5)
+s.pin(0, 5, "M")
+
+# ===============================================================
+# 02 Contacts and switches
+# ===============================================================
+s = sym("NO contact", "02 Contacts and switches", "Schließer")
+poles(s, 1, ["13", "14"]); s.mask(-4.0, -5.0, "hilfs")
+
+s = sym("NC contact", "02 Contacts and switches", "Öffner")
+poles(s, 1, ["21", "22"], nc=True); s.mask(-4.0, -5.0, "hilfs")
+
+s = sym("Changeover contact", "02 Contacts and switches", "Wechsler")
+s.line(0, -7.5, 0, -2.5)
+s.line(0, -2.5, -2.5, 2.5)
+s.line(-2.5, 7.5, -2.5, 2.5)
+s.line(2.5, 7.5, 2.5, 2.5)
+s.pin(0, -7.5, "11"); s.pin(-2.5, 7.5, "12"); s.pin(2.5, 7.5, "14")
+s.mask(-5.0, -5.0, "hilfs")
+
+s = sym("NO contact 3-pole", "02 Contacts and switches", "Schließer 3-polig (Hauptkontakte)")
+poles(s, 3, ["1", "2", "3", "4", "5", "6"]); s.mask(-4.0, -5.0, "hilfs")
+
+s = sym("NO contact 4-pole", "02 Contacts and switches", "Schließer 4-polig")
+poles(s, 4, ["1", "2", "3", "4", "5", "6", "7", "8"]); s.mask(-4.0, -5.0, "hilfs")
+
+s = sym("Push button NO", "02 Contacts and switches", "Taster, Schließer")
+poles(s, 1, ["13", "14"]); head(s, 0, "push"); s.mask(-7.0, -5.0, "hilfs")
+
+s = sym("Push button NC", "02 Contacts and switches", "Taster, Öffner")
+poles(s, 1, ["21", "22"], nc=True); head(s, 0, "push"); s.mask(-7.0, -5.0, "hilfs")
+
+s = sym("Switch NO", "02 Contacts and switches", "Schalter (handbetätigt), Schließer")
+poles(s, 1, ["13", "14"]); head(s, 0, "hand"); s.mask(-8.0, -5.0, "hilfs")
+
+s = sym("Main switch 3-pole", "02 Contacts and switches", "Hauptschalter 3-polig (handbetätigt)")
+poles(s, 3, ["1", "2", "3", "4", "5", "6"]); head(s, 0, "hand"); s.mask(-8.0, -5.0, "hilfs")
+
+# ===============================================================
+# 03 Protection
+# ===============================================================
+for n, nm in ((1, "1-pole"), (2, "2-pole"), (3, "3-pole"), (4, "4-pole")):
+    s = sym("Fuse " + nm, "03 Protection", "Sicherung %d-polig" % n)
+    for i in range(n):
+        fuse_pole(s, 5.0 * i, str(2 * i + 1), str(2 * i + 2))
+    s.mask(-2.0, -6.5)
+
+def breaker(s, n):
+    for i in range(n):
+        x = 5.0 * i
+        contact_pole(s, x, str(2 * i + 1), str(2 * i + 2))
+        s.line(x - 1.0, 4.5, x + 1.0, 6.5); s.line(x - 1.0, 6.5, x + 1.0, 4.5)   # cross
+    gang(s, 0, 5.0 * (n - 1))
+    head(s, 0, "hand")
+
+s = sym("Circuit breaker 1-pole", "03 Protection", "Leitungsschutzschalter / Leistungsschalter 1-polig")
+breaker(s, 1); s.mask(-8.0, -5.0)
+s = sym("Circuit breaker 3-pole", "03 Protection", "Leistungsschalter 3-polig")
+breaker(s, 3); s.mask(-8.0, -5.0)
+
+s = sym("Motor protection switch 3-pole", "03 Protection", "Motorschutzschalter 3-polig")
+for i in range(3):
+    x = 5.0 * i
+    contact_pole(s, x, str(2 * i + 1), str(2 * i + 2))
+    s.line(x - 1.0, 4.5, x + 1.0, 6.5); s.line(x - 1.0, 6.5, x + 1.0, 4.5)
+    s.rect(x - 1.5, -3.8, x + 1.5, -6.2)                                   # thermal release
+gang(s, 0, 10); head(s, 0, "hand"); s.mask(-8.0, -5.0)
+
+s = sym("Overload relay 3-pole", "03 Protection", "Motorrelais / Überstromauslöser 3-polig (Hauptstrompfad)")
+for i in range(3):
+    x = 5.0 * i
+    s.line(x, 7.5, x, -7.5)
+    s.rect(x - 1.5, 3.5, x + 1.5, -3.5)
+    s.pin(x, 7.5, str(2 * i + 1)); s.pin(x, -7.5, str(2 * i + 2))
+s.line(-1.5, 0, 11.5, 0, dash=True)
+s.mask(-2.0, -6.5)
+
+s = sym("Overload relay contact NC", "03 Protection", "Motorrelais Öffnerkontakt (95/96)")
+poles(s, 1, ["95", "96"], nc=True)
+s.poly([(-5.0, 1.0), (-3.0, 1.0), (-3.0, -3.0), (-5.0, -3.0)])
+s.line(-1.25, 0, -3.0, 0, dash=True); s.mask(-6.0, -5.0, "hilfs")
+
+# ===============================================================
+# 04 Coils and actuators
+# ===============================================================
+s = sym("Coil", "04 Coils and actuators", "Spule (Schütz / Relais)")
+s.line(0, 7.5, 0, 5.0); s.line(0, -5.0, 0, -7.5)
+s.rect(-3.5, -5.0, 3.5, 5.0); s.pin(0, 7.5, "A1"); s.pin(0, -7.5, "A2")
+s.mask(-4.5, -5.0)
+
+s = sym("Solenoid valve coil", "04 Coils and actuators", "Magnetventil (Spule)")
+s.line(0, 7.5, 0, 5.0); s.line(0, -5.0, 0, -7.5)
+s.rect(-3.5, -5.0, 3.5, 5.0); s.line(-3.5, 5.0, 3.5, -5.0)
+s.pin(0, 7.5, "1"); s.pin(0, -7.5, "2"); s.mask(-4.5, -5.0)
+
+s = sym("Indicator lamp", "04 Coils and actuators", "Meldeleuchte")
+s.line(0, 7.5, 0, 3.5); s.line(0, -3.5, 0, -7.5)
+s.circle(0, 0, 3.5)
+r = 3.5 * math.cos(math.radians(45))
+s.line(-r, -r, r, r); s.line(-r, r, r, -r)
+s.pin(0, 7.5, "X1"); s.pin(0, -7.5, "X2"); s.mask(-4.5, -5.0)
+
+s = sym("Horn / buzzer", "04 Coils and actuators", "Hupe / Summer")
+s.line(0, 7.5, 0, 4.0); s.line(0, -4.0, 0, -7.5)
+s.poly([(-3.5, 4.0), (3.5, 4.0), (3.5, -1.0), (0, -4.0), (-3.5, -1.0)], closed=True)
+s.pin(0, 7.5, "1"); s.pin(0, -7.5, "2"); s.mask(-4.5, -5.0)
+
+# ===============================================================
+# 05 Motors and drives
+# ===============================================================
+s = sym("Motor 3-phase", "05 Motors and drives", "Drehstrommotor")
+s.circle(0, 0, 7.5)
+s.text(0, 1.5, "M", 3.5); s.text(0, -2.5, "3~", 2.5)
+for i, nm in enumerate(("U1", "V1", "W1")):
+    x = -5.0 + 5.0 * i
+    y0 = math.sqrt(7.5 ** 2 - x ** 2)
+    s.line(x, 10.0, x, y0)
+    s.pin(x, 10.0, nm)
+s.mask(-8.5, -7.0)
+
+s = sym("Motor 1-phase", "05 Motors and drives", "Wechselstrommotor")
+s.circle(0, 0, 6.0)
+s.text(0, 1.5, "M", 3.5); s.text(0, -2.5, "1~", 2.5)
+for x, nm in ((-2.5, "U1"), (2.5, "U2")):
+    y0 = math.sqrt(6.0 ** 2 - x ** 2)
+    s.line(x, 8.5, x, y0); s.pin(x, 8.5, nm)
+s.mask(-7.0, -6.0)
+
+s = sym("Motor DC", "05 Motors and drives", "Gleichstrommotor")
+s.circle(0, 0, 6.0)
+s.text(0, 1.5, "M", 3.5); s.text(0, -2.5, "=", 2.5)
+for x, nm in ((-2.5, "A1"), (2.5, "A2")):
+    y0 = math.sqrt(6.0 ** 2 - x ** 2)
+    s.line(x, 8.5, x, y0); s.pin(x, 8.5, nm)
+s.mask(-7.0, -6.0)
+
+# ===============================================================
+# 06 Passive components
+# ===============================================================
+s = sym("Resistor", "06 Passive components", "Widerstand")
+s.line(0, 7.5, 0, 4.0); s.line(0, -4.0, 0, -7.5)
+s.rect(-1.5, -4.0, 1.5, 4.0); two_pin(s); s.mask(-2.5, -5.0)
+
+s = sym("Capacitor", "06 Passive components", "Kondensator")
+s.line(0, 7.5, 0, 1.0); s.line(0, -1.0, 0, -7.5)
+s.line(-3.0, 1.0, 3.0, 1.0); s.line(-3.0, -1.0, 3.0, -1.0)
+two_pin(s); s.mask(-4.0, -5.0)
+
+s = sym("Capacitor polarised", "06 Passive components", "Elektrolytkondensator (gepolt)")
+s.line(0, 7.5, 0, 1.0); s.line(0, -1.5, 0, -7.5)
+s.line(-3.0, 1.0, 3.0, 1.0); s.arc(0, 6.5, 8.0, 248, 292)
+s.text(3.5, 3.0, "+", 2.0)
+two_pin(s); s.mask(-4.0, -5.0)
+
+s = sym("Inductor", "06 Passive components", "Spule / Drossel")
+s.line(0, 7.5, 0, 6.0); s.line(0, -6.0, 0, -7.5)
+for i in range(4):
+    s.arc(0, 4.5 - 3.0 * i, 1.5, 270, 90)
+two_pin(s); s.mask(-3.5, -5.0)
+
+# ===============================================================
+# 07 Semiconductors
+# ===============================================================
+s = sym("Diode", "07 Semiconductors", "Diode")
+s.line(0, 7.5, 0, 2.0); s.line(0, -2.0, 0, -7.5)
+s.poly([(-2.5, 2.0), (2.5, 2.0), (0, -2.0)], closed=True)
+s.line(-2.5, -2.0, 2.5, -2.0)
+s.pin(0, 7.5, "A"); s.pin(0, -7.5, "K"); s.mask(-4.0, -5.0)
+
+s = sym("Zener diode", "07 Semiconductors", "Z-Diode")
+s.line(0, 7.5, 0, 2.0); s.line(0, -2.0, 0, -7.5)
+s.poly([(-2.5, 2.0), (2.5, 2.0), (0, -2.0)], closed=True)
+s.poly([(-3.5, -3.0), (-2.5, -2.0), (2.5, -2.0), (3.5, -1.0)])
+s.pin(0, 7.5, "A"); s.pin(0, -7.5, "K"); s.mask(-4.5, -5.0)
+
+s = sym("LED", "07 Semiconductors", "Leuchtdiode")
+s.line(0, 7.5, 0, 2.0); s.line(0, -2.0, 0, -7.5)
+s.poly([(-2.5, 2.0), (2.5, 2.0), (0, -2.0)], closed=True)
+s.line(-2.5, -2.0, 2.5, -2.0)
+for dy in (0.0, -2.0):
+    s.line(3.5, 1.0 + dy, 6.0, 3.5 + dy)
+    s.poly([(4.7, 3.5 + dy), (6.0, 3.5 + dy), (6.0, 2.2 + dy)])
+s.pin(0, 7.5, "A"); s.pin(0, -7.5, "K"); s.mask(-4.0, -5.0)
+
+s = sym("Bridge rectifier", "07 Semiconductors", "Brückengleichrichter")
+s.poly([(0, 8), (8, 0), (0, -8), (-8, 0)], closed=True)
+s.text(-3.5, 3.0, "~", 3.0); s.text(3.5, 3.0, "+", 3.0)
+s.text(3.5, -3.0, "~", 3.0); s.text(-3.5, -3.0, "-", 3.0)
+s.line(0, 8, 0, 10); s.line(0, -8, 0, -10)
+s.line(-8, 0, -10, 0); s.line(8, 0, 10, 0)
+s.pin(0, 10, "+"); s.pin(0, -10, "-"); s.pin(-10, 0, "AC1"); s.pin(10, 0, "AC2")
+s.mask(-12.0, -4.0)
+
+# ===============================================================
+# 08 Sources and transformers
+# ===============================================================
+s = sym("Battery", "08 Sources and transformers", "Batterie")
+s.line(0, 7.5, 0, 1.5); s.line(0, -1.5, 0, -7.5)
+s.line(-3.0, 1.5, 3.0, 1.5); s.line(-1.5, 0, 1.5, 0); s.line(-3.0, -1.5, 3.0, -1.5)
+s.pin(0, 7.5, "+"); s.pin(0, -7.5, "-"); s.mask(-4.0, -5.0)
+
+s = sym("Power supply AC-DC", "08 Sources and transformers", "Netzteil AC/DC")
+s.rect(-7.5, -5.0, 7.5, 5.0); s.line(-7.5, -5.0, 7.5, 5.0)
+s.text(-3.5, 2.5, "~", 3.0); s.text(3.5, -2.5, "=", 3.0)
+s.line(-3.0, 5.0, -3.0, 7.5); s.line(3.0, 5.0, 3.0, 7.5)
+s.line(-3.0, -5.0, -3.0, -7.5); s.line(3.0, -5.0, 3.0, -7.5)
+s.pin(-3.0, 7.5, "L"); s.pin(3.0, 7.5, "N")
+s.pin(-3.0, -7.5, "+"); s.pin(3.0, -7.5, "-")
+s.mask(-8.5, -5.0)
+
+s = sym("Transformer 1-phase", "08 Sources and transformers", "Transformator einphasig")
+s.circle(0, 3.0, 4.5); s.circle(0, -3.0, 4.5)
+s.line(-2.5, 7.5, -2.5, 6.5); s.line(2.5, 7.5, 2.5, 6.5)
+s.line(-2.5, -7.5, -2.5, -6.5); s.line(2.5, -7.5, 2.5, -6.5)
+s.pin(-2.5, 7.5, "1"); s.pin(2.5, 7.5, "2")
+s.pin(-2.5, -7.5, "3"); s.pin(2.5, -7.5, "4")
+s.mask(-5.5, -5.0)
+
+# ===============================================================
+# 09 Measuring
+# ===============================================================
+for nm, de, letter in (("Voltmeter", "Voltmeter", "V"), ("Ammeter", "Amperemeter", "A")):
+    s = sym(nm, "09 Measuring", de)
+    s.line(0, 7.5, 0, 3.5); s.line(0, -3.5, 0, -7.5)
+    s.circle(0, 0, 3.5); s.text(0, 0, letter, 3.0)
+    two_pin(s); s.mask(-4.5, -5.0)
+
+
+def main():
+    import shutil
+    if os.path.isdir(OUT):                       # keep symbols/README.md
+        for n in os.listdir(OUT):
+            if os.path.isdir(os.path.join(OUT, n)):
+                shutil.rmtree(os.path.join(OUT, n))
+    names = set()
+    for s in SYMBOLS:
+        assert s.name not in names, s.name
+        names.add(s.name)
+        s.save()
+    print(len(SYMBOLS), "symbols written to", OUT)
+    return SYMBOLS
+
+
+if __name__ == "__main__":
+    main()
