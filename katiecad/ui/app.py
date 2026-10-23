@@ -971,6 +971,8 @@ class CadApp:
                               command=self.projekt_speichern)
         m_projekt.add_command(label=tr("menu.projekt.schliessen"),
                               command=self.projekt_schliessen)
+        m_projekt.add_command(label=tr("menu.projekt.umbenennen"),
+                              command=self.projekt_umbenennen)
         m_projekt.add_separator()
         m_projekt.add_command(label=tr("menu.projekt.blatt_neu"),
                               command=self.blatt_neu)
@@ -6728,6 +6730,39 @@ class CadApp:
         self._mark_clean()
         self.seitenleiste.aktualisieren()
         self._update_titel()
+
+    def projekt_umbenennen(self):
+        """Projekt umbenennen (Projektdatei, wenn moeglich auch der Ordner)."""
+        p = self.projekt
+        if p is None:
+            self.status.set(tr("msg.projekt.kein_projekt"))
+            return
+        name = _LayoutNameDialog(self.root, tr("msg.projekt.umbenennen"),
+                                 p.name, label=tr("dlg.projekt.name")).result
+        if name is None or name.strip() == p.name:
+            return
+        try:
+            self._zeichnung_in_datei(p.blatt_pfad(p.aktiv))   # offene Aenderungen sichern
+            ordner_alt = p.ordner
+            alt = p.name
+            mit_ordner = p.umbenennen(name)
+        except ProjektFehler as e:
+            code = str(e)
+            if code in ("leer", "zeichen", "ende", "reserviert", "existiert"):
+                msg = tr("msg.projekt.name_" + code)
+            else:
+                msg = tr("msg.projekt.fehler", fehler=code)
+            messagebox.showerror(tr("msg.projekt.titel"), msg, parent=self.root)
+            return
+        except OSError as e:
+            messagebox.showerror(tr("msg.projekt.titel"),
+                                 tr("msg.projekt.fehler", fehler=e), parent=self.root)
+            return
+        self._ge_cache = {}
+        self._letzten_projektordner_merken(p)
+        self.seitenleiste.aktualisieren()
+        self._update_titel()
+        self.status.set(tr("msg.projekt.umbenannt", alt=alt, name=p.name))
 
     def projekt_schliessen(self):
         if self.projekt is None:
