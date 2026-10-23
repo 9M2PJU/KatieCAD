@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-katiecad/ui/widgets.py - Plattformunabhaengige Bedienelemente (nur Tkinter).
+katiecad/ui/widgets.py - Platform-independent controls (Tkinter only).
 
-Warum: tk.Button ignoriert unter macOS (Aqua) die Farben bg/fg - Knoepfe mit
-eigenem Farbschema erscheinen dort einfach weiss. Ein tk.Label dagegen
-respektiert Farben auf Windows, Linux UND macOS. Die Klassen hier bauen
-darauf auf.
+Why: tk.Button ignores the bg/fg colours on macOS (Aqua) - buttons with a
+custom colour scheme simply appear white there. A tk.Label, however,
+respects colours on Windows, Linux AND macOS. The classes here are built
+on it.
 """
 
 import tkinter as tk
@@ -14,10 +14,10 @@ from katiecad.model.core import FARBEN
 
 
 class FlatButton(tk.Label):
-    """Knopf auf Label-Basis mit Hover-/Druck-Zustand.
+    """Label-based button with hover/pressed state.
 
-    Unterstuetzt config(text=..., bg=..., fg=..., activebackground=...,
-    activeforeground=..., highlightbackground=...) wie tk.Button."""
+    Supports config(text=..., bg=..., fg=..., activebackground=...,
+    activeforeground=..., highlightbackground=...) like tk.Button."""
 
     def __init__(self, parent, text="", command=None, padx=10, pady=4,
                  font=None, **kw):
@@ -37,10 +37,10 @@ class FlatButton(tk.Label):
         self.bind("<ButtonPress-1>", self._press)
         self.bind("<ButtonRelease-1>", self._release)
 
-    # -- Optionen wie tk.Button -------------------------------------
+    # -- Options like tk.Button -------------------------------------
     def configure(self, cnf=None, **kw):
         if isinstance(cnf, str) or (cnf is None and not kw):
-            return super().configure(cnf)          # Abfrage einer Option
+            return super().configure(cnf)          # Query an option
         if cnf:
             kw = {**cnf, **kw}
         if "bg" in kw:
@@ -68,7 +68,7 @@ class FlatButton(tk.Label):
         else:
             tk.Label.configure(self, bg=self._bg, fg=self._fg)
 
-    # -- Ereignisse --------------------------------------------------
+    # -- Events --------------------------------------------------
     def _enter(self, _e=None):
         self._hover = True
         self._anwenden()
@@ -93,7 +93,7 @@ class FlatButton(tk.Label):
 
 
 def farb_swatch(parent, farbe, command, width=4):
-    """Anklickbares Farbfeld (Label statt tk.Button, siehe Modulkopf)."""
+    """Clickable colour field (label instead of tk.Button, see module header)."""
     lbl = tk.Label(parent, bg=farbe, width=width, relief=tk.RIDGE, bd=2,
                    highlightthickness=1, cursor="hand2",
                    highlightbackground=FARBEN["cyan"])
