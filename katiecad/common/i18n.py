@@ -76,6 +76,14 @@ TEXTE = {
         "dlg.vp.titel": "Pin",
         "dlg.vp.text": "Bezeichnung des Pins (z. B. 13, A1, L1):",
         "dlg.vp.anzeigen": "Text anzeigen",
+        "menu.elektro.kabel": "Kabel setzen (KABEL)",
+        "tb.wz.kabel": "Kabel",
+        "dlg.kabel.titel": "Kabel",
+        "dlg.kabel.hinweis": "CAB ist die Kennung (wie IND bei Geräten, für spätere Listen). REF füllt sich selbst, sobald es andere Kabel mit gleichem CAB gibt. Die Aderstriche entstehen automatisch, wo eine senkrechte Leitung das Kabel kreuzt.",
+        "dlg.kabel.ader": "Ader {n} (Abstand {abstand} mm):",
+        "msg.kabel.start": "Kabel: Klick = Anfang (linkes Ende) setzen, ESC = abbrechen.",
+        "msg.kabel.ende": "Kabel: Klick rechts vom Anfang = Ende setzen (später am Griff verlängerbar).",
+        "msg.kabel.gesetzt": "Kabel gesetzt.",
         "dlg.bb.titel": "Block-Browser",
         "dlg.bb.ordner": "Ordner",
         "dlg.bb.dateien": "Blöcke",
@@ -624,6 +632,14 @@ TEXTE = {
         "dlg.vp.titel": "Pin",
         "dlg.vp.text": "Pin label (e.g. 13, A1, L1):",
         "dlg.vp.anzeigen": "Show text",
+        "menu.elektro.kabel": "Place cable (KABEL)",
+        "tb.wz.kabel": "Cable",
+        "dlg.kabel.titel": "Cable",
+        "dlg.kabel.hinweis": "CAB is the identifier (like IND for devices, for later lists). REF fills itself when other cables share the same CAB. Core marks appear automatically where a vertical wire crosses the cable.",
+        "dlg.kabel.ader": "Core {n} (distance {abstand} mm):",
+        "msg.kabel.start": "Cable: click = set start (left end), ESC = cancel.",
+        "msg.kabel.ende": "Cable: click right of the start = set end (can be extended later with the grip).",
+        "msg.kabel.gesetzt": "Cable placed.",
         "dlg.bb.titel": "Block browser",
         "dlg.bb.ordner": "Folders",
         "dlg.bb.dateien": "Blocks",
@@ -1126,4 +1142,3 @@ def tr(schluessel, **kwargs):
 def setze_sprache(code):
     if code in TEXTE:
         SPRACHE["aktuell"] = code
-
