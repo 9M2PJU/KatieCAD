@@ -84,8 +84,9 @@ from katiecad.ui.dialogs import (
     QuerverweisDialog, VerbindungspunkteDialog, ProjektDruckDialog,
     VerbindungspunktDialog, VerbindungDialog, FestMaskeDialog,
     KoordinatenfeldDialog,
-    TitleBlockDialog,
+    TitleBlockDialog, DokumentationDialog,
 )
+from katiecad.reports import seiten as SEI, anwenden as ANW
 from katiecad.fileio.pdf import pdf_erzeugen, pdf_senden, pdf_mehrseitig_erzeugen
 from katiecad.electrical.logic import (leitungen_automatisch, kabel_kreuzungen, querverweis_ziele, qv_texte_aus_blattdaten,
                               qv_texte_aus_elementen, naechster_vp,
@@ -982,6 +983,11 @@ class CadApp:
         m_projekt.add_separator()
         m_projekt.add_command(label=tr("menu.projekt.drucken"),
                               command=self.projekt_drucken)
+        m_projekt.add_separator()
+        m_projekt.add_command(label=tr("menu.projekt.doku"),
+                              command=self.dokumentation_erzeugen)
+        m_projekt.add_command(label=tr("menu.projekt.doku_csv"),
+                              command=self.dokumentation_csv)
         m_projekt.add_separator()
         m_projekt.add_command(label=tr("menu.projekt.loeschen"),
                               command=self.projekt_loeschen)
@@ -4922,6 +4928,11 @@ class CadApp:
                 self.eingabe_var.set("")
                 self._befehl(cmd, tok[1] if len(tok) > 1 else "")
                 return
+            if self._block_erzeuge_auswahl is not None:
+                pt = self._parse_xy(text, einh)
+                self.eingabe_var.set("")
+                self._block_erzeugen_fertig(pt)
+                return
             if w == "stutzen" and self._trim_status == "grenzen":
                 self._trim_grenzen_bestaetigen()
                 self.eingabe_var.set("")
@@ -6787,8 +6798,9 @@ class CadApp:
         except OSError:
             pass
         self.entry_eingabe.focus_set()
-        self.status.set(tr("msg.blatt.wechsel", nr=p.nummer(index),
-                           name=p.blaetter[index].name))
+        self.status.set(tr("msg.doku.bericht_blatt") if p.blaetter[index].bericht
+                        else tr("msg.blatt.wechsel", nr=p.nummer(index),
+                                name=p.blaetter[index].name))
         return True
 
     def blatt_neu(self):
@@ -7220,7 +7232,10 @@ class CadApp:
             return
         masken = [e for e in self.auswahl if isinstance(e, ElektroMaske)]
         if not masken:
-            self.status.set(tr("msg.geraet.keine_maske"))
+            in_block = any(isinstance(e, BlockReferenz) and e.geraet_maske() is not None
+                           for e in self.auswahl)
+            self.status.set(tr("msg.geraet.maske_im_block" if in_block
+                               else "msg.geraet.keine_maske"))
             return
         if len(masken) > 1:
             self.status.set(tr("msg.geraet.mehrere"))
@@ -7656,7 +7671,8 @@ class CadApp:
             return SimpleNamespace(
                 elemente=self.elemente, layers=self.layers,
                 layouts=self.layouts, aktives_layout=self.aktives_layout,
-                _einh_faktor=self._einh_faktor, dezimalkomma=self.dezimalkomma)
+                _einh_faktor=self._einh_faktor, dezimalkomma=self.dezimalkomma,
+                bericht=p.blaetter[index].bericht)
         try:
             with open(p.blatt_pfad(index), "r", encoding="utf-8") as f:
                 daten = json.load(f)
@@ -7685,7 +7701,8 @@ class CadApp:
             return SimpleNamespace(
                 elemente=elemente, layers=layers, layouts=layouts,
                 aktives_layout=ak, _einh_faktor=lambda: faktor,
-                dezimalkomma=SimpleNamespace(get=lambda: komma))
+                dezimalkomma=SimpleNamespace(get=lambda: komma),
+                bericht=p.blaetter[index].bericht)
         except Exception as ex:
             print(f"[KatieCAD] Blatt {index + 1} nicht lesbar: {ex}")
             return None
@@ -7757,6 +7774,110 @@ class CadApp:
                 tr("msg.druckp.uebersprungen", liste="\n".join(rest)),
                 parent=self.root)
 
+    # ========================================================
+    # Dokumentation: Deckblatt, Inhaltsverzeichnis, Listen
+    # ========================================================
+    def _zeichnungsblaetter_einlesen(self):
+        """[BlattInfo] aller Zeichnungsblaetter (ohne Berichtsblaetter) oder
+        None, wenn ein Blatt nicht lesbar ist."""
+        p = self.projekt
+        infos, indizes = [], []
+        for i in p.zeichnungsblaetter():
+            ctx = self._blatt_druckkontext(i)
+            if ctx is None:
+                messagebox.showerror(
+                    tr("dlg.doku.titel"),
+                    tr("msg.projekt.blatt_fehlt", pfad=p.blatt_pfad(i)),
+                    parent=self.root)
+                return None, None
+            leitungen_automatisch(ctx.elemente)
+            kabel_kreuzungen(ctx.elemente)
+            infos.append(SEI.BlattInfo(p.blaetter[i].name, ctx.elemente,
+                                       SEI.beschreibung_aus_layouts(ctx.layouts)))
+            indizes.append(i)
+        return infos, indizes
+
+    def dokumentation_erzeugen(self):
+        p = self.projekt
+        if p is None:
+            self.status.set(tr("msg.projekt.kein_projekt"))
+            return
+        if not self._blatt_sichern():
+            return
+        ordner = TB.template_folders(p.ordner)
+        eintraege = [(tr("dlg.doku.ohne_vorlage"), None)]
+        eintraege += [(n, pf) for n, pf in TB.list_templates(ordner)]
+        cfg = lade_konfiguration()
+        vorgabe = cfg.get("title_block")
+        vorgabe = vorgabe if vorgabe and vorgabe != "builtin" else None
+        dlg = DokumentationDialog(self.root, eintraege, p.doku, p.daten,
+                                  p.name, vorlage_vorgabe=vorgabe)
+        res = dlg.result
+        if res is None:
+            return
+        if not res["berichte"]:
+            self.status.set(tr("msg.doku.keine_auswahl"))
+            return
+        p.daten = res["daten"]
+        p.doku = {"berichte": res["berichte"], "vorlage": res["vorlage"],
+                  "klemmen_geraete": res["klemmen_geraete"]}
+        vorlage = None
+        try:
+            if res["vorlage"]:
+                els = TB.load_template(res["vorlage"], self._dict_zu_element)
+                vorlage = SEI.Vorlage(os.path.splitext(
+                    os.path.basename(res["vorlage"]))[0], els)
+            infos, _idx = self._zeichnungsblaetter_einlesen()
+            if infos is None:
+                return
+            programm = os.path.dirname(TB.program_folder())
+            vorne, hinten = SEI.berichte_erzeugen(
+                infos, p.name, p.daten, set(res["berichte"]), vorlage,
+                SPRACHE["aktuell"], SEI.spalten_ordner(programm, p.ordner),
+                klemmen_in_geraeteliste=res["klemmen_geraete"])
+            basis = self._leere_zeichnung_daten(einstellungen_uebernehmen=True)
+            neu_aktiv = ANW.ins_projekt(p, vorne, hinten, basis,
+                                        self._json_atomar_schreiben,
+                                        bg_layout=self.bg_layout)
+            p.speichern()
+        except (OSError, ValueError) as e:
+            messagebox.showerror(tr("dlg.doku.titel"),
+                                 tr("msg.doku.fehler", fehler=e), parent=self.root)
+            return
+        self._blatt_laden(neu_aktiv)
+        p.speichern()
+        self.status.set(tr("msg.doku.fertig", vorn=len(vorne), hinten=len(hinten)))
+
+    def dokumentation_csv(self):
+        """Geraeteliste, Klemmenplan und Kabelplan als CSV-Dateien."""
+        p = self.projekt
+        if p is None:
+            self.status.set(tr("msg.projekt.kein_projekt"))
+            return
+        if not self._blatt_sichern():
+            return
+        ziel = filedialog.askdirectory(parent=self.root, initialdir=p.ordner,
+                                       title=tr("msg.doku.csv_titel"))
+        if not ziel:
+            return
+        infos, indizes = self._zeichnungsblaetter_einlesen()
+        if infos is None:
+            return
+        programm = os.path.dirname(TB.program_folder())
+        try:
+            tabellen = SEI.tabellen_fuer_export(
+                [(k, b.elemente) for k, b in enumerate(infos)],
+                lambda k: indizes[k] + 1,
+                SEI.spalten_ordner(programm, p.ordner),
+                bool(p.doku.get("klemmen_geraete", True)))
+            namen = {t: tr("rep." + t) for t in tabellen}
+            pfade = ANW.csv_exportieren(ziel, tabellen, namen)
+        except OSError as e:
+            messagebox.showerror(tr("dlg.doku.titel"),
+                                 tr("msg.doku.fehler", fehler=e), parent=self.root)
+            return
+        self.status.set(tr("msg.doku.csv_fertig", n=len(pfade), ordner=ziel))
+
     def drucken(self):
         dlg = DruckDialog(self.root, self)
         if not dlg.result:
@@ -7808,6 +7929,21 @@ class CadApp:
         self.entry_eingabe.focus_set()
 
     def _block_erzeugen_fertig(self, basispunkt):
+        try:
+            self._block_erzeugen_fertig_intern(basispunkt)
+        except Exception as ex:
+            import traceback
+            traceback.print_exc()
+            self._block_erzeuge_auswahl = None
+            self._geraet_modus = False
+            self._clear_temp()
+            self.redraw()
+            self._update_eingabe_hinweis()
+            messagebox.showerror(tr("msg.block.fehler.titel"),
+                                 tr("msg.block.fehler", fehler=ex),
+                                 parent=self.root)
+
+    def _block_erzeugen_fertig_intern(self, basispunkt):
         de = SPRACHE["aktuell"] == "de"
         if self._block_erzeuge_auswahl is None:
             return
@@ -7965,7 +8101,17 @@ class CadApp:
 
     def _naechster_block_name(self):
         i = 1
-        while f"Block{i}" in self.block_bibliothek:
+        try:
+            ordner = self._block_speicherordner()
+        except Exception:
+            ordner = None
+
+        def belegt(n):
+            if n in self.block_bibliothek:
+                return True
+            return bool(ordner) and os.path.exists(
+                os.path.join(ordner, vorschlag_dateiname(n)))
+        while belegt(f"Block{i}"):
             i += 1
         return f"Block{i}"
 
@@ -8172,5 +8318,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
- 
