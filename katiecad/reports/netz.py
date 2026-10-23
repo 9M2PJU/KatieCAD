@@ -110,7 +110,7 @@ class Netz:
         elif isinstance(k, Verbindung):
             arme = [(self._neu(blatt, ax, ay, "verb", bes=bes), d)
                     for (ax, ay, d) in k.anschluesse()]
-            kreuzung = k.art == 4 and not k.punkt
+            kreuzung = len(k.arme) == 4 and not k.punkt
             for i, (a, da) in enumerate(arme):
                 for b, db in arme[i + 1:]:
                     if not kreuzung or (da - db) % 360 == 180:
