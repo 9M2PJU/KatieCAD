@@ -1,0 +1,101 @@
+name: Release
+
+# Start: push a tag  (git tag v1.0.0 && git push origin v1.0.0)
+# or manually under  Actions > Release > Run workflow.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-22.04, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Linux - Tk and tools
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y python3-tk tk-dev
+
+      - name: Python packages
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller
+
+      - name: Tests
+        run: python tests/run_all.py
+
+      - name: Version
+        id: ver
+        shell: bash
+        run: echo "v=$(python -c "from katiecad.manifest import VERSION; print(VERSION)")" >> "$GITHUB_OUTPUT"
+
+      - name: Icons
+        run: python tools/make_icon.py
+
+      - name: PyInstaller
+        shell: bash
+        run: |
+          SEP=":"; [ "$RUNNER_OS" = "Windows" ] && SEP=";"
+          ICON=KatieCAD.png
+          [ "$RUNNER_OS" = "Windows" ] && ICON=KatieCAD.ico
+          [ "$RUNNER_OS" = "macOS" ] && ICON=build/KatieCAD.icns
+          pyinstaller --noconfirm --windowed --name KatieCAD --icon "$ICON" \
+            --collect-submodules katiecad --collect-submodules ezdxf \
+            --add-data "symbols${SEP}symbols" \
+            --add-data "title_blocks${SEP}title_blocks" \
+            --add-data "report_templates${SEP}report_templates" \
+            --add-data "docs${SEP}docs" \
+            --add-data "KatieCAD.ico${SEP}." --add-data "KatieCAD.png${SEP}." \
+            main.py
+
+      - name: Windows installer (Inno Setup)
+        if: runner.os == 'Windows'
+        run: |
+          choco install innosetup -y --no-progress
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "/DAppVersion=${{ steps.ver.outputs.v }}" installer\KatieCAD.iss
+
+      - name: macOS disk image
+        if: runner.os == 'macOS'
+        run: |
+          mkdir -p release dmg
+          cp -R dist/KatieCAD.app dmg/
+          ln -s /Applications dmg/Applications
+          hdiutil create -volname KatieCAD -srcfolder dmg -ov -format UDZO \
+            "release/KatieCAD-${{ steps.ver.outputs.v }}-macOS.dmg"
+
+      - name: Linux packages
+        if: runner.os == 'Linux'
+        run: |
+          installer/build_deb.sh "${{ steps.ver.outputs.v }}"
+          tar -C dist -czf "release/KatieCAD-${{ steps.ver.outputs.v }}-Linux.tar.gz" KatieCAD
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KatieCAD-${{ runner.os }}
+          path: release/*
+
+  publish:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: release/*
+          generate_release_notes: true
