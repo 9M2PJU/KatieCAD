@@ -1,0 +1,147 @@
+{
+  "format": "katiecad-block",
+  "version": 1,
+  "block": {
+    "name": "Zener diode",
+    "basispunkt": [
+      0.0,
+      0.0
+    ],
+    "elemente": [
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": 0,
+        "y1": 7.5,
+        "x2": 0,
+        "y2": 2.0
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": 0,
+        "y1": -2.0,
+        "x2": 0,
+        "y2": -7.5
+      },
+      {
+        "typ": "polylinie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "punkte": [
+          [
+            -2.5,
+            2.0
+          ],
+          [
+            2.5,
+            2.0
+          ],
+          [
+            0,
+            -2.0
+          ]
+        ],
+        "geschlossen": true
+      },
+      {
+        "typ": "polylinie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "punkte": [
+          [
+            -3.5,
+            -3.0
+          ],
+          [
+            -2.5,
+            -2.0
+          ],
+          [
+            2.5,
+            -2.0
+          ],
+          [
+            3.5,
+            -1.0
+          ]
+        ],
+        "geschlossen": false
+      },
+      {
+        "typ": "vpunkt",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.25,
+        "x": 0,
+        "y": 7.5,
+        "inhalt": "A",
+        "hoehe": 2.0,
+        "winkel": 0.0,
+        "schriftart": "Arial",
+        "einfuegepunkt": "mitte_links",
+        "tag": "VP1",
+        "prompt": "Pin 1",
+        "wert": "A",
+        "sichtbar": true,
+        "richtungen": null,
+        "radius": 0.5
+      },
+      {
+        "typ": "vpunkt",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.25,
+        "x": 0,
+        "y": -7.5,
+        "inhalt": "K",
+        "hoehe": 2.0,
+        "winkel": 0.0,
+        "schriftart": "Arial",
+        "einfuegepunkt": "mitte_links",
+        "tag": "VP2",
+        "prompt": "Pin 2",
+        "wert": "K",
+        "sichtbar": true,
+        "richtungen": null,
+        "radius": 0.5
+      },
+      {
+        "typ": "maske",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": null,
+        "x": -4.5,
+        "y": -5.0,
+        "werte": {
+          "IND": "IND",
+          "TYP": "TYP",
+          "PER": "PER"
+        },
+        "ausgeblendet": [],
+        "platzhalter": true,
+        "rolle": "haupt"
+      }
+    ]
+  }
+}
