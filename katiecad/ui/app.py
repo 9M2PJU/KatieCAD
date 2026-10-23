@@ -920,7 +920,11 @@ class CadApp:
                              padx=6, pady=4,
                              bg=FARBEN["bg_mittel"], fg=FARBEN["cyan"],
                              font=("Consolas", 9))
-        koord_bar.pack(side=tk.BOTTOM, fill=tk.X, before=self.seitenleiste)
+        # Must come before the side bar in the packing order; if the side
+        # bar is hidden (saved setting) it is not packed, so use the canvas.
+        vor = (self.seitenleiste if self.seitenleiste.ist_sichtbar()
+               else self.canvas)
+        koord_bar.pack(side=tk.BOTTOM, fill=tk.X, before=vor)
 
     def _build_menu(self):
         # Forces the dark colour for the menu
