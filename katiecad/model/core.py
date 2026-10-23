@@ -1641,7 +1641,8 @@ class BlockReferenz(Element):
             el.x, el.y = self._welt_pts(el.x, el.y)      # Texts stay horizontal
         elif isinstance(el, Verbindung):
             el.x, el.y = self._welt_pts(el.x, el.y)
-            el.ausrichtung = (el.ausrichtung + int(round(self.winkel / 90.0))) % 4
+            el.arme = Verbindung.arme_normieren(
+                [d + self.winkel for d in el.arme])
         elif isinstance(el, Bemassung):
             el.x1, el.y1 = self._welt_pts(el.x1, el.y1)
             el.x2, el.y2 = self._welt_pts(el.x2, el.y2)
@@ -2258,73 +2259,67 @@ class Querverweis(Element):
 # NEW (electrical): junction, electrical mask, terminal
 # ============================================================
 class Verbindung(Element):
-    """Wire junction (red, firmly belongs to the wire) with 2, 3 or 4
-    connections as in Eplan.
+    """Wire junction (red, firmly belongs to the wire).
 
-    art 2: corner      - arms in two adjacent directions
-    art 3: T-piece     - three arms, one missing
-    art 4: crossing    - four arms, optionally with a dot (= connected)
-    ausrichtung (0..3, counter-clockwise, 0 = east):
-        art 2: arms at  a*90  and  a*90+90
-        art 3/4: straight arm at a*90, kinked arm opposite (see _lokal)
-    The arm ends are the connection points for wires."""
+    The junction is described by the set of directions in which an arm
+    leaves the centre (``arme``: any subset of 0/90/180/270 degrees with
+    at least two entries; 0 = east, 90 = north, ...) and a dot flag.
+      2 arms: corner or straight piece
+      3 arms: T-piece, in any direction, with or without dot
+      4 arms: crossing; with dot = connected, without dot = the wires
+              only cross (opposite arms are connected)
+    The arm ends are the connection points for wires.
+
+    Legacy files (keys art / ausrichtung / punkt) are converted on load:
+      art 2: arms at a*90 and a*90+90
+      art 3: arms at a*90, a*90+90 and a*90+180
+      art 4: all four arms; the dot only counted for art 4."""
     ARM = 2.5
     PUNKT_RADIUS = 1.25
-    ARTEN = (2, 3, 4)
-    _V = {0: (1.0, 0.0), 90: (0.0, 1.0), 180: (-1.0, 0.0), 270: (0.0, -1.0)}
+    RICHTUNGEN = (0, 90, 180, 270)
 
-    def __init__(self, x, y, art=2, ausrichtung=0, punkt=True, **kw):
+    def __init__(self, x, y, art=None, ausrichtung=0, punkt=True,
+                 arme=None, **kw):
         kw.setdefault("farbe", LEITUNG_FARBE)
         kw.setdefault("eig_farbe", True)
         kw.setdefault("staerke", LEITUNG_STAERKE)
         super().__init__("verbindung", **kw)
         self.x, self.y = float(x), float(y)
-        self.art = int(art) if int(art) in self.ARTEN else 2
-        self.ausrichtung = int(ausrichtung) % 4
+        if arme is None:                       # legacy description
+            art = int(art) if art in (2, 3, 4) else 2
+            a = int(ausrichtung) % 4
+            arme = ([a * 90, a * 90 + 90] if art == 2 else
+                    [a * 90, a * 90 + 90, a * 90 + 180] if art == 3 else
+                    [0, 90, 180, 270])
+            punkt = bool(punkt) and art == 4
+        self.arme = self.arme_normieren(arme)
         self.punkt = bool(punkt)
 
-    def _lokal(self):
-        """Polylines (local, ausrichtung 0) and arm ends (x, y, direction)
-        as in Eplan. U = ARM.
-        art 2: corner (arms east + north)
-        art 3/4 without dot: straight arm to the east, opposite arm
-          runs with a kink (45 degrees) onto the vertical through-line;
-          art 3 has the through-line only to the north, art 4 to the
-          north and south.  Ausrichtung rotates the whole thing by a*90 degrees.
-        art 4 with dot: cross with a filled dot."""
-        u = self.ARM
-        if self.art == 2:
-            return ([[(u, 0.0), (0.0, 0.0), (0.0, u)]],
-                    [(u, 0.0, 0), (0.0, u, 90)])
-        if self.art == 4 and self.punkt:
-            return ([[(u, 0.0), (-u, 0.0)], [(0.0, u), (0.0, -u)]],
-                    [(u, 0.0, 0), (0.0, u, 90), (-u, 0.0, 180), (0.0, -u, 270)])
-        zuege = [[(0.0, 0.0), (u, 0.0)],                      # straight arm
-                 [(-u, 0.0), (-0.5 * u, 0.0), (0.0, 0.5 * u)]]  # kinked arm
-        enden = [(u, 0.0, 0), (-u, 0.0, 180), (0.0, u, 90)]
-        if self.art == 4:
-            zuege.append([(0.0, u), (0.0, -u)])
-            enden.append((0.0, -u, 270))
-        else:
-            zuege.append([(0.0, 0.0), (0.0, u)])
-        return zuege, enden
+    @classmethod
+    def arme_normieren(cls, arme):
+        """Sorted, valid, unique directions; falls back to a corner."""
+        out = sorted({int(round(float(r) / 90.0)) * 90 % 360 for r in arme})
+        return out if len(out) >= 2 else [0, 90]
+
+    @property
+    def art(self):
+        """Number of connections (2, 3 or 4)."""
+        return len(self.arme)
 
     def _welt(self, px, py):
-        w = self.ausrichtung * math.pi / 2.0
-        c, sn = round(math.cos(w)), round(math.sin(w))
-        return (self.x + px * c - py * sn, self.y + px * sn + py * c)
+        return (self.x + px, self.y + py)
 
-    def arme(self):
-        """Directions (degrees) of the connections."""
-        return [(d + self.ausrichtung * 90) % 360
-                for (_x, _y, d) in self._lokal()[1]]
+    def arme_enden(self):
+        u = self.ARM
+        return [(u * math.cos(math.radians(d)), u * math.sin(math.radians(d)), d)
+                for d in self.arme]
 
     def anschluesse(self):
         """Arm ends (x, y, direction)."""
         out = []
-        for (px, py, d) in self._lokal()[1]:
-            wx, wy = self._welt(px, py)
-            out.append((wx, wy, (d + self.ausrichtung * 90) % 360))
+        for (px, py, d) in self.arme_enden():
+            wx, wy = self._welt(round(px, 9), round(py, 9))
+            out.append((wx, wy, d))
         return out
 
     def aufgeloest(self):
@@ -2332,11 +2327,9 @@ class Verbindung(Element):
                   linientyp=self.linientyp, eig_farbe=self.eig_farbe,
                   staerke=self.staerke)
         out = []
-        for zug in self._lokal()[0]:
-            pts = [self._welt(px, py) for (px, py) in zug]
-            for a, b in zip(pts, pts[1:]):
-                out.append(Linie(a[0], a[1], b[0], b[1], **st))
-        if self.art == 4 and self.punkt:
+        for (ax, ay, _d) in self.anschluesse():
+            out.append(Linie(self.x, self.y, ax, ay, **st))
+        if self.punkt and len(self.arme) >= 3:
             r = self.PUNKT_RADIUS
             pts = [(self.x + r * math.cos(2 * math.pi * i / 16),
                     self.y + r * math.sin(2 * math.pi * i / 16)) for i in range(16)]
@@ -2355,7 +2348,8 @@ class Verbindung(Element):
 
     def drehen(self, cx, cy, winkel_deg):
         self.x, self.y = punkte_drehen(self.x, self.y, cx, cy, winkel_deg)
-        self.ausrichtung = (self.ausrichtung + int(round(-winkel_deg / 90.0))) % 4
+        self.arme = self.arme_normieren(
+            [d - winkel_deg for d in self.arme])
 
     def griffe(self):
         return [("p", self.x, self.y)]
@@ -2756,4 +2750,3 @@ class Koordinatenfeld(Element):
 
 ZUSAMMENGESETZT = (BlockReferenz, Querverweis, Verbindung, ElektroMaske, Klemme,
                    Kabel, Koordinatenfeld)
-
