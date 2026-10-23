@@ -2163,13 +2163,14 @@ class KoordinatenfeldDialog(tk.Toplevel):
 
 
 class VerbindungDialog(tk.Toplevel):
-    """Type (2/3/4 connections), orientation and dot of a junction.
-    result: {'art': int, 'ausrichtung': 0..3, 'punkt': bool} or None."""
+    """Arms and dot of a junction (same layout as the pin dialog).
+    result: {'arme': [0|90|180|270, ...], 'punkt': bool} or None."""
 
     def __init__(self, parent, vorgabe=None):
         super().__init__(parent)
         self.result = None
         v = vorgabe or {}
+        arme = v.get("arme", (0, 90, 180))
         self.title(tr("dlg.verb.titel"))
         self.transient(parent)
         _modal(self)
@@ -2177,66 +2178,37 @@ class VerbindungDialog(tk.Toplevel):
         self.resizable(False, False)
         f = ttk.Frame(self, padding=14)
         f.pack(fill=tk.BOTH, expand=True)
-
-        self._arten = [2, 3, 4]
-        self.v_art = tk.StringVar(value=tr("dlg.verb.art.%d" % v.get("art", 2)))
-        self.v_aus = tk.StringVar()
-        self.v_punkt = tk.BooleanVar(value=v.get("punkt", True))
-        self._aus_start = int(v.get("ausrichtung", 0)) % 4
-
-        ttk.Label(f, text=tr("dlg.verb.art")).grid(row=0, column=0, sticky=tk.W, pady=3, padx=(0, 10))
-        self.cb_art = ttk.Combobox(f, textvariable=self.v_art, state="readonly", width=26,
-                                   values=[tr("dlg.verb.art.%d" % a) for a in self._arten])
-        self.cb_art.grid(row=0, column=1, sticky=tk.EW, pady=3)
-        ttk.Label(f, text=tr("dlg.verb.ausrichtung")).grid(row=1, column=0, sticky=tk.W, pady=3, padx=(0, 10))
-        self.cb_aus = ttk.Combobox(f, textvariable=self.v_aus, state="readonly", width=26)
-        self.cb_aus.grid(row=1, column=1, sticky=tk.EW, pady=3)
-        self.chk = ttk.Checkbutton(f, text=tr("dlg.verb.punkt"), variable=self.v_punkt,
-                                   command=lambda: self._punkt_geaendert())
-        self.chk.grid(row=2, column=1, sticky=tk.W, pady=3)
+        ttk.Label(f, text=tr("dlg.verb.arme")).pack(anchor=tk.W, pady=(0, 2))
+        rf = ttk.Frame(f)
+        rf.pack(anchor=tk.W)
+        self.v_r = {r: tk.BooleanVar(value=r in arme) for r in (90, 0, 270, 180)}
+        for zeile, spalte, r, key in ((0, 1, 90, "nord"), (1, 2, 0, "ost"),
+                                      (2, 1, 270, "sued"), (1, 0, 180, "west")):
+            ttk.Checkbutton(rf, text=tr("dlg.vp." + key),
+                            variable=self.v_r[r]).grid(
+                row=zeile, column=spalte, sticky=tk.W, padx=6, pady=1)
+        self.v_punkt = tk.BooleanVar(value=bool(v.get("punkt", True)))
+        ttk.Checkbutton(f, text=tr("dlg.verb.punkt"),
+                        variable=self.v_punkt).pack(anchor=tk.W, pady=(10, 0))
         ttk.Label(f, text=tr("dlg.verb.hinweis"), style="Hint.TLabel",
-                  wraplength=340, justify=tk.LEFT).grid(
-            row=3, column=0, columnspan=2, sticky=tk.W, pady=(6, 4))
+                  wraplength=320, justify=tk.LEFT).pack(anchor=tk.W, pady=(6, 0))
+        self.l_fehler = ttk.Label(f, text="", foreground="#ff6b6b")
+        self.l_fehler.pack(anchor=tk.W)
         bf = ttk.Frame(f)
-        bf.grid(row=4, column=0, columnspan=2, pady=(8, 0))
+        bf.pack(pady=(8, 0))
         ttk.Button(bf, text=tr("dlg.ok"), command=self._ok).pack(side=tk.LEFT, padx=4)
         ttk.Button(bf, text=tr("dlg.abbrechen"), command=self.destroy).pack(side=tk.LEFT, padx=4)
-
-        self.cb_art.bind("<<ComboboxSelected>>", lambda e: self._art_geaendert())
-        self._art_geaendert(self._aus_start)
         self.bind("<Return>", lambda e: self._ok())
         self.bind("<Escape>", lambda e: self.destroy())
         _zentrieren(self, parent)
         self.wait_window(self)
 
-    def _art(self):
-        anz = [tr("dlg.verb.art.%d" % a) for a in self._arten]
-        return self._arten[anz.index(self.v_art.get())]
-
-    def _labels(self, art):
-        rt = lambda i: tr("dlg.richtung.%d" % ((i % 4) * 90))
-        if art == 2:
-            return [f"{rt(i)} + {rt(i + 1)}" for i in range(4)]
-        return [f"{tr('dlg.verb.gerade')} {rt(i)}" for i in range(4)]
-
-    def _art_geaendert(self, aus=0):
-        art = self._art()
-        labels = self._labels(art)
-        self.cb_aus.config(values=labels)
-        self.v_aus.set(labels[min(aus, len(labels) - 1)])
-        self.chk.state(["!disabled"] if art == 4 else ["disabled"])
-        self._punkt_geaendert()
-
-    def _punkt_geaendert(self):
-        # Cross with dot has no orientation
-        sperre = self._art() == 4 and self.v_punkt.get()
-        self.cb_aus.state(["disabled"] if sperre else ["!disabled"])
-
     def _ok(self):
-        art = self._art()
-        labels = self._labels(art)
-        aus = labels.index(self.v_aus.get()) if self.v_aus.get() in labels else 0
-        self.result = {"art": art, "ausrichtung": aus, "punkt": bool(self.v_punkt.get())}
+        arme = sorted(r for r, v in self.v_r.items() if v.get())
+        if len(arme) < 2:
+            self.l_fehler.config(text=tr("dlg.verb.min2"))
+            return
+        self.result = {"arme": arme, "punkt": bool(self.v_punkt.get())}
         self.destroy()
 
 
