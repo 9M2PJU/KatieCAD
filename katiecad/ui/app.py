@@ -62,7 +62,7 @@ from katiecad.model.core import (
     Layer, Layout, Element, Linie, Kreis, Bogen, Rechteck, Polylinie, Text,
     Bemassung, Viewport, Schraffur, konturen_aus_elementen,
     AttributDefinition, Leitung, Verbindungspunkt, Querverweis,
-    Verbindung, ElektroMaske, Klemme, Koordinatenfeld, ZUSAMMENGESETZT,
+    Verbindung, ElektroMaske, Klemme, Kabel, Koordinatenfeld, ZUSAMMENGESETZT,
     vp_tags_eindeutig, LEITUNG_FARBE, UI_SCHRIFT,
     BlockDefinition, BlockReferenz, BlockBibliothek,
     bogen_sweep, bogen_punkte, winkel_im_bogen, bogen_aus_3_punkten,
@@ -87,7 +87,7 @@ from katiecad.ui.dialogs import (
     TitleBlockDialog,
 )
 from katiecad.fileio.pdf import pdf_erzeugen, pdf_senden, pdf_mehrseitig_erzeugen
-from katiecad.electrical.logic import (leitungen_automatisch, querverweis_ziele, qv_texte_aus_blattdaten,
+from katiecad.electrical.logic import (leitungen_automatisch, kabel_kreuzungen, querverweis_ziele, qv_texte_aus_blattdaten,
                               qv_texte_aus_elementen, naechster_vp,
                               naechster_anschluss, anschlusspunkte,
                               naechste_bezeichnung, geraete,
@@ -99,7 +99,7 @@ from katiecad.electrical.logic import (leitungen_automatisch, querverweis_ziele,
 from types import SimpleNamespace
 
 ELEKTRO_WERKZEUGE = ("vpunkt", "verbindung", "leitung", "querverweis",
-                     "maske", "klemme", "koordinatenfeld")
+                     "maske", "klemme", "koordinatenfeld", "kabel")
 
 
 # ============================================================
@@ -337,6 +337,8 @@ class CadApp:
         self._mk_rolle = "haupt"
         self._kl_werte = {}
         self._vp_richtungen = (0, 90, 180, 270)
+        self._kabel_p1 = None
+        self._kb_werte = {}
         self._kf_werte = {"spalten": 6, "zeilen": 4, "breite": 287.0,
                           "hoehe": 164.0, "raster": False}
         self._geraet_modus = False
@@ -1132,6 +1134,8 @@ class CadApp:
                               command=lambda: self._werkzeug_setzen("maske"))
         m_elektro.add_command(label=tr("menu.elektro.klemme"),
                               command=lambda: self._werkzeug_setzen("klemme"))
+        m_elektro.add_command(label=tr("menu.elektro.kabel"),
+                              command=lambda: self._werkzeug_setzen("kabel"))
         m_elektro.add_command(label=tr("menu.elektro.koordinatenfeld"),
                               command=lambda: self._werkzeug_setzen("koordinatenfeld"))
         m_elektro.add_separator()
@@ -1197,7 +1201,7 @@ class CadApp:
         ttk.Label(tb, text=tr("menu.elektro") + ":",
                   style="Title.TLabel").pack(side=tk.LEFT, padx=(0, 4))
         for key in ("vpunkt", "verbindung", "querverweis",
-                    "maske", "klemme", "koordinatenfeld"):
+                    "maske", "klemme", "kabel", "koordinatenfeld"):
             ttk.Radiobutton(tb, text=tr(f"tb.wz.{key}"), value=key,
                             variable=self.aktives_werkzeug,
                             command=self._werkzeug_toolbar
@@ -2103,6 +2107,11 @@ class CadApp:
             self.status.set(tr("msg.attdef.abgebrochen"))
             return
         wz_e = self.aktives_werkzeug.get()
+        if wz_e == "kabel" and getattr(self, "_kabel_p1", None) is not None:
+            self._kabel_p1 = None
+            self._clear_temp()
+            self.status.set(tr("msg.kabel.start"))
+            return
         if wz_e == "leitung" and self._leitung_p1 is not None:
             self._leitung_p1 = None
             self._clear_temp()
@@ -2166,6 +2175,7 @@ class CadApp:
         self.status.set("Zurück zur Auswahl." if de else "Back to selection.")
 
     def _werkzeug_gewechselt(self):
+        self._kabel_p1 = None
         self._leitung_beenden()
         self.letzter_punkt = None
         self.aktuelle_polylinie = []
@@ -2212,6 +2222,9 @@ class CadApp:
                 self._klemme_starten()
             elif wz == "koordinatenfeld":
                 self.status.set(tr("msg.kf.platzieren"))
+            elif wz == "kabel":
+                self._kabel_p1 = None
+                self.status.set(tr("msg.kabel.start"))
 
     def _clear_temp(self):
         self.temp_ids = []
@@ -2652,6 +2665,10 @@ class CadApp:
             l = self.layers.get(el.layer)
             if l and not l.sichtbar:
                 continue
+            if isinstance(el, Kabel):
+                sammle(el.x, el.y, "endpunkt", 0)
+                sammle(el.x + el.laenge, el.y, "endpunkt", 0)
+                continue
             if isinstance(el, Koordinatenfeld):
                 a, b, c2, d2 = el.umriss_rect()
                 for (qx, qy) in ((a, b), (c2, b), (c2, d2), (a, d2)):
@@ -2902,7 +2919,7 @@ class CadApp:
         if wz_m == "querverweis" and self._qv_vorgabe and not self._ist_layout():
             self._qv_vorschau(event)
             return
-        if (wz_m in ("verbindung", "maske", "klemme", "koordinatenfeld")
+        if (wz_m in ("verbindung", "maske", "klemme", "koordinatenfeld", "kabel")
                 and not self._ist_layout()):
             if self._geister_vorschau(event, wz_m):
                 return
@@ -3398,6 +3415,8 @@ class CadApp:
             self._klemme_platzieren(x_mm, y_mm)
         elif werkzeug == "koordinatenfeld":
             self._feld_platzieren(x_mm, y_mm)
+        elif werkzeug == "kabel":
+            self._kabel_klick(x_mm, y_mm)
 
     # --------------------------------------------------------
     # Stutzen (TRIM)
@@ -3841,6 +3860,9 @@ class CadApp:
         if isinstance(el, Koordinatenfeld):
             self._feld_bearbeiten(el)
             return
+        if isinstance(el, Kabel):
+            self._kabel_bearbeiten(el)
+            return
         if isinstance(el, AttributDefinition):
             self._attdef_bearbeiten(el)
             return
@@ -4005,6 +4027,8 @@ class CadApp:
         c = self.canvas
         try:
             self._leitungen_automatisch()
+            if not self._ist_layout():
+                kabel_kreuzungen(self.elemente)
         except Exception as ex:
             print(f"[KatieCAD] Leitungen: {ex}")
         try:
@@ -4554,6 +4578,7 @@ class CadApp:
             if typ == "maske":      return ElektroMaske(**d)
             if typ == "klemme":     return Klemme(**d)
             if typ == "koordinatenfeld": return Koordinatenfeld(**d)
+            if typ == "kabel":      return Kabel(**d)
             if typ == "block":
                 kinder_dicts = d.pop("elemente", [])
                 kinder = []
@@ -5703,7 +5728,7 @@ class CadApp:
         ziele = [e for e in self.auswahl
                  if not isinstance(e, (Viewport, Text, Bemassung, BlockReferenz,
                                        Schraffur, Querverweis, Verbindung,
-                                       ElektroMaske, Klemme, Koordinatenfeld))]
+                                       ElektroMaske, Klemme, Kabel, Koordinatenfeld))]
         if not ziele:
             return
         self._snapshot()
@@ -7314,6 +7339,54 @@ class CadApp:
         self.redraw()
         self.status.set(tr("msg.kf.gesetzt"))
 
+    def _kabel_klick(self, x, y):
+        if self._ist_layout():
+            return
+        p1 = self._kabel_p1
+        if p1 is None:
+            self._kabel_p1 = (x, y)
+            self.status.set(tr("msg.kabel.ende"))
+            return
+        if x - p1[0] < 1.0:
+            self.status.set(tr("msg.kabel.ende"))
+            return
+        dlg = FestMaskeDialog(self.root, tr("dlg.kabel.titel"), Kabel.FELDER,
+                              self._kb_werte, hinweis=tr("dlg.kabel.hinweis"))
+        if dlg.result is None:
+            return
+        w = dict(dlg.result["werte"])
+        self._snapshot()
+        daten = self._layer_daten()
+        daten["staerke"] = None
+        self._ziel_liste().append(Kabel(p1[0], p1[1], w, laenge=x - p1[0], **daten))
+        w["CAB"] = naechste_bezeichnung(w.get("CAB", ""))
+        self._kb_werte = w
+        self._kabel_p1 = None
+        self._clear_temp()
+        self.redraw()
+        self.status.set(tr("msg.kabel.gesetzt"))
+
+    def _kabel_bearbeiten(self, el):
+        kreuz = el.adern_liste()
+        zusatz = [(k, tr("dlg.kabel.ader", n=i + 1, abstand=k), n)
+                  for i, (k, n) in enumerate(kreuz)]
+        dlg = FestMaskeDialog(self.root, tr("dlg.kabel.titel"), Kabel.FELDER,
+                              el.werte, hinweis=tr("dlg.kabel.hinweis"),
+                              zusatz=zusatz)
+        if dlg.result is None:
+            return
+        self._snapshot()
+        el.setze_werte(dlg.result["werte"])
+        neu = dict(el.adern)
+        for (k, _t, _n) in zusatz:
+            text = dlg.result["zusatz"].get(k, "").strip()
+            if text:
+                neu[k] = text
+            else:
+                neu.pop(k, None)
+        el.adern = neu
+        self.redraw()
+
     def _feld_bearbeiten(self, el):
         dlg = KoordinatenfeldDialog(self.root, {
             "spalten": el.spalten, "zeilen": el.zeilen, "breite": el.breite,
@@ -7356,6 +7429,16 @@ class CadApp:
         elif wz == "koordinatenfeld":
             ghost = Koordinatenfeld(pt[0], pt[1], **self._kf_werte,
                                     layer=self.aktiver_layer.get())
+        elif wz == "kabel":
+            p1 = getattr(self, "_kabel_p1", None)
+            if p1 is None:
+                ghost = Kabel(pt[0], pt[1], self._kb_werte, laenge=10.0,
+                              layer=self.aktiver_layer.get())
+            else:
+                ghost = Kabel(p1[0], p1[1], self._kb_werte,
+                              laenge=max(1.0, pt[0] - p1[0]),
+                              layer=self.aktiver_layer.get())
+            kabel_kreuzungen(list(self.elemente) + [ghost])
         else:
             ghost = Klemme(pt[0], pt[1], self._kl_werte,
                            layer=self.aktiver_layer.get())
@@ -7633,6 +7716,7 @@ class CadApp:
                 texte[j + 1] = self._qv_texte_blatt(p.blatt_pfad(j))
         for i, _, ctx in kontexte:
             leitungen_automatisch(ctx.elemente)
+            kabel_kreuzungen(ctx.elemente)
             querverweis_ziele(ctx.elemente, i + 1,
                               {n: t for n, t in texte.items() if n != i + 1})
             geraete_referenzen(
