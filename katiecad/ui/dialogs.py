@@ -1601,6 +1601,61 @@ class VerbindungspunktDialog(tk.Toplevel):
         self.destroy()
 
 
+class KoordinatenfeldDialog(tk.Toplevel):
+    """Spalten, Zeilen, Groesse und Rasterlinien des Koordinatenfeldes.
+    result: {'spalten', 'zeilen', 'breite', 'hoehe', 'raster'} oder None."""
+
+    def __init__(self, parent, vorgabe=None):
+        super().__init__(parent)
+        self.result = None
+        v = vorgabe or {}
+        self.title(tr("dlg.kf.titel"))
+        self.transient(parent)
+        _modal(self)
+        self.configure(bg=FARBEN["bg_mittel"])
+        self.resizable(False, False)
+        f = ttk.Frame(self, padding=14)
+        f.pack(fill=tk.BOTH, expand=True)
+        self._vars = {}
+        felder = (("spalten", "dlg.kf.spalten", 6), ("zeilen", "dlg.kf.zeilen", 4),
+                  ("breite", "dlg.kf.breite", 287), ("hoehe", "dlg.kf.hoehe", 150))
+        for i, (key, label, std) in enumerate(felder):
+            self._vars[key] = tk.StringVar(value=str(v.get(key, std)))
+            ttk.Label(f, text=tr(label)).grid(row=i, column=0, sticky=tk.W,
+                                              pady=3, padx=(0, 10))
+            ttk.Entry(f, textvariable=self._vars[key], width=10).grid(
+                row=i, column=1, sticky=tk.W, pady=3)
+        self.v_raster = tk.BooleanVar(value=bool(v.get("raster", False)))
+        ttk.Checkbutton(f, text=tr("dlg.kf.raster"), variable=self.v_raster).grid(
+            row=4, column=0, columnspan=2, sticky=tk.W, pady=3)
+        ttk.Label(f, text=tr("dlg.kf.hinweis"), style="Hint.TLabel",
+                  wraplength=380, justify=tk.LEFT).grid(
+            row=5, column=0, columnspan=2, sticky=tk.W, pady=(6, 4))
+        bf = ttk.Frame(f)
+        bf.grid(row=6, column=0, columnspan=2, pady=(8, 0))
+        ttk.Button(bf, text=tr("dlg.ok"), command=self._ok).pack(side=tk.LEFT, padx=4)
+        ttk.Button(bf, text=tr("dlg.abbrechen"), command=self.destroy).pack(side=tk.LEFT, padx=4)
+        self.bind("<Return>", lambda e: self._ok())
+        self.bind("<Escape>", lambda e: self.destroy())
+        _zentrieren(self, parent)
+        self.wait_window(self)
+
+    def _ok(self):
+        try:
+            sp = int(float(self._vars["spalten"].get().replace(",", ".")))
+            ze = int(float(self._vars["zeilen"].get().replace(",", ".")))
+            br = float(self._vars["breite"].get().replace(",", "."))
+            ho = float(self._vars["hoehe"].get().replace(",", "."))
+            if not (1 <= sp <= 99 and 1 <= ze <= 26 and br > 20 and ho > 20):
+                raise ValueError
+        except ValueError:
+            messagebox.showerror(tr("dlg.kf.titel"), tr("dlg.kf.fehler"), parent=self)
+            return
+        self.result = {"spalten": sp, "zeilen": ze, "breite": br, "hoehe": ho,
+                       "raster": bool(self.v_raster.get())}
+        self.destroy()
+
+
 class VerbindungDialog(tk.Toplevel):
     """Art (2/3/4 Anschluesse), Ausrichtung und Punkt einer Verbindung.
     result: {'art': int, 'ausrichtung': 0..3, 'punkt': bool} oder None."""
