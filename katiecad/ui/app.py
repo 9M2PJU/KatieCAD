@@ -61,7 +61,7 @@ from katiecad.model.core import (
     Layer, Layout, Element, Linie, Kreis, Bogen, Rechteck, Polylinie, Text,
     Bemassung, Viewport, Schraffur, konturen_aus_elementen,
     AttributDefinition, Leitung, Verbindungspunkt, Querverweis,
-    Verbindung, ElektroMaske, Klemme, ZUSAMMENGESETZT,
+    Verbindung, ElektroMaske, Klemme, Koordinatenfeld, ZUSAMMENGESETZT,
     vp_tags_eindeutig, LEITUNG_FARBE, UI_SCHRIFT,
     BlockDefinition, BlockReferenz, BlockBibliothek,
     bogen_sweep, bogen_punkte, winkel_im_bogen, bogen_aus_3_punkten,
@@ -81,6 +81,7 @@ from katiecad.ui.dialogs import (
     ProjektNeuDialog, AttributDefinitionDialog, BlockAttributeDialog,
     QuerverweisDialog, VerbindungspunkteDialog, ProjektDruckDialog,
     VerbindungspunktDialog, VerbindungDialog, FestMaskeDialog,
+    KoordinatenfeldDialog,
     TitleBlockDialog,
 )
 from katiecad.fileio.pdf import pdf_erzeugen, pdf_senden, pdf_mehrseitig_erzeugen
@@ -96,7 +97,7 @@ from katiecad.electrical.logic import (querverweis_ziele, qv_texte_aus_blattdate
 from types import SimpleNamespace
 
 ELEKTRO_WERKZEUGE = ("vpunkt", "verbindung", "leitung", "querverweis",
-                     "maske", "klemme")
+                     "maske", "klemme", "koordinatenfeld")
 
 
 # ============================================================
@@ -333,6 +334,8 @@ class CadApp:
         self._mk_werte = {}
         self._mk_rolle = "haupt"
         self._kl_werte = {}
+        self._kf_werte = {"spalten": 6, "zeilen": 4, "breite": 287.0,
+                          "hoehe": 150.0, "raster": False}
         self._geraet_modus = False
 
         self._clipboard = []
@@ -1130,6 +1133,8 @@ class CadApp:
                               command=lambda: self._werkzeug_setzen("maske"))
         m_elektro.add_command(label=tr("menu.elektro.klemme"),
                               command=lambda: self._werkzeug_setzen("klemme"))
+        m_elektro.add_command(label=tr("menu.elektro.koordinatenfeld"),
+                              command=lambda: self._werkzeug_setzen("koordinatenfeld"))
         m_elektro.add_separator()
         m_elektro.add_command(label=tr("menu.elektro.geraet_erzeugen"),
                               command=self.geraet_erzeugen)
@@ -1186,17 +1191,17 @@ class CadApp:
                     "stutzen", "brechen"):
             ttk.Radiobutton(tb, text=tr(f"tb.wz.{key}"), value=key,
                             variable=self.aktives_werkzeug,
-                            command=self._werkzeug_gewechselt
+                            command=self._werkzeug_toolbar
                             ).pack(side=tk.LEFT)
 
         ttk.Separator(tb, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=8)
         ttk.Label(tb, text=tr("menu.elektro") + ":",
                   style="Title.TLabel").pack(side=tk.LEFT, padx=(0, 4))
         for key in ("vpunkt", "verbindung", "leitung", "querverweis",
-                    "maske", "klemme"):
+                    "maske", "klemme", "koordinatenfeld"):
             ttk.Radiobutton(tb, text=tr(f"tb.wz.{key}"), value=key,
                             variable=self.aktives_werkzeug,
-                            command=self._werkzeug_gewechselt
+                            command=self._werkzeug_toolbar
                             ).pack(side=tk.LEFT)
 
         # --- Toolbar 2 ---
@@ -1574,6 +1579,12 @@ class CadApp:
 
     def _werkzeug_aus_menue(self, key):
         self.aktives_werkzeug.set(key)
+        self._werkzeug_toolbar()
+
+    def _werkzeug_toolbar(self):
+        """Werkzeugwahl durch den Benutzer: "Auswahl" hebt die Markierung auf."""
+        if self.aktives_werkzeug.get() == "auswahl":
+            self.auswahl = []
         self._werkzeug_gewechselt()
 
     def _bem_art_starten(self, art):
@@ -2200,6 +2211,8 @@ class CadApp:
                 self._maske_starten()
             elif wz == "klemme":
                 self._klemme_starten()
+            elif wz == "koordinatenfeld":
+                self.status.set(tr("msg.kf.platzieren"))
 
     def _clear_temp(self):
         self.temp_ids = []
@@ -2640,6 +2653,11 @@ class CadApp:
             l = self.layers.get(el.layer)
             if l and not l.sichtbar:
                 continue
+            if isinstance(el, Koordinatenfeld):
+                a, b, c2, d2 = el.umriss_rect()
+                for (qx, qy) in ((a, b), (c2, b), (c2, d2), (a, d2)):
+                    sammle(qx, qy, "endpunkt", 0)
+                continue
             if isinstance(el, Verbindung):
                 sammle(el.x, el.y, "endpunkt", 0)
                 for ax, ay, _d in el.anschluesse():
@@ -2885,7 +2903,8 @@ class CadApp:
         if wz_m == "querverweis" and self._qv_vorgabe and not self._ist_layout():
             self._qv_vorschau(event)
             return
-        if wz_m in ("verbindung", "maske", "klemme") and not self._ist_layout():
+        if (wz_m in ("verbindung", "maske", "klemme", "koordinatenfeld")
+                and not self._ist_layout()):
             if self._geister_vorschau(event, wz_m):
                 return
         pt = self._eingabepunkt(event, self.letzter_punkt)
@@ -3016,6 +3035,14 @@ class CadApp:
         return None
 
     def _punkt_auf_element(self, el, x_mm, y_mm, tol):
+        if isinstance(el, Koordinatenfeld):
+            # nur Rahmen/Umriss treffen, nicht das Innere (darin wird gezeichnet)
+            for zug in el.auswahl_linien():
+                for a, b in zip(zug, zug[1:]):
+                    if abstand_punkt_segment(x_mm, y_mm, a[0], a[1],
+                                             b[0], b[1]) <= tol:
+                        return True
+            return False
         if isinstance(el, ZUSAMMENGESETZT):
             for kind in el.aufgeloest():
                 if self._punkt_auf_element(kind, x_mm, y_mm, tol):
@@ -3128,6 +3155,8 @@ class CadApp:
             l = self.layers.get(el.layer)
             if l and not l.sichtbar:
                 continue
+            if getattr(el, "NUR_KLICK", False):
+                continue                 # Koordinatenfeld: nur per Klick
             el_bbox = el.bbox()
             if richtung == "links":
                 if bbox_enthalten(bbox, el_bbox):
@@ -3145,6 +3174,13 @@ class CadApp:
             x1, y1 = self.mm_to_px(el.x, el.y + el.hoehe)
             x2, y2 = self.mm_to_px(el.x + el.breite, el.y)
             c.create_rectangle(x1 - 2, y1 - 2, x2 + 2, y2 + 2,
+                               outline=farbe, width=3, dash=(3, 3), tags=tags)
+            return
+        if isinstance(el, Koordinatenfeld):
+            x1, y1, x2, y2 = el.umriss_rect()
+            p1 = self.mm_to_px(x1, y2)
+            p2 = self.mm_to_px(x2, y1)
+            c.create_rectangle(p1[0] - 2, p1[1] - 2, p2[0] + 2, p2[1] + 2,
                                outline=farbe, width=3, dash=(3, 3), tags=tags)
             return
         papier = self.view["zoom"] if self._ist_layout() else None
@@ -3361,6 +3397,8 @@ class CadApp:
             self._maske_platzieren(x_mm, y_mm)
         elif werkzeug == "klemme":
             self._klemme_platzieren(x_mm, y_mm)
+        elif werkzeug == "koordinatenfeld":
+            self._feld_platzieren(x_mm, y_mm)
 
     # --------------------------------------------------------
     # Stutzen (TRIM)
@@ -3801,6 +3839,9 @@ class CadApp:
         if isinstance(el, (ElektroMaske, Klemme)):
             self._fest_bearbeiten(el)
             return
+        if isinstance(el, Koordinatenfeld):
+            self._feld_bearbeiten(el)
+            return
         if isinstance(el, AttributDefinition):
             self._attdef_bearbeiten(el)
             return
@@ -3916,13 +3957,17 @@ class CadApp:
             self._op_hinweis()
             return
         if abs(x1_px - x0_px) < 4 and abs(y1_px - y0_px) < 4:
-            self.auswahl_leeren()
+            # Additive Auswahl: ein Klick ins Leere behaelt die Markierung
+            # (Aufheben nur mit ESC oder ueber das Werkzeug "Auswahl").
+            pass
         else:
             bbox = (min(x0_mm, x1_mm), min(y0_mm, y1_mm),
                     max(x0_mm, x1_mm), max(y0_mm, y1_mm))
             richtung = "links" if x1_px >= x0_px else "rechts"
             treffer = self._elemente_im_auswahlrechteck(bbox, richtung)
-            self.auswahl = treffer
+            for t in treffer:
+                if t not in self.auswahl:
+                    self.auswahl.append(t)
             de = SPRACHE["aktuell"] == "de"
             self.status.set(
                 (f"{len(self.auswahl)} Element(e) markiert "
@@ -4022,7 +4067,13 @@ class CadApp:
     def _zeichne_element(self, el, tags=("element",), tf=None, skala=None,
                          clip=None, stil=None):
         if isinstance(el, ZUSAMMENGESETZT):
-            for kind in el.aufgeloest():
+            if isinstance(el, Koordinatenfeld):
+                # gestrichelter Viewport-Umriss nur in der Modellansicht
+                kinder = el.aufgeloest(umriss=(tf is None and tags == ("element",)
+                                               and not self._ist_layout()))
+            else:
+                kinder = el.aufgeloest()
+            for kind in kinder:
                 self._zeichne_element(kind, tags=tags, tf=tf,
                                       skala=skala, clip=clip, stil=stil)
             return
@@ -4490,6 +4541,7 @@ class CadApp:
             if typ == "verbindung": return Verbindung(**d)
             if typ == "maske":      return ElektroMaske(**d)
             if typ == "klemme":     return Klemme(**d)
+            if typ == "koordinatenfeld": return Koordinatenfeld(**d)
             if typ == "block":
                 kinder_dicts = d.pop("elemente", [])
                 kinder = []
@@ -5639,7 +5691,7 @@ class CadApp:
         ziele = [e for e in self.auswahl
                  if not isinstance(e, (Viewport, Text, Bemassung, BlockReferenz,
                                        Schraffur, Querverweis, Verbindung,
-                                       ElektroMaske, Klemme))]
+                                       ElektroMaske, Klemme, Koordinatenfeld))]
         if not ziele:
             return
         self._snapshot()
@@ -7236,6 +7288,32 @@ class CadApp:
         if not n_ein:
             self.status.set(tr("msg.klemme.gesetzt"))
 
+    def _feld_platzieren(self, x, y):
+        dlg = KoordinatenfeldDialog(self.root, self._kf_werte)
+        if dlg.result is None:
+            return
+        self._kf_werte = dict(dlg.result)
+        self._snapshot()
+        daten = self._layer_daten()
+        daten["staerke"] = None
+        self._ziel_liste().append(Koordinatenfeld(x, y, **dlg.result, **daten))
+        self.aktives_werkzeug.set("auswahl")
+        self._werkzeug_gewechselt()
+        self.redraw()
+        self.status.set(tr("msg.kf.gesetzt"))
+
+    def _feld_bearbeiten(self, el):
+        dlg = KoordinatenfeldDialog(self.root, {
+            "spalten": el.spalten, "zeilen": el.zeilen, "breite": el.breite,
+            "hoehe": el.hoehe, "raster": el.raster})
+        if dlg.result is None:
+            return
+        self._snapshot()
+        el.spalten, el.zeilen = dlg.result["spalten"], dlg.result["zeilen"]
+        el.breite, el.hoehe = dlg.result["breite"], dlg.result["hoehe"]
+        el.raster = dlg.result["raster"]
+        self.redraw()
+
     def _fest_bearbeiten(self, el):
         ist_maske = isinstance(el, ElektroMaske)
         dlg = FestMaskeDialog(
@@ -7263,11 +7341,15 @@ class CadApp:
             ghost = ElektroMaske(pt[0], pt[1], self._mk_werte,
                                  rolle=self._mk_rolle,
                                  layer=self.aktiver_layer.get())
+        elif wz == "koordinatenfeld":
+            ghost = Koordinatenfeld(pt[0], pt[1], **self._kf_werte,
+                                    layer=self.aktiver_layer.get())
         else:
             ghost = Klemme(pt[0], pt[1], self._kl_werte,
                            layer=self.aktiver_layer.get())
         self._clear_temp()
-        for k in ghost.aufgeloest():
+        for k in (ghost.aufgeloest(umriss=True) if wz == "koordinatenfeld"
+                  else ghost.aufgeloest()):
             self._zeichne_element(k, tags=("vorschau",))
         self._fadenkreuz(event.x, event.y)
         return True
@@ -7892,3 +7974,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
