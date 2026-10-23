@@ -85,7 +85,7 @@ from katiecad.ui.dialogs import (
     TitleBlockDialog,
 )
 from katiecad.fileio.pdf import pdf_erzeugen, pdf_senden, pdf_mehrseitig_erzeugen
-from katiecad.electrical.logic import (querverweis_ziele, qv_texte_aus_blattdaten,
+from katiecad.electrical.logic import (leitungen_automatisch, querverweis_ziele, qv_texte_aus_blattdaten,
                               qv_texte_aus_elementen, naechster_vp,
                               naechster_anschluss, anschlusspunkte,
                               naechste_bezeichnung, geraete,
@@ -335,7 +335,7 @@ class CadApp:
         self._mk_rolle = "haupt"
         self._kl_werte = {}
         self._kf_werte = {"spalten": 6, "zeilen": 4, "breite": 287.0,
-                          "hoehe": 150.0, "raster": False}
+                          "hoehe": 164.0, "raster": False}
         self._geraet_modus = False
 
         self._clipboard = []
@@ -1124,8 +1124,6 @@ class CadApp:
                               command=lambda: self._werkzeug_setzen("vpunkt"))
         m_elektro.add_command(label=tr("menu.elektro.verbindung"),
                               command=lambda: self._werkzeug_setzen("verbindung"))
-        m_elektro.add_command(label=tr("menu.elektro.leitung"),
-                              command=lambda: self._werkzeug_setzen("leitung"))
         m_elektro.add_command(label=tr("menu.elektro.querverweis"),
                               command=lambda: self._werkzeug_setzen("querverweis"))
         m_elektro.add_separator()
@@ -1197,7 +1195,7 @@ class CadApp:
         ttk.Separator(tb, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=8)
         ttk.Label(tb, text=tr("menu.elektro") + ":",
                   style="Title.TLabel").pack(side=tk.LEFT, padx=(0, 4))
-        for key in ("vpunkt", "verbindung", "leitung", "querverweis",
+        for key in ("vpunkt", "verbindung", "querverweis",
                     "maske", "klemme", "koordinatenfeld"):
             ttk.Radiobutton(tb, text=tr(f"tb.wz.{key}"), value=key,
                             variable=self.aktives_werkzeug,
@@ -2140,7 +2138,7 @@ class CadApp:
         self._trim_abbrechen()
         self._break_abbrechen()
         self._warte_auf_basispunkt = False
-        self._clipboard_mit_basis = False
+        # (Basispunkt der Zwischenablage bleibt bei ESC erhalten)
         if self._vp_aktion != "none":
             self._vp_reset_drag()
         self._vp_fenster = None
@@ -3993,8 +3991,21 @@ class CadApp:
         self.letzter_punkt = None
         self.redraw()
 
+    def _leitungen_automatisch(self):
+        """Leitungen entstehen/verschwinden von selbst (wie Eplan P8)."""
+        if self._ist_layout():
+            return
+        neu, weg, entfernt = leitungen_automatisch(self.elemente)
+        if entfernt and self.auswahl:
+            ids = {id(e) for e in entfernt}
+            self.auswahl = [e for e in self.auswahl if id(e) not in ids]
+
     def redraw(self):
         c = self.canvas
+        try:
+            self._leitungen_automatisch()
+        except Exception as ex:
+            print(f"[KatieCAD] Leitungen: {ex}")
         try:
             self._querverweise_aktualisieren()
         except Exception as ex:
@@ -7615,6 +7626,7 @@ class CadApp:
             else:
                 texte[j + 1] = self._qv_texte_blatt(p.blatt_pfad(j))
         for i, _, ctx in kontexte:
+            leitungen_automatisch(ctx.elemente)
             querverweis_ziele(ctx.elemente, i + 1,
                               {n: t for n, t in texte.items() if n != i + 1})
             geraete_referenzen(
@@ -7974,4 +7986,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
