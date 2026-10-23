@@ -2190,6 +2190,15 @@ class VerbindungDialog(tk.Toplevel):
         self.v_punkt = tk.BooleanVar(value=bool(v.get("punkt", True)))
         ttk.Checkbutton(f, text=tr("dlg.verb.punkt"),
                         variable=self.v_punkt).pack(anchor=tk.W, pady=(10, 0))
+        ttk.Label(f, text=tr("dlg.verb.schraeg")).pack(anchor=tk.W, pady=(10, 2))
+        sf = ttk.Frame(f)
+        sf.pack(anchor=tk.W)
+        self.v_schraeg = tk.IntVar(value=(int(v.get("ausrichtung", 0)) * 90 + 180) % 360)
+        for zeile, spalte, r, key in ((0, 1, 90, "nord"), (1, 2, 0, "ost"),
+                                      (2, 1, 270, "sued"), (1, 0, 180, "west")):
+            ttk.Radiobutton(sf, text=tr("dlg.vp." + key), value=r,
+                            variable=self.v_schraeg).grid(
+                row=zeile, column=spalte, sticky=tk.W, padx=6, pady=1)
         ttk.Label(f, text=tr("dlg.verb.hinweis"), style="Hint.TLabel",
                   wraplength=320, justify=tk.LEFT).pack(anchor=tk.W, pady=(6, 0))
         self.l_fehler = ttk.Label(f, text="", foreground="#ff6b6b")
@@ -2208,7 +2217,8 @@ class VerbindungDialog(tk.Toplevel):
         if len(arme) < 2:
             self.l_fehler.config(text=tr("dlg.verb.min2"))
             return
-        self.result = {"arme": arme, "punkt": bool(self.v_punkt.get())}
+        self.result = {"arme": arme, "punkt": bool(self.v_punkt.get()),
+                       "ausrichtung": ((int(self.v_schraeg.get()) - 180) // 90) % 4}
         self.destroy()
 
 
