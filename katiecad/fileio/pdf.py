@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-katiecad/fileio/pdf.py - PDF-Erzeugung fuer Modell- und Layout-Ansicht.
-Enthaelt KEIN Tkinter. Wird von CadApp aufgerufen.
+katiecad/fileio/pdf.py - PDF generation for model and layout view.
+Contains NO Tkinter. Called by CadApp.
 
-NEU (Schritt 2): BlockReferenz wird aufgeloest ausgegeben.
-NEU (Schritt 8): Schraffuren (Solid und Linien) werden unterstuetzt.
-NEU (Elektro): Querverweise, Verbindungspunkt-Beschriftung, mehrseitige PDFs.
+NEW (step 2): BlockReferenz is output resolved.
+NEW (step 8): hatchings (solid and lines) are supported.
+NEW (electrical): cross references, connection point labels, multi-page PDFs.
 """
 
 import math, os, sys, tempfile, subprocess
@@ -51,7 +51,7 @@ def _effektive_staerke_mm(el, layers):
 
 
 def _prims(el, skala, einh_faktor, dezimalkomma):
-    """Liefert die Primitiven eines Elements (wie CadApp._prims)."""
+    """Returns the primitives of an element (like CadApp._prims)."""
     if isinstance(el, Linie):
         return [("l", [(el.x1, el.y1), (el.x2, el.y2)], False)]
     if isinstance(el, Rechteck):
@@ -83,9 +83,9 @@ def _prims(el, skala, einh_faktor, dezimalkomma):
 
 
 def _pdf_element(seite, el, tf, zs, farbig, layers, einh_faktor, dezimalkomma):
-    # NEU: Block / Querverweis aufgeloest ausgeben
+    # NEW: output block / cross reference resolved
     if isinstance(el, (ElektroMaske, Klemme, Kabel)):
-        # Leere Felder erscheinen im Druck nicht (keine <TAG>-Platzhalter)
+        # Empty fields do not appear in the print (no <TAG> placeholders)
         for kind in el.aufgeloest(platzhalter=False):
             _pdf_element(seite, kind, tf, zs, farbig, layers,
                          einh_faktor, dezimalkomma)
@@ -96,8 +96,8 @@ def _pdf_element(seite, el, tf, zs, farbig, layers, einh_faktor, dezimalkomma):
                          einh_faktor, dezimalkomma)
         return
 
-    # NEU: Verbindungspunkt - der Kreis erscheint nur im Modell, im PDF
-    # nur die Beschriftung.
+    # NEW: connection point - the circle appears only in the model, in the PDF
+    # only the label.
     if isinstance(el, Verbindungspunkt):
         t = el.text_element()
         if t is not None:
@@ -105,18 +105,18 @@ def _pdf_element(seite, el, tf, zs, farbig, layers, einh_faktor, dezimalkomma):
                          einh_faktor, dezimalkomma)
         return
 
-    # NEU: Schraffur ausgeben
+    # NEW: output hatching
     if isinstance(el, Schraffur):
         farbe = _pdf_farbe(el, layers, farbig)
         if el.muster == "solid":
             pts = [tf(x, y) for (x, y) in el.punkte]
             seite.flaeche(pts, farbe)
         else:
-            # Grenzlinie (optional, hier zeichnen wir sie mit, um saubere Kanten zu haben)
+            # Boundary line (optional, drawn here to get clean edges)
             pts = [tf(x, y) for (x, y) in el.punkte]
             seite.linie(pts, 0.25, farbe, None, True)
             
-            # Schraffurlinien
+            # Hatch lines
             for (p1, p2) in el.geometrie_linien():
                 seite.linie([tf(p1[0], p1[1]), tf(p2[0], p2[1])], 0.18, farbe)
         return
@@ -192,8 +192,8 @@ def _pdf_viewport(seite, vp, elemente, layers, farbig, rahmen,
 
 
 def pdf_seite_erzeugen(app, quelle, farbig, vp_rahmen, layout_index=None):
-    """Erzeugt eine PdfSeite fuer Modell oder Layout.
-    app muss bieten: elemente, layers, layouts, aktives_layout,
+    """Creates a PdfSeite for model or layout.
+    app must provide: elemente, layers, layouts, aktives_layout,
                      layout_format, _einh_faktor(), dezimalkomma.get()."""
     de = SPRACHE["aktuell"] == "de"
     einh = app._einh_faktor()
@@ -247,22 +247,22 @@ def pdf_seite_erzeugen(app, quelle, farbig, vp_rahmen, layout_index=None):
 
 
 def pdf_erzeugen(app, quelle, farbig, vp_rahmen, layout_index=None):
-    """Erzeugt PDF-Bytes (eine Seite) fuer Modell oder Layout."""
+    """Creates PDF bytes (one page) for model or layout."""
     return pdf_seite_erzeugen(app, quelle, farbig, vp_rahmen,
                               layout_index).to_bytes()
 
 
 def pdf_mehrseitig_erzeugen(kontexte, quelle, farbig, vp_rahmen):
-    """Mehrere Blaetter in EINE PDF-Datei (eine Seite pro Blatt/Layout).
+    """Several sheets into ONE PDF file (one page per sheet/layout).
 
-    kontexte: Liste von (anzeigename, ctx); ctx bietet dieselben Attribute
-              wie `app` in pdf_erzeugen.
-    Rueckgabe: (pdf_bytes, uebersprungene_namen)
+    kontexte: list of (display_name, ctx); ctx offers the same attributes
+              as `app` in pdf_erzeugen.
+    Returns: (pdf_bytes, skipped_names)
     """
     seiten, uebersprungen = [], []
     for name, ctx in kontexte:
         try:
-            # Berichtsblaetter (Listen, Deckblatt) liegen im Layout
+            # Report sheets (lists, cover sheet) live in the layout
             q = "layout" if getattr(ctx, "bericht", None) else quelle
             seiten.append(pdf_seite_erzeugen(ctx, q, farbig, vp_rahmen))
         except Exception:
@@ -290,4 +290,3 @@ def pdf_senden(pfad, drucken):
              f"({ex}).\nDie PDF liegt hier:\n{pfad}" if de else
              f"The file could not be opened/printed automatically ({ex}).\n"
              f"The PDF is here:\n{pfad}"))
-
