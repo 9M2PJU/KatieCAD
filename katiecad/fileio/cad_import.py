@@ -1,19 +1,19 @@
 # -*- coding: utf-8 -*-
 """
-katiecad/fileio/cad_import.py - Robuster DXF/DWG-Import fuer KatieCAD.
-Enthaelt KEIN Tkinter. Wird von CadApp.import_dxf / import_dwg aufgerufen.
+katiecad/fileio/cad_import.py - Robust DXF/DWG import for KatieCAD.
+Contains NO Tkinter. Called by CadApp.import_dxf / import_dwg.
 
-Unterstuetzt (DXF):
-  LINE, CIRCLE, ARC, ELLIPSE, SPLINE, LWPOLYLINE, POLYLINE (2D/3D, mit
-  Bulges), TEXT, MTEXT, ATTRIB, HATCH, SOLID/TRACE, 3DFACE, LEADER,
-  MLEADER, DIMENSION (als Geometrie), INSERT/MINSERT (wird aufgeloest,
-  auch verschachtelt).
-Zusaetzlich: Layerfarben (ACI/RGB), Layer aus/gefroren, Linientypen,
-Linienstaerken, Einheiten ($INSUNITS -> mm), OCS (Extrusion -Z),
-defekte Dateien ueber ezdxf.recover.
+Supported (DXF):
+  LINE, CIRCLE, ARC, ELLIPSE, SPLINE, LWPOLYLINE, POLYLINE (2D/3D, with
+  bulges), TEXT, MTEXT, ATTRIB, HATCH, SOLID/TRACE, 3DFACE, LEADER,
+  MLEADER, DIMENSION (as geometry), INSERT/MINSERT (resolved,
+  also nested).
+In addition: layer colours (ACI/RGB), layers off/frozen, line types,
+line weights, units ($INSUNITS -> mm), OCS (extrusion -Z),
+damaged files via ezdxf.recover.
 
-DWG: ueber ODA File Converter (via ezdxf.addons.odafc) oder LibreDWG
-(dwg2dxf) nach DXF konvertieren; ezdwg nur noch als letzter Notnagel.
+DWG: converted to DXF via the ODA File Converter (via ezdxf.addons.odafc) or
+LibreDWG (dwg2dxf); ezdwg only as a last resort.
 """
 
 import math
@@ -37,18 +37,18 @@ except ImportError:                                   # pragma: no cover
     _recover = None
     EZDXF_OK = False
 
-# $INSUNITS -> Millimeter
+# $INSUNITS -> millimetres
 _EINHEIT_MM = {
-    1: 25.4,        # Zoll
-    2: 304.8,       # Fuss
+    1: 25.4,        # inch
+    2: 304.8,       # foot
     4: 1.0,         # mm
     5: 10.0,        # cm
     6: 1000.0,      # m
     7: 1.0e6,       # km
-    8: 0.0254,      # Mikrozoll
-    9: 0.0254e-3,   # Mil -> (selten)
+    8: 0.0254,      # microinch
+    9: 0.0254e-3,   # mil -> (rare)
     10: 914.4,      # Yard
-    13: 1.0e-3,     # Mikrometer
+    13: 1.0e-3,     # micrometre
     14: 100.0,      # dm
 }
 
@@ -67,7 +67,7 @@ _MTEXT_ATTACH = {
     7: "unten_links", 8: "unten_zentriert", 9: "unten_rechts",
 }
 
-# Entitaeten, die per virtual_entities() in Grundelemente zerlegt werden
+# Entities that are decomposed into basic elements via virtual_entities()
 _EXPLODE = ("INSERT", "DIMENSION", "ARC_DIMENSION", "LARGE_RADIAL_DIMENSION",
             "MLEADER", "MULTILEADER", "MLINE")
 _IGNORIERT_LEISE = {"POINT", "XLINE", "RAY", "VIEWPORT", "ATTDEF",
@@ -75,14 +75,14 @@ _IGNORIERT_LEISE = {"POINT", "XLINE", "RAY", "VIEWPORT", "ATTDEF",
 
 
 # ============================================================
-# Hilfsfunktionen
+# Helper functions
 # ============================================================
 def _hex(rgb):
     return "#%02x%02x%02x" % tuple(int(max(0, min(255, c))) for c in rgb)
 
 
 def _aci_hex(aci):
-    """ACI -> Hex. 7 (Weiss/Schwarz) -> App-Standardfarbe."""
+    """ACI -> hex. 7 (white/black) -> application default colour."""
     if aci == 7:
         return FARBEN["cyan"]
     try:
@@ -126,14 +126,14 @@ def _extrusion_z(e):
 
 
 # ============================================================
-# Konverter
+# Converter
 # ============================================================
 class DxfImporter:
-    """Wandelt ein ezdxf-Dokument in KatieCAD-Elemente um."""
+    """Converts an ezdxf document into KatieCAD elements."""
 
     def __init__(self, doc, layers, einheit_auto=True):
         self.doc = doc
-        self.layers = layers              # dict name -> Layer (wird ergaenzt)
+        self.layers = layers              # dict name -> layer (extended as needed)
         self.elemente = []
         self.uebersprungen = Counter()
         self.fehler = 0
@@ -149,7 +149,7 @@ class DxfImporter:
         self._layer_aus = set()
         self._layer_lesen()
 
-    # ---- Layer -------------------------------------------------
+    # ---- Layers ------------------------------------------------
     def _layer_lesen(self):
         try:
             for l in self.doc.layers:
@@ -190,7 +190,7 @@ class DxfImporter:
             self.layers[name] = Layer(name, FARBEN["cyan"], 0.35)
             self.neue_layer.append(name)
 
-    # ---- Gemeinsame Attribute ----------------------------------
+    # ---- Common attributes -------------------------------------
     def _attr(self, e):
         layer = "0"
         try:
@@ -228,7 +228,7 @@ class DxfImporter:
     def _p(self, v):
         return (float(v[0]) * self.faktor, float(v[1]) * self.faktor)
 
-    # ---- Hauptschleife -----------------------------------------
+    # ---- Main loop ---------------------------------------------
     def importiere(self, entitaeten, tiefe=0):
         for e in entitaeten:
             try:
@@ -259,7 +259,7 @@ class DxfImporter:
                 return
             self.importiere(list(e.virtual_entities()), tiefe + 1)
             if typ == "INSERT":
-                try:                               # sichtbare Attribute
+                try:                               # visible attributes
                     self.importiere(list(e.attribs), tiefe + 1)
                 except Exception:
                     pass
@@ -274,7 +274,7 @@ class DxfImporter:
             return
         self.uebersprungen[typ] += 1
 
-    # ---- Einfache Geometrie ------------------------------------
+    # ---- Simple geometry ---------------------------------------
     def _add(self, el):
         self.elemente.append(el)
         return True
@@ -314,7 +314,7 @@ class DxfImporter:
                                    **self._attr(e)))
 
     def _via_pfad(self, e, geschlossen=None):
-        """Generischer Weg: ezdxf.path (liefert WCS-Punkte)."""
+        """Generic way: ezdxf.path (returns WCS points)."""
         from ezdxf import path as ezpath
         p = ezpath.make_path(e)
         dist = max(self._groesse(e) / 800.0, 1e-9)
@@ -336,7 +336,7 @@ class DxfImporter:
         except Exception:
             return 1000.0
 
-    # ---- Kurven ------------------------------------------------
+    # ---- Curves ------------------------------------------------
     def _c_ellipse(self, e):
         dist = max(self._groesse(e) / 800.0, 1e-9)
         pts = list(e.flattening(dist))
@@ -351,11 +351,11 @@ class DxfImporter:
             return False
         return self._punkte_zu_poly(e, pts, getattr(e, "closed", False))
 
-    # ---- Polylinien --------------------------------------------
+    # ---- Polylines ---------------------------------------------
     def _c_lwpolyline(self, e):
         raw = list(e.get_points("xyb"))
         if any(abs(b) > 1e-9 for (_, _, b) in raw):
-            # Bulges -> Linien + Boegen
+            # Bulges -> lines + arcs
             self.importiere(list(e.virtual_entities()), 1)
             return True
         pts = list(e.vertices_in_wcs())
@@ -374,7 +374,7 @@ class DxfImporter:
             pts = [v.dxf.location for v in e.vertices]
         return self._punkte_zu_poly(e, pts, e.is_closed)
 
-    # ---- Flaechen ----------------------------------------------
+    # ---- Areas -------------------------------------------------
     def _c_solid(self, e):
         d = e.dxf
         v = [d.vtx0, d.vtx1, d.vtx3 if d.hasattr("vtx3") else d.vtx2, d.vtx2]
@@ -429,7 +429,7 @@ class DxfImporter:
         abstand = max(diag / 25.0, 1e-6)
         self._add(Schraffur(aussen, muster="solid" if solid else "linien",
                             winkel=winkel, abstand=abstand, **kw))
-        for ins in polys[1:]:                     # Inseln als Kontur
+        for ins in polys[1:]:                     # Islands as outline
             self._add(Polylinie(ins, geschlossen=True, **self._attr(e)))
         return True
 
@@ -468,11 +468,11 @@ class DxfImporter:
 
 
 # ============================================================
-# Dateien lesen
+# Reading files
 # ============================================================
 def dxf_lesen(pfad):
-    """Liest DXF; faellt bei Fehlern auf ezdxf.recover zurueck.
-    Rueckgabe: (doc, hinweise:list[str])"""
+    """Reads DXF; falls back to ezdxf.recover on errors.
+    Returns: (doc, hints:list[str])"""
     hinweise = []
     try:
         return ezdxf.readfile(pfad), hinweise
@@ -484,7 +484,7 @@ def dxf_lesen(pfad):
 
 
 def _oda_pfad_setzen():
-    """Sucht den ODA File Converter an ueblichen Orten (Windows)."""
+    """Looks for the ODA File Converter in the usual locations (Windows)."""
     if not sys.platform.startswith("win"):
         return
     import glob
@@ -504,9 +504,9 @@ def _oda_pfad_setzen():
 
 
 def dwg_zu_dxf_doc(pfad):
-    """Konvertiert DWG -> ezdxf-Dokument.
-    Reihenfolge: ODA File Converter, LibreDWG (dwg2dxf).
-    Rueckgabe: (doc, quelle) oder wirft RuntimeError mit Hilfetext."""
+    """Converts DWG -> ezdxf document.
+    Order: ODA File Converter, LibreDWG (dwg2dxf).
+    Returns: (doc, source) or raises RuntimeError with help text."""
     fehler = []
     # 1) ODA File Converter
     try:
@@ -533,9 +533,9 @@ def dwg_zu_dxf_doc(pfad):
     raise RuntimeError("; ".join(fehler))
 
 
-# ---- ezdwg-Notnagel (API nicht stabil -> tolerant) ---------------
+# ---- ezdwg last resort (API not stable -> tolerant) ---------------
 def _g(obj, name, default=None):
-    """Liest Attribut ODER dict-Eintrag aus e / e.dxf."""
+    """Reads an attribute OR dict entry from e / e.dxf."""
     for quelle in (getattr(obj, "dxf", None), obj):
         if quelle is None:
             continue
@@ -604,7 +604,7 @@ def ezdwg_lesen(pfad, layers):
 
 
 # ============================================================
-# Oeffentliche Einstiegspunkte
+# Public entry points
 # ============================================================
 class ImportErgebnis:
     def __init__(self):
@@ -618,9 +618,9 @@ class ImportErgebnis:
 
 
 def importiere_datei(pfad, layers):
-    """Liest .dxf oder .dwg und liefert ImportErgebnis.
-    'layers' (dict) wird um neue Layer ergaenzt.
-    Wirft Exceptions mit lesbarer Meldung."""
+    """Reads .dxf or .dwg and returns an ImportErgebnis.
+    'layers' (dict) is extended with new layers.
+    Raises exceptions with a readable message."""
     ext = os.path.splitext(pfad)[1].lower()
     erg = ImportErgebnis()
 
