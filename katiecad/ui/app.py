@@ -7324,7 +7324,7 @@ class CadApp:
 
     # Junction
     def _verbindung_starten(self):
-        vor = self._vb_vorgabe or {"arme": [0, 90, 180], "punkt": True}
+        vor = self._vb_vorgabe or {"arme": [0, 90, 180], "punkt": True, "ausrichtung": 0}
         dlg = VerbindungDialog(self.root, vor)
         if dlg.result is None:
             self.aktives_werkzeug.set("auswahl")
@@ -7335,7 +7335,8 @@ class CadApp:
 
     def _neue_verbindung(self, x, y):
         v = self._vb_vorgabe
-        return Verbindung(x, y, arme=v["arme"], punkt=v["punkt"],
+        return Verbindung(x, y, ausrichtung=v.get("ausrichtung", 0),
+                          arme=v["arme"], punkt=v["punkt"],
                           layer=self.aktiver_layer.get())
 
     def _verbindung_platzieren(self, x, y):
@@ -7349,7 +7350,8 @@ class CadApp:
 
     def _verbindung_bearbeiten(self, el):
         dlg = VerbindungDialog(self.root, {"arme": el.arme,
-                                           "punkt": el.punkt})
+                                           "punkt": el.punkt,
+                                           "ausrichtung": el.ausrichtung})
         if dlg.result is None:
             return
         liste = self._aktuelle_elemente_liste()
@@ -7357,6 +7359,7 @@ class CadApp:
         self._snapshot()
         el.arme = Verbindung.arme_normieren(dlg.result["arme"])
         el.punkt = dlg.result["punkt"]
+        el.ausrichtung = dlg.result["ausrichtung"]
         verbindungen_bereinigen(liste, vorher - {id(el)})
         self.redraw()
 
@@ -8386,3 +8389,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
