@@ -60,7 +60,6 @@ python main.py
 ## Documentation
 
 - [User guide (English)](docs/USER_GUIDE.md) · [Anleitung (Deutsch)](docs/ANLEITUNG.md)
-- [Building installers](docs/BUILD.md) · [Making a release](docs/RELEASE.md)
 
 ## License
 
