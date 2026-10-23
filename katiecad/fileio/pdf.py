@@ -16,7 +16,7 @@ from katiecad.model.core import (
     Text, Bemassung, Viewport,
     Linie, Rechteck, Polylinie, Kreis, Bogen,
     BlockReferenz, Schraffur, Querverweis, Verbindungspunkt,
-    Verbindung, ElektroMaske, Klemme, Koordinatenfeld,
+    Verbindung, ElektroMaske, Klemme, Koordinatenfeld, Kabel,
     pdf_mehrseitig,
     bogen_sweep, bogen_punkte,
     normmassstab_unter, massstab_text,
@@ -84,7 +84,7 @@ def _prims(el, skala, einh_faktor, dezimalkomma):
 
 def _pdf_element(seite, el, tf, zs, farbig, layers, einh_faktor, dezimalkomma):
     # NEU: Block / Querverweis aufgeloest ausgeben
-    if isinstance(el, (ElektroMaske, Klemme)):
+    if isinstance(el, (ElektroMaske, Klemme, Kabel)):
         # Leere Felder erscheinen im Druck nicht (keine <TAG>-Platzhalter)
         for kind in el.aufgeloest(platzhalter=False):
             _pdf_element(seite, kind, tf, zs, farbig, layers,
@@ -288,4 +288,3 @@ def pdf_senden(pfad, drucken):
              f"({ex}).\nDie PDF liegt hier:\n{pfad}" if de else
              f"The file could not be opened/printed automatically ({ex}).\n"
              f"The PDF is here:\n{pfad}"))
-
