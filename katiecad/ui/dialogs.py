@@ -1565,9 +1565,11 @@ class ProjektDruckDialog(tk.Toplevel):
 
 class VerbindungspunktDialog(tk.Toplevel):
     """Bezeichnung eines Verbindungspunkts + Schalter 'Text anzeigen'.
-    result: {'wert': str, 'sichtbar': bool} oder None."""
+    result: {'wert': str, 'sichtbar': bool, 'richtungen': [0|90|180|270]}
+    oder None."""
 
-    def __init__(self, parent, wert="", sichtbar=True, titel=None):
+    def __init__(self, parent, wert="", sichtbar=True, titel=None,
+                 richtungen=(0, 90, 180, 270)):
         super().__init__(parent)
         self.result = None
         self.title(titel or tr("dlg.vp.titel"))
@@ -1584,6 +1586,16 @@ class VerbindungspunktDialog(tk.Toplevel):
         self.v_sicht = tk.BooleanVar(value=sichtbar)
         ttk.Checkbutton(f, text=tr("dlg.vp.anzeigen"),
                         variable=self.v_sicht).pack(anchor=tk.W)
+        ttk.Label(f, text=tr("dlg.vp.richtungen")).pack(anchor=tk.W, pady=(10, 2))
+        rf = ttk.Frame(f)
+        rf.pack(anchor=tk.W)
+        self.v_r = {r: tk.BooleanVar(value=r in richtungen)
+                    for r in (90, 0, 270, 180)}
+        for zeile, spalte, r, key in ((0, 1, 90, "nord"), (1, 2, 0, "ost"),
+                                      (2, 1, 270, "sued"), (1, 0, 180, "west")):
+            ttk.Checkbutton(rf, text=tr("dlg.vp." + key),
+                            variable=self.v_r[r]).grid(
+                row=zeile, column=spalte, sticky=tk.W, padx=6, pady=1)
         bf = ttk.Frame(f)
         bf.pack(pady=(10, 0))
         ttk.Button(bf, text=tr("dlg.ok"), command=self._ok).pack(side=tk.LEFT, padx=4)
@@ -1597,7 +1609,9 @@ class VerbindungspunktDialog(tk.Toplevel):
 
     def _ok(self):
         self.result = {"wert": self.v_wert.get().strip(),
-                       "sichtbar": bool(self.v_sicht.get())}
+                       "sichtbar": bool(self.v_sicht.get()),
+                       "richtungen": sorted(r for r, v in self.v_r.items()
+                                            if v.get())}
         self.destroy()
 
 
