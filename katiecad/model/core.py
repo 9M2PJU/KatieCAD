@@ -1643,6 +1643,7 @@ class BlockReferenz(Element):
             el.x, el.y = self._welt_pts(el.x, el.y)
             el.arme = Verbindung.arme_normieren(
                 [d + self.winkel for d in el.arme])
+            el.ausrichtung = (el.ausrichtung + int(round(self.winkel / 90.0))) % 4
         elif isinstance(el, Bemassung):
             el.x1, el.y1 = self._welt_pts(el.x1, el.y1)
             el.x2, el.y2 = self._welt_pts(el.x2, el.y2)
@@ -2292,8 +2293,14 @@ class Verbindung(Element):
                     [a * 90, a * 90 + 90, a * 90 + 180] if art == 3 else
                     [0, 90, 180, 270])
             punkt = bool(punkt) and art == 4
+            if art != 4:
+                a = 0
+            ausrichtung = a
         self.arme = self.arme_normieren(arme)
         self.punkt = bool(punkt)
+        # Only used by the 4-arm crossing WITHOUT dot: the kinked arm
+        # points to  ausrichtung*90 + 180  (as before).
+        self.ausrichtung = int(ausrichtung) % 4
 
     @classmethod
     def arme_normieren(cls, arme):
@@ -2322,13 +2329,47 @@ class Verbindung(Element):
             out.append((wx, wy, d))
         return out
 
+    def _zuege(self):
+        """Polylines in world coordinates, as in Eplan.
+        With dot: plain straight arms.  Without dot:
+          2 arms: corner / straight piece
+          3 arms: T-piece - the arm opposite the missing direction is the
+                  stem; of the two side arms one is straight and one runs
+                  with a kink (45 degrees) onto the stem
+          4 arms: crossing - through-line + straight arm + kinked arm"""
+        u = self.ARM
+        c = (self.x, self.y)
+
+        def vec(d, f=1.0):
+            r = math.radians(d)
+            return (round(self.x + f * u * math.cos(r), 9),
+                    round(self.y + f * u * math.sin(r), 9))
+
+        arme = self.arme
+        if len(arme) == 2:
+            return [[vec(arme[0]), c, vec(arme[1])]]
+        if self.punkt:
+            return [[c, vec(d)] for d in arme]
+
+        def kink(s):                 # kinked arm towards stem direction s
+            k = (s + 90) % 360
+            return [vec(k), vec(k, 0.5), vec(s, 0.5)]
+
+        if len(arme) == 3:
+            fehlt = [d for d in self.RICHTUNGEN if d not in arme][0]
+            s = (fehlt + 180) % 360
+            return [[c, vec((s - 90) % 360)], [c, vec(s)], kink(s)]
+        s = (self.ausrichtung * 90 + 180 - 90) % 360
+        return [[c, vec((s - 90) % 360)], [vec(s), vec((s + 180) % 360)], kink(s)]
+
     def aufgeloest(self):
         st = dict(layer=self.layer, farbe=self.farbe,
                   linientyp=self.linientyp, eig_farbe=self.eig_farbe,
                   staerke=self.staerke)
         out = []
-        for (ax, ay, _d) in self.anschluesse():
-            out.append(Linie(self.x, self.y, ax, ay, **st))
+        for zug in self._zuege():
+            for a, b in zip(zug, zug[1:]):
+                out.append(Linie(a[0], a[1], b[0], b[1], **st))
         if self.punkt and len(self.arme) >= 3:
             r = self.PUNKT_RADIUS
             pts = [(self.x + r * math.cos(2 * math.pi * i / 16),
@@ -2350,6 +2391,7 @@ class Verbindung(Element):
         self.x, self.y = punkte_drehen(self.x, self.y, cx, cy, winkel_deg)
         self.arme = self.arme_normieren(
             [d - winkel_deg for d in self.arme])
+        self.ausrichtung = (self.ausrichtung + int(round(-winkel_deg / 90.0))) % 4
 
     def griffe(self):
         return [("p", self.x, self.y)]
