@@ -1,17 +1,17 @@
 # -*- coding: utf-8 -*-
 """
-katiecad/reports/seiten.py - Berichtsblaetter zusammenstellen (KEIN Tkinter).
+katiecad/reports/seiten.py - Assemble report sheets (NO Tkinter).
 
-Erzeugt Deckblatt, Inhaltsverzeichnis, Geraeteliste, Klemmenplan und
-Kabelplan als Listen von Layout-Elementen (A4 quer, Blattrahmen und
-Schriftkopf aus der gewaehlten Vorlage). Die Anwendung schreibt daraus
-normale Blaetter ins Projekt.
+Creates cover sheet, table of contents, device list, terminal diagram and
+cable plan as lists of layout elements (A4 landscape, sheet frame and
+title block from the chosen template). The application writes ordinary
+sheets into the project from them.
 
-Reihenfolge der Blaetter:
-    Deckblatt, Inhaltsverzeichnis | Zeichnungsblaetter | Geraeteliste,
-    Klemmenplan, Kabelplan
-Die Blattnummern der Zeichnungsblaetter haengen von der Zahl der Blaetter
-davor ab; die Funktion rechnet so lange, bis die Seitenzahlen stabil sind.
+Order of the sheets:
+    cover sheet, table of contents | drawing sheets | device list,
+    terminal diagram, cable plan
+The sheet numbers of the drawing sheets depend on the number of sheets
+before them; the function iterates until the page counts are stable.
 """
 
 import datetime
@@ -31,7 +31,7 @@ FORMAT = "A4 (297x210)"
 TYPEN = ("deckblatt", "inhalt", "geraete", "klemmen", "kabel")
 LISTEN = ("geraete", "klemmen", "kabel")
 
-# Schluessel der Projektdaten -> Tags im Schriftkopf (Deutsch / Englisch)
+# Keys of the project data -> tags in the title block (German / English)
 TITEL_TAGS = {
     "gezeichnet": ("GEZEICHNET", "DRAWN"),
     "gezeichnet_datum": ("GEZEICHNET_DATUM", "DRAWN_DATE"),
@@ -49,7 +49,7 @@ DATEN_SCHLUESSEL = ("anlage", "kunde", "auftrag", "zeichnungsnummer", "firma",
 
 
 class BlattInfo:
-    """Ein Zeichnungsblatt des Projekts (ohne Berichtsblaetter)."""
+    """A drawing sheet of the project (without report sheets)."""
 
     def __init__(self, name, elemente, beschreibung=""):
         self.name = name
@@ -63,7 +63,7 @@ class BerichtSeite:
 
 
 class Vorlage:
-    """Schriftkopf-Vorlage (Elemente mit Ursprung unten rechts)."""
+    """Title block template (elements with origin at the bottom right)."""
 
     def __init__(self, name, elemente):
         self.name = name
@@ -78,7 +78,7 @@ class Vorlage:
 
 
 # ------------------------------------------------------------------
-# Spaltendefinitionen (anpassbar ueber report_templates/<typ>.json)
+# Column definitions (customisable via report_templates/<type>.json)
 # ------------------------------------------------------------------
 _STANDARD = {
     "inhalt": [("nr", "rep.col.blatt", 8, "r"), ("name", "rep.col.bezeichnung", 40, "l"),
@@ -99,8 +99,8 @@ _OPTIONEN = {"textgroesse": 2.5, "zeilenhoehe": 6.0}
 
 
 def lade_spalten(typ, ordner=()):
-    """(spalten, optionen). `ordner`: Ordner mit <typ>.json (spaeter =
-    hoehere Prioritaet). Fehlerhafte Dateien werden ignoriert."""
+    """(columns, options). `ordner`: folders containing <type>.json (later =
+    higher priority). Faulty files are ignored."""
     spalten = [Spalte(k, tr(t), g, a) for k, t, g, a in _STANDARD[typ]]
     opt = dict(_OPTIONEN)
     for o in ordner:
@@ -141,7 +141,7 @@ def spalten_ordner(programm_ordner, projekt_ordner=None):
 
 
 # ------------------------------------------------------------------
-# Rahmen, Schriftkopf, Flaeche
+# Frame, title block, area
 # ------------------------------------------------------------------
 def _rahmen():
     b, h = ZEICHNUNGSFORMATE[FORMAT]
@@ -154,19 +154,19 @@ def _rahmen():
 
 
 def inhaltsflaeche(vorlage):
-    """(x1, y1, x2, y2) fuer Tabellen: Blattrahmen minus Schriftkopf."""
+    """(x1, y1, x2, y2) for tables: sheet frame minus title block."""
     _a, innen, _el = _rahmen()
     tb = vorlage.hoehe if vorlage is not None else 0.0
     return (innen[0] + 2.0, innen[1] + tb + 3.0, innen[2] - 2.0, innen[3] - 3.0)
 
 
 def kurzes_datum(heute, sprache):
-    """Kurzes Datum fuer enge Schriftkopf-Felder (15 mm): 23.10.26 / 26-10-23."""
+    """Short date for narrow title block fields (15 mm): 23.10.26 / 26-10-23."""
     return heute.strftime("%d.%m.%y") if sprache == "de" else heute.strftime("%y-%m-%d")
 
 
 def titel_werte(daten, titel1, projektname, heute, sprache):
-    """Tag-Werte fuer den Schriftkopf aus den Projektdaten."""
+    """Tag values for the title block from the project data."""
     d = dict(daten)
     if d.get("gezeichnet") or d.get("datum"):
         d["gezeichnet_datum"] = d.get("gezeichnet_datum") or d.get("datum") \
@@ -175,8 +175,8 @@ def titel_werte(daten, titel1, projektname, heute, sprache):
     for key, tags in TITEL_TAGS.items():
         v = d.get(key, "")
         if v:
-            for t in tags:           # alle Schreibweisen belegen (unbekannte
-                werte[t] = v         # Tags ignoriert der Block)
+            for t in tags:           # fill in all spellings (unknown
+                werte[t] = v         # tags are ignored by the block)
     werte["TITEL1"] = titel1
     werte["TITEL2"] = d.get("anlage") or projektname
     werte["TITEL3"] = d.get("kunde", "")
@@ -185,7 +185,7 @@ def titel_werte(daten, titel1, projektname, heute, sprache):
 
 
 def _seite(typ, name, titel1, inhalt, ctx, nr, gesamt):
-    """Rahmen + Inhalt + Schriftkopf einer Berichtsseite."""
+    """Frame + content + title block of a report page."""
     _a, _i, rahmen = _rahmen()
     el = list(rahmen) + list(inhalt)
     v = ctx["vorlage"]
@@ -202,7 +202,7 @@ def _seite(typ, name, titel1, inhalt, ctx, nr, gesamt):
 
 
 # ------------------------------------------------------------------
-# Deckblatt
+# Cover sheet
 # ------------------------------------------------------------------
 def deckblatt_inhalt(daten, projektname, flaeche, heute, sprache):
     x1, y1, x2, y2 = flaeche
@@ -239,10 +239,10 @@ def deckblatt_inhalt(daten, projektname, flaeche, heute, sprache):
 
 
 # ------------------------------------------------------------------
-# Zeilen je Berichtstyp (auch fuer den CSV-Export)
+# Rows per report type (also for the CSV export)
 # ------------------------------------------------------------------
 def listen_zeilen(typ, blaetter, nummer, netz=None, klemmen_in_geraeteliste=True):
-    """Zeilen eines Listen-Berichts. blaetter: [(idx, elemente)]."""
+    """Rows of a list report. blaetter: [(idx, elements)]."""
     if typ == "geraete":
         return D.geraeteliste(blaetter, nummer, netz, klemmen_in_geraeteliste)
     if typ == "klemmen":
@@ -257,7 +257,7 @@ def netz_aufbauen(blaetter):
 
 
 def tabellen_fuer_export(blaetter, nummer, ordner=(), klemmen_in_geraeteliste=True):
-    """{typ: (spalten, zeilen)} fuer Geraeteliste, Klemmenplan, Kabelplan."""
+    """{type: (columns, rows)} for device list, terminal diagram, cable plan."""
     netz = netz_aufbauen(blaetter)
     out = {}
     for typ in LISTEN:
@@ -285,16 +285,16 @@ def _name(basis, k, n):
 
 
 # ------------------------------------------------------------------
-# Hauptfunktion
+# Main function
 # ------------------------------------------------------------------
 def berichte_erzeugen(blaetter, projektname, daten, aktiv, vorlage, sprache,
                       ordner=(), heute=None, klemmen_in_geraeteliste=True):
-    """Erzeugt die gewuenschten Berichtsblaetter.
+    """Creates the requested report sheets.
 
-    blaetter: [BlattInfo] der Zeichnungsblaetter in Projektreihenfolge
-    aktiv:    Menge der gewuenschten Typen aus TYPEN
-    vorlage:  Vorlage oder None (ohne Schriftkopf)
-    -> (vorne, hinten): Listen von BerichtSeite"""
+    blaetter: [BlattInfo] of the drawing sheets in project order
+    aktiv:    set of requested types from TYPEN
+    vorlage:  template or None (without title block)
+    -> (vorne, hinten): lists of BerichtSeite"""
     heute = heute or datetime.date.today()
     aktiv = set(aktiv)
     ctx = {"vorlage": vorlage, "daten": dict(daten), "projekt": projektname,
@@ -325,7 +325,7 @@ def berichte_erzeugen(blaetter, projektname, daten, aktiv, vorlage, sprache,
         gesamt = vorn + len(blaetter) + hinten_n
         if "inhalt" not in aktiv:
             break
-        # Eintraege des Inhaltsverzeichnisses in Blattreihenfolge
+        # Table-of-contents entries in sheet order
         eintraege = []
         if n_deck:
             eintraege.append((namen["deckblatt"], "", namen["deckblatt"]))
@@ -374,8 +374,8 @@ def berichte_erzeugen(blaetter, projektname, daten, aktiv, vorlage, sprache,
 
 
 def beschreibung_aus_layouts(layouts):
-    """Titel aus dem Schriftkopf (TITEL1..3 bzw. TITLE) des ersten Layouts mit
-    Schriftkopf, z. B. 'Hauptstromkreis - Antrieb'."""
+    """Title from the title block (TITEL1..3 or TITLE) of the first layout with a
+    title block, e.g. 'Main circuit - drive'."""
     for lay in layouts:
         for e in lay.elemente:
             if TB.is_title_block(e):
