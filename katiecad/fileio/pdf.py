@@ -262,7 +262,9 @@ def pdf_mehrseitig_erzeugen(kontexte, quelle, farbig, vp_rahmen):
     seiten, uebersprungen = [], []
     for name, ctx in kontexte:
         try:
-            seiten.append(pdf_seite_erzeugen(ctx, quelle, farbig, vp_rahmen))
+            # Berichtsblaetter (Listen, Deckblatt) liegen im Layout
+            q = "layout" if getattr(ctx, "bericht", None) else quelle
+            seiten.append(pdf_seite_erzeugen(ctx, q, farbig, vp_rahmen))
         except Exception:
             uebersprungen.append(name)
     if not seiten:
@@ -288,3 +290,4 @@ def pdf_senden(pfad, drucken):
              f"({ex}).\nDie PDF liegt hier:\n{pfad}" if de else
              f"The file could not be opened/printed automatically ({ex}).\n"
              f"The PDF is here:\n{pfad}"))
+
