@@ -1,16 +1,16 @@
 # -*- coding: utf-8 -*-
 """
-katiecad/model/core.py - Datenmodell, Geometrie und PDF-Ausgabe.
-Enthaelt KEIN Tkinter und keine GUI-Logik.
+katiecad/model/core.py - Data model, geometry and PDF output.
+Contains NO Tkinter and no GUI logic.
 
-NEU (Block-Unterstuetzung, Schritt 1):
-  - BlockDefinition   Vorlage eines Blocks (Name + Elemente relativ zum Basispunkt)
-  - BlockReferenz     Eingefuegter Block (Position, Skalierung, Winkel + tiefe Kopie)
-  - BlockBibliothek   Globale, zeichnungsuebergreifende Blockbibliothek (blocks.json)
-  - BEFEHLE erweitert: BLOCK/B, INSERT/I, BLOCKLISTE/BL
-NEU: Radius- und Durchmesser-Bemaßung (DIMRADIUS/DIMDIAMETER).
-NEU (Elektro-Basis): AttributDefinition + BlockReferenz.attribute
-     (Funktionstexte wie Name, Geraetetyp, Leistung ...).
+NEW (block support, step 1):
+  - BlockDefinition   template of a block (name + elements relative to the base point)
+  - BlockReferenz     inserted block (position, scale, angle + deep copy)
+  - BlockBibliothek   global block library shared across drawings (blocks.json)
+  - BEFEHLE extended: BLOCK/B, INSERT/I, BLOCKLISTE/BL
+NEW: radius and diameter dimensioning (DIMRADIUS/DIMDIAMETER).
+NEW (electrical base): AttributDefinition + BlockReferenz.attribute
+     (function texts such as name, device type, power ...).
 """
 
 import math, sys, zlib
@@ -20,7 +20,7 @@ from katiecad.common.i18n import tr, SPRACHE
 
 
 # ============================================================
-# Farbschema
+# Colour scheme
 # ============================================================
 FARBEN = {
     "bg_dunkel":    "#120a1f",
@@ -44,7 +44,7 @@ FARBEN = {
 
 
 # ============================================================
-# Konstanten
+# Constants
 # ============================================================
 EINHEITEN = {"mm": 1.0, "cm": 10.0, "m": 1000.0, "in": 25.4}
 
@@ -91,7 +91,7 @@ MIN_VP_GROESSE = 10.0
 PASTE_OFFSET_MM = 10.0
 
 TEXT_BREITE = 0.72
-# Oberflaechen-Schrift je Plattform (Segoe UI gibt es nur unter Windows)
+# UI font per platform (Segoe UI exists only on Windows)
 UI_SCHRIFT = ("Segoe UI" if sys.platform.startswith("win")
               else "Helvetica Neue" if sys.platform == "darwin"
               else "DejaVu Sans")
@@ -101,7 +101,7 @@ LW_PX_FAKTOR = 6.5
 BEM_RICHTUNGEN = ("horizontal", "vertikal", "ausgerichtet",
                   "radius", "durchmesser")
 
-# Toleranz fuer "Punkt liegt auf Objekt" (in Modell-mm)
+# Tolerance for "point lies on object" (in model mm)
 TRIM_TOL = 1e-6
 
 
@@ -117,7 +117,7 @@ def ist_dunkel(hexfarbe):
 
 
 # ============================================================
-# Geometrie-Hilfen
+# Geometry helpers
 # ============================================================
 def norm360(a):
     return a % 360.0
@@ -276,14 +276,14 @@ def punkt_in_gedrehtem_rechteck(px, py, cx, cy, w, h, winkel_deg, tol=0.0):
 
 
 def punkte_drehen(px, py, cx, cy, winkel_deg):
-    """Dreht (px, py) um (cx, cy) um winkel_deg.
+    """Rotates (px, py) about (cx, cy) by winkel_deg.
 
-    ACHTUNG Konvention: Das Modell hat Y nach oben; diese Formel dreht dort
-    bei POSITIVEM winkel_deg im UHRZEIGERSINN. Die Dreh-Werkzeuge uebergeben
-    deshalb -winkel (CCW-Wunsch). Alle drehen()-Methoden, die zusaetzlich ein
-    Winkelfeld pflegen (Text, Bogen, Schraffur, Block, Querverweis), muessen
-    das Feld daher mit  `- winkel_deg`  fortschreiben; die Winkelfelder selbst
-    sind ueberall mathematisch (gegen den Uhrzeigersinn positiv)."""
+    CAUTION, convention: the model has Y pointing up; this formula rotates
+    CLOCKWISE there for a POSITIVE winkel_deg. The rotate tools therefore
+    pass -winkel (CCW wish). All drehen() methods that additionally keep an
+    angle field (text, arc, hatching, block, cross reference) must therefore
+    update that field with  `- winkel_deg`; the angle fields themselves are
+    mathematical everywhere (counter-clockwise positive)."""
     a = math.radians(winkel_deg)
     ca, sa = math.cos(a), math.sin(a)
     dx, dy = px - cx, py - cy
@@ -305,8 +305,8 @@ def parse_massstab(text):
 
 
 def ort_text(o):
-    """Anzeige eines Verweisziels. o = Blattnummer oder (Blatt, "Spalte/Zeile").
-    Beispiel: (1, "3/B") -> "1/3/B"; (2, "") -> "2"."""
+    """Display of a reference target. o = sheet number or (sheet, "column/row").
+    Example: (1, "3/B") -> "1/3/B"; (2, "") -> "2"."""
     if isinstance(o, (tuple, list)):
         blatt, feld = o[0], (o[1] if len(o) > 1 else "")
         return f"{blatt}/{feld}" if feld else str(blatt)
@@ -361,7 +361,7 @@ def bbox_ueberlappt(a, b):
 
 
 # ============================================================
-# NEU: Stutzen (TRIM) und Brechen (BREAK) - Geometrie-Helfer
+# NEW: trim (TRIM) and break (BREAK) - geometry helpers
 # ============================================================
 def _punkt_auf_segment_param(px, py, x1, y1, x2, y2, tol=TRIM_TOL):
     dx, dy = x2 - x1, y2 - y1
@@ -563,7 +563,7 @@ def teile_bogen_durch_winkel(start, ende, winkel_liste):
 
 
 # ============================================================
-# Befehlszeile (beide Sprachen immer verfügbar)
+# Command line (both languages always available)
 # ============================================================
 BEFEHLE = {
     "RASTER": "raster", "GRID": "raster",
@@ -601,27 +601,27 @@ BEFEHLE = {
     "RECHTECK": "tool:rechteck", "REC": "tool:rechteck", "RECTANG": "tool:rechteck",
     "TEXT": "tool:text", "T": "tool:text",
     "BEMASSUNG": "tool:bemassung", "BEM": "tool:bemassung", "DIM": "tool:bemassung",
-    # NEU: Spezial-Bemaßung Radius / Durchmesser
+    # NEW: special dimensioning radius / diameter
     "DIMRADIUS":   "bem:radius", "DR": "bem:radius",
     "RADIUS":      "bem:radius", "RBEM": "bem:radius",
     "DIMDIAMETER": "bem:durchmesser", "DD": "bem:durchmesser",
     "DURCHMESSER": "bem:durchmesser", "DIA": "bem:durchmesser",
     "STUTZEN": "tool:stutzen", "TRIM": "tool:stutzen", "TR": "tool:stutzen",
     "BRECHEN": "tool:brechen", "BREAK": "tool:brechen", "BR": "tool:brechen",
-    # --- NEU: Blockbefehle ---
+    # --- NEW: block commands ---
     "BLOCK": "block:neu", "B": "block:neu", "BLOCKNEU": "block:neu",
     "INSERT": "block:einfuegen", "EINFUEGENBLOCK": "block:einfuegen",
     "I": "block:einfuegen", "BLOCKEINFUEGEN": "block:einfuegen",
     "BLOCKLISTE": "block:liste", "BL": "block:liste",
     "BLOCKVERWALTEN": "block:liste",
-    # --- NEU: Block aufloesen (EXPLODE) ---
+    # --- NEW: explode block (EXPLODE) ---
     "EXPLODE": "block:explode", "X": "block:explode",
     "AUFLOESEN": "block:explode", "BLOCKAUFLOESEN": "block:explode",
 }
 
 
 # ============================================================
-# Minimaler PDF-Schreiber
+# Minimal PDF writer
 # ============================================================
 _HELV = [278, 278, 355, 556, 556, 889, 667, 191, 333, 333, 389, 584, 278, 333, 278, 278,
          556, 556, 556, 556, 556, 556, 556, 556, 556, 556, 278, 278, 584, 584, 584, 556,
@@ -718,7 +718,7 @@ class PdfSeite:
 
 
 def pdf_mehrseitig(seiten):
-    """Schreibt eine PDF-Datei mit einer Seite pro PdfSeite-Objekt."""
+    """Writes a PDF file with one page per PdfSeite object."""
     if not seiten:
         raise ValueError("Keine Seiten")
     n = len(seiten)
@@ -755,7 +755,7 @@ def pdf_mehrseitig(seiten):
 
 
 # ============================================================
-# Layer
+# Layers
 # ============================================================
 class Layer:
     def __init__(self, name, farbe="#c29bff", staerke=0.35, sichtbar=True):
@@ -770,7 +770,7 @@ class Layer:
 
 
 # ============================================================
-# Elemente
+# Elements
 # ============================================================
 class Element:
     def __init__(self, typ, layer="0", farbe="#c29bff",
@@ -879,7 +879,7 @@ class Bogen(Element):
         self.cx += dx; self.cy += dy
 
     def _drei_punkte(self):
-        """Startpunkt, Bogenmitte und Endpunkt in Modellkoordinaten."""
+        """Start point, arc centre and end point in model coordinates."""
         mitte = self.start + bogen_sweep(self.start, self.ende) / 2.0
         def p(w):
             a = math.radians(w)
@@ -894,14 +894,14 @@ class Bogen(Element):
                 ("ende", e_[0], e_[1])]
 
     def _aus_drei_punkten(self, s_, m_, e_):
-        """Kreisbogen durch Start s_, Mitte m_ und Ende e_ (wie AutoCAD:
-        zwei Punkte bleiben stehen, der gezogene bestimmt Radius/Lage)."""
+        """Arc through start s_, centre m_ and end e_ (as in AutoCAD:
+        two points stay fixed, the dragged one determines radius/position)."""
         ax, ay = s_
         bx, by = m_
         qx, qy = e_
         d = 2.0 * (ax * (by - qy) + bx * (qy - ay) + qx * (ay - by))
         if abs(d) < 1e-9:
-            return False                        # (fast) gerade - kein Kreis
+            return False                        # (almost) straight - not a circle
         a2, b2, q2 = ax * ax + ay * ay, bx * bx + by * by, qx * qx + qy * qy
         ux = (a2 * (by - qy) + b2 * (qy - ay) + q2 * (ay - by)) / d
         uy = (a2 * (qx - bx) + b2 * (ax - qx) + q2 * (bx - ax)) / d
@@ -910,7 +910,7 @@ class Bogen(Element):
             return False
         a_s = math.degrees(math.atan2(ay - uy, ax - ux))
         a_e = math.degrees(math.atan2(qy - uy, qx - ux))
-        # Durchlaufsinn s -> m -> e: > 0 = gegen den Uhrzeigersinn
+        # Direction of travel s -> m -> e: > 0 = counter-clockwise
         orient = (bx - ax) * (qy - by) - (by - ay) * (qx - bx)
         if orient > 0:
             self.start, self.ende = a_s % 360.0, a_e % 360.0
@@ -924,7 +924,7 @@ class Bogen(Element):
             self.cx, self.cy = x, y
         elif griff_id in ("start", "mitte", "ende"):
             voll = bogen_sweep(self.start, self.ende) >= 359.99
-            if voll:                            # Vollkreis: Radius / Winkel
+            if voll:                            # Full circle: radius / angle
                 if griff_id == "mitte":
                     self.r = max(0.001, math.hypot(x - self.cx, y - self.cy))
                 elif griff_id == "start":
@@ -1045,9 +1045,9 @@ class Text(Element):
 
     def masse(self):
         zeilen = self.inhalt.split("\n") or [""]
-        # Echte Zeichenbreiten (Helvetica/Arial-Metrik, identisch zum PDF):
-        # "A" ist breiter als "1". Eine feste Breite pro Zeichen liess Texte
-        # ueber den Einfuegepunkt hinausragen.
+        # Real character widths (Helvetica/Arial metrics, identical to the PDF):
+        # "A" is wider than "1". A fixed width per character let texts
+        # protrude beyond the insertion point.
         fs = self.hoehe / CAD_VERSALHOEHE
         w = max(max(pdf_textbreite(z, fs) for z in zeilen),
                 TEXT_BREITE * self.hoehe)
@@ -1157,7 +1157,7 @@ class Bemassung(Element):
     def linear_richtung(p1, p2, m):
         dx, dy = abs(p2[0] - p1[0]), abs(p2[1] - p1[1])
 
-        # NEU: Wenn die Linie schräg ist, nehmen wir automatisch den Winkel der Linie
+        # NEW: if the line is slanted, the line angle is used automatically
         if dx > 1e-6 and dy > 1e-6:
             return "ausgerichtet"
 
@@ -1269,7 +1269,7 @@ class Bemassung(Element):
             res["text"] = (txt, c[0], c[1], a_deg, tw, h)
             return res
 
-        # ---------- Radius / Durchmesser ----------
+        # ---------- Radius / diameter -------------
         C, P = (self.x1, self.y1), (self.x2, self.y2)
         rad = math.hypot(P[0] - C[0], P[1] - C[1])
         if rad < 1e-9:
@@ -1277,18 +1277,18 @@ class Bemassung(Element):
         u = ((P[0] - C[0]) / rad, (P[1] - C[1]) / rad)
 
         if r == "radius":
-            # Kleines Mittelkreuz (proportional, aber nicht größer als der Kreis)
+            # Small centre cross (proportional, but not larger than the circle)
             k = min(0.5 * h, rad * 0.4)
             res["linien"].append((C[0] - k, C[1], C[0] + k, C[1]))
             res["linien"].append((C[0], C[1] - k, C[0], C[1] + k))
 
-            # Messlinie vom Zentrum zum Bogenpunkt
+            # Measurement line from the centre to the arc point
             res["linien"].append((C[0], C[1], P[0], P[1]))
 
-            # Pfeil am Bogen, zeigt nach außen (zur Messstelle)
+            # Arrow on the arc, pointing outwards (towards the measured point)
             res["pfeile"].append((P[0], P[1], math.atan2(u[1], u[0]), pf))
 
-            # Textposition: manuell (tx/ty) oder aus mx/my
+            # Text position: manual (tx/ty) or from mx/my
             if manuell:
                 c = (self.tx, self.ty)
             else:
@@ -1298,7 +1298,7 @@ class Bemassung(Element):
                     c = (P[0] + u[0] * (tgap + h),
                          P[1] + u[1] * (tgap + h))
 
-            # Führungslinie, wenn der Text außerhalb des Bogens steht
+            # Leader line if the text is outside the arc
             d_p = math.hypot(c[0] - P[0], c[1] - P[1])
             if d_p > h * 0.8:
                 res["linien"].append((P[0], P[1], c[0], c[1]))
@@ -1306,35 +1306,35 @@ class Bemassung(Element):
             res["text"] = (txt, c[0], c[1], 0.0, tw, h)
             res["mitte"] = ((C[0] + P[0]) / 2, (C[1] + P[1]) / 2)
 
-        else:  # durchmesser
+        else:  # diameter
             Q = (2 * C[0] - P[0], 2 * C[1] - P[1])
 
-            # Linie durch den ganzen Kreis, Pfeile an beiden Enden
+            # Line through the whole circle, arrows at both ends
             res["linien"].append((P[0], P[1], Q[0], Q[1]))
             res["pfeile"].append((P[0], P[1], math.atan2(u[1], u[0]), pf))
             res["pfeile"].append((Q[0], Q[1], math.atan2(-u[1], -u[0]), pf))
 
-            # Textschräge an die Messlinie anpassen (in [-90, +90])
+            # Adjust text slant to the measurement line (in [-90, +90])
             a_deg = math.degrees(math.atan2(u[1], u[0]))
             if a_deg > 90.0 + 1e-9:
                 a_deg -= 180.0
             elif a_deg <= -90.0 + 1e-9:
                 a_deg += 180.0
             ar = math.radians(a_deg)
-            up = (-math.sin(ar), math.cos(ar))   # senkrecht zur Messlinie
+            up = (-math.sin(ar), math.cos(ar))   # perpendicular to the measurement line
 
-            # Textposition: bei manuell tx/ty, sonst mittig über/unter Zentrum
+            # Text position: manual tx/ty, otherwise centred above/below the centre
             if manuell:
                 c = (self.tx, self.ty)
             else:
-                # Seite anhand der Maus-Klickposition bestimmen
+                # Determine the side from the mouse click position
                 seite = 1.0 if ((self.mx - C[0]) * up[0] +
                                 (self.my - C[1]) * up[1]) >= 0 else -1.0
                 c = (C[0] + up[0] * (tgap + h / 2) * seite,
                      C[1] + up[1] * (tgap + h / 2) * seite)
 
-            # Führungslinie vom nächstgelegenen Pfeil zum Text,
-            # wenn der Text außerhalb des Kreises liegt
+            # Leader line from the nearest arrow to the text
+            # if the text is outside the circle
             d_center = math.hypot(c[0] - C[0], c[1] - C[1])
             if d_center > rad + h * 0.3:
                 d_p = math.hypot(c[0] - P[0], c[1] - P[1])
@@ -1432,18 +1432,18 @@ class Viewport(Element):
 
 
 # ============================================================
-# NEU: Block-Unterstuetzung
+# NEW: block support
 # ============================================================
 class AttributDefinition(Text):
-    """Attributdefinition (wie ATTDEF in AutoCAD).
+    """Attribute definition (like ATTDEF in AutoCAD).
 
-    Ein Text, der Teil einer Blockdefinition wird. Beim Einfuegen des
-    Blocks bekommt jede Referenz einen eigenen Wert pro Attribut-Tag
-    (z.B. NAME, GERAETETYP, LEISTUNG), der spaeter editierbar ist.
+    A text that becomes part of a block definition. When the block is
+    inserted, each reference gets its own value per attribute tag
+    (e.g. NAME, DEVICETYPE, POWER), which can be edited later.
 
-    Im normalen Zeichnungsbereich wird nur der Tag als Platzhalter
-    angezeigt; in einer BlockReferenz wird stattdessen der Wert
-    dargestellt (siehe BlockReferenz.aufgeloest()).
+    In the normal drawing area only the tag is shown as a placeholder;
+    in a BlockReferenz the value is shown instead (see
+    BlockReferenz.aufgeloest()).
     """
 
     def __init__(self, x, y, inhalt=None, hoehe=3.5, winkel=0.0,
@@ -1461,8 +1461,8 @@ class AttributDefinition(Text):
         self.sichtbar = bool(sichtbar)
 
     def als_text(self, wert):
-        """Normales Text-Element mit dem gegebenen Wert (oder None, wenn
-        das Attribut unsichtbar oder leer ist)."""
+        """Normal text element with the given value (or None if
+        the attribute is invisible or empty)."""
         if not self.sichtbar or wert is None or str(wert) == "":
             return None
         return Text(self.x, self.y, str(wert), self.hoehe, self.winkel,
@@ -1473,7 +1473,7 @@ class AttributDefinition(Text):
 
 
 def _attribut_defs(elemente):
-    """AttributDefinitionen + feste Felder (IND/TYP/PER/NUM) von Masken."""
+    """AttributDefinitionen + fixed fields (IND/TYP/PER/NUM) of masks."""
     out = [e for e in elemente if isinstance(e, AttributDefinition)]
     vorhanden = {a.tag for a in out}
     for e in elemente:
@@ -1487,11 +1487,11 @@ def _attribut_defs(elemente):
 
 
 class BlockDefinition:
-    """Benannte Vorlage eines Blocks.
+    """Named template of a block.
 
-    Die Elemente werden in *lokalen* Koordinaten gespeichert, d.h.
-    bereits relativ zum Basispunkt (Basispunkt = (0, 0) im lokalen System).
-    Das erleichtert das spaetere Transformieren beim Einfuegen enorm.
+    The elements are stored in *local* coordinates, i.e. already relative
+    to the base point (base point = (0, 0) in the local system).
+    This greatly simplifies transforming them later on insertion.
     """
 
     def __init__(self, name, basispunkt, elemente):
@@ -1500,8 +1500,8 @@ class BlockDefinition:
         self.elemente = list(elemente)
 
     def attribut_definitionen(self):
-        """Alle Attribute dieser Blockdefinition (inkl. der festen Felder
-        von Elektro-Maske / Klemme)."""
+        """All attributes of this block definition (incl. the fixed fields
+        of electrical mask / terminal)."""
         return _attribut_defs(self.elemente)
 
     def to_dict(self):
@@ -1524,13 +1524,13 @@ class BlockDefinition:
 
 
 class BlockReferenz(Element):
-    """Ein eingefuegter Block.
+    """An inserted block.
 
-    Haelt eine *tiefe Kopie* der Definitionselemente (relativ zum
-    Basispunkt). So bleibt die Zeichnung autark und Aenderungen an der
-    Definition wirken sich nicht rueckwirkend auf platzierte Instanzen aus
-    (bewusst einfach gehalten - echtes AutoCAD verhaelt sich anders, aber
-    fuer unsere Zwecke ist diese Semantik klarer und robuster).
+    Holds a *deep copy* of the definition elements (relative to the base
+    point). This keeps the drawing self-contained, and changes to the
+    definition do not retroactively affect placed instances (deliberately
+    kept simple - real AutoCAD behaves differently, but for our purposes
+    these semantics are clearer and more robust).
     """
 
     def __init__(self, x, y, block_name, elemente,
@@ -1539,25 +1539,25 @@ class BlockReferenz(Element):
         super().__init__("block", **kw)
         self.x, self.y = x, y
         self.block_name = block_name
-        # tiefe Kopie, damit die Referenz wirklich eigenstaendig ist
+        # deep copy so that the reference is truly independent
         self.elemente = [deepcopy(e) for e in elemente]
         self.skalierung = float(skalierung) if skalierung else 1.0
         self.winkel = float(winkel) if winkel else 0.0
-        # Attributwerte dieser Instanz: {TAG: Wert}
+        # Attribute values of this instance: {TAG: value}
         self.attribute = dict(attribute) if attribute else {}
         for ad in self.attribut_definitionen():
             self.attribute.setdefault(ad.tag, ad.wert)
-        # Tags, deren Text in DIESER Instanz nicht angezeigt wird
+        # Tags whose text is not displayed in THIS instance
         self.ausgeblendet = set(ausgeblendet or [])
-        self._cache = None          # (Signatur, aufgeloeste Kinder)
-        self.refs = []              # Geraete-Verweise (Blattnummern), berechnet
+        self._cache = None          # (signature, resolved children)
+        self.refs = []              # Device references (sheet numbers), computed
 
-    # ---- Attribute ---------------------------------------------
+    # ---- Attributes --------------------------------------------
     def attribut_definitionen(self):
         return _attribut_defs(self.elemente)
 
     def geraet_maske(self):
-        """Elektro-Maske dieses Blocks (Geraet) oder None."""
+        """Electrical mask of this block (device) or None."""
         for e in self.elemente:
             if isinstance(e, ElektroMaske):
                 return e
@@ -1571,7 +1571,7 @@ class BlockReferenz(Element):
         self.ausgeblendet = {t for t in tags if t in bekannt}
 
     def setze_attribute(self, werte):
-        """Uebernimmt Werte {TAG: Wert} (nur bekannte Tags)."""
+        """Takes over values {TAG: value} (known tags only)."""
         bekannt = {ad.tag for ad in self.attribut_definitionen()}
         for tag, wert in werte.items():
             if tag in bekannt:
@@ -1579,9 +1579,9 @@ class BlockReferenz(Element):
 
     # ---- Transformation ----------------------------------------
     def _welt_pts(self, lx, ly):
-        """Lokale Koordinaten (relativ zum Basispunkt) -> Weltkoordinaten.
-        Beruecksichtigt Skalierung, Drehung (positiver Winkel = gegen den
-        Uhrzeigersinn, wie bei Text-/Bogenwinkeln) und Translation."""
+        """Local coordinates (relative to the base point) -> world coordinates.
+        Takes scaling, rotation (positive angle = counter-clockwise, as with
+        text/arc angles) and translation into account."""
         s = self.skalierung
         a = math.radians(self.winkel)
         ca, sa = math.cos(a), math.sin(a)
@@ -1590,8 +1590,8 @@ class BlockReferenz(Element):
                 self.y + px * sa + py * ca)
 
     def _transformiere(self, el):
-        """Transformiert ein Kind-Element *in place* vom lokalen ins
-        Weltkoordinatensystem."""
+        """Transforms a child element *in place* from the local to the
+        world coordinate system."""
         if isinstance(el, Linie):
             el.x1, el.y1 = self._welt_pts(el.x1, el.y1)
             el.x2, el.y2 = self._welt_pts(el.x2, el.y2)
@@ -1604,8 +1604,8 @@ class BlockReferenz(Element):
             el.start = (el.start + self.winkel) % 360.0
             el.ende = (el.ende + self.winkel) % 360.0
         elif isinstance(el, Rechteck):
-            # Gedrehtes Rechteck -> Polylinie (achsenparalleles Rechteck
-            # kann nach Drehung nicht mehr als Rechteck dargestellt werden)
+            # Rotated rectangle -> polyline (an axis-parallel rectangle
+            # can no longer be represented as a rectangle after rotation)
             p1 = self._welt_pts(el.x1, el.y1)
             p2 = self._welt_pts(el.x2, el.y1)
             p3 = self._welt_pts(el.x2, el.y2)
@@ -1633,12 +1633,12 @@ class BlockReferenz(Element):
             el.x, el.y = self._welt_pts(el.x, el.y)
             el.richtung = round((el.richtung + self.winkel) / 90.0) * 90 % 360
         elif isinstance(el, Schraffur):
-            # (fehlte bisher: Schraffuren blieben beim Einfuegen am Ursprung)
+            # (was missing before: hatchings stayed at the origin on insertion)
             el.punkte = [self._welt_pts(x, y) for (x, y) in el.punkte]
             el.winkel = (el.winkel + self.winkel) % 360.0
             el.abstand *= self.skalierung
         elif isinstance(el, (_FestMaske, Koordinatenfeld)):
-            el.x, el.y = self._welt_pts(el.x, el.y)      # Texte bleiben waagerecht
+            el.x, el.y = self._welt_pts(el.x, el.y)      # Texts stay horizontal
         elif isinstance(el, Verbindung):
             el.x, el.y = self._welt_pts(el.x, el.y)
             el.ausrichtung = (el.ausrichtung + int(round(self.winkel / 90.0))) % 4
@@ -1650,18 +1650,18 @@ class BlockReferenz(Element):
                 el.tx, el.ty = self._welt_pts(el.tx, el.ty)
             el.hoehe *= self.skalierung
             el.pfeil *= self.skalierung
-            # Richtung "horizontal"/"vertikal" wird nach Drehung zu
-            # "ausgerichtet", sonst wuerde sie falsch aussehen.
+            # Direction "horizontal"/"vertical" becomes, after rotation,
+            # "aligned", otherwise it would look wrong.
             if self.winkel % 360.0 not in (0.0, 180.0):
                 if el.richtung in ("horizontal", "vertikal"):
                     el.richtung = "ausgerichtet"
 
     def aufgeloest(self):
-        """Liefert die transformierten Kind-Elemente als flache Liste."""
-        # Ergebnis wird zwischengespeichert: Snap, Zeichnen und Treffertests
-        # rufen das pro Mausbewegung auf - ohne Cache entstehen dabei
-        # tausende tiefe Kopien (Speicherdruck bei vielen Symbolen).
-        # Die Liste ist NUR LESEND zu verwenden (Aufloesen: vorher kopieren).
+        """Returns the transformed child elements as a flat list."""
+        # Result is cached: snapping, drawing and hit tests
+        # call this on every mouse movement - without a cache thousands
+        # of deep copies would be created (memory pressure with many symbols).
+        # The list is READ-ONLY (when resolving: copy first).
         sig = (self.x, self.y, self.skalierung, self.winkel,
                tuple(sorted(self.attribute.items())),
                tuple(sorted(self.ausgeblendet)), tuple(self.refs))
@@ -1672,7 +1672,7 @@ class BlockReferenz(Element):
             k = deepcopy(el)
             self._transformiere(k)
             if isinstance(k, _FestMaske):
-                # Maske/Klemme: Werte kommen aus den Attributen der Instanz
+                # Mask/terminal: values come from the attributes of the instance
                 k.werte = {t: str(self.attribute.get(t, k.werte.get(t, "")))
                            for t in k.FELDER}
                 k.ausgeblendet = set(self.ausgeblendet) & set(k.FELDER)
@@ -1681,8 +1681,8 @@ class BlockReferenz(Element):
                 out.append(k)
                 continue
             if isinstance(k, Verbindungspunkt):
-                # Verbindungspunkt: Kreis + Beschriftung bleiben ein Element,
-                # die Beschriftung kommt aus dem Attributwert der Instanz.
+                # Connection point: circle + label remain one element,
+                # the label comes from the attribute value of the instance.
                 k.wert = str(self.attribute.get(k.tag, k.wert))
                 k.inhalt = k.wert
                 if k.tag in self.ausgeblendet:
@@ -1699,7 +1699,7 @@ class BlockReferenz(Element):
         self._cache = (sig, out)
         return out
 
-    # ---- Element-API -------------------------------------------
+    # ---- Element API -------------------------------------------
     def bbox(self):
         xs, ys = [], []
         for el in self.elemente:
@@ -1732,20 +1732,20 @@ class BlockReferenz(Element):
         d.pop("_cache", None)
         d.pop("refs", None)
         d["ausgeblendet"] = sorted(self.ausgeblendet)
-        # Kinder als dicts ablegen (nicht die Objekte selbst)
+        # Store children as dicts (not the objects themselves)
         d["elemente"] = [e.to_dict() for e in self.elemente]
         return d
 
 
 # ============================================================
-# NEU: Globale Blockbibliothek (blocks.json)
+# NEW: global block library (blocks.json)
 # ============================================================
 class BlockBibliothek:
-    """Zeichnungsuebergreifende Blockbibliothek.
+    """Block library shared across drawings.
 
-    Speichert Blockdefinitionen in einer benutzerspezifischen JSON-Datei
-    (analog zu katiecad/common/config.py). Beim Start werden bestehende Bloecke
-    geladen; bei Aenderungen wird die Datei sofort aktualisiert.
+    Stores block definitions in a user-specific JSON file (analogous to
+    katiecad/common/config.py). Existing blocks are loaded at start-up;
+    on changes the file is updated immediately.
     """
 
     DATEI = "blocks.json"
@@ -1755,7 +1755,7 @@ class BlockBibliothek:
         self._definitionen = {}
         self._laden()
 
-    # ---- Pfad (plattformgerecht, gleiche Logik wie katiecad.common.config) ----
+    # ---- Path (platform-appropriate, same logic as katiecad.common.config) ----
     @staticmethod
     def _verzeichnis():
         import os, sys
@@ -1830,20 +1830,20 @@ class BlockBibliothek:
 
 
 class Schraffur(Element):
-    """Schraffur ueber einer geschlossenen Kontur.
+    """Hatching over a closed contour.
 
-    WICHTIG: Der Elementtyp (self.typ) bleibt "schraffur", damit
-    Speichern/Laden/Kopieren/Undo (_dict_zu_element) das Element
-    erkennen. Das Fuellmuster steht in self.muster ("solid"/"linien").
-    Der Parameter `typ="solid"|"linien"` wird aus Kompatibilitaetsgruenden
-    (alter Import-Code, alte Dateien) weiterhin als Alias akzeptiert.
+    IMPORTANT: the element type (self.typ) stays "schraffur" so that
+    save/load/copy/undo (_dict_zu_element) recognise the element. The fill
+    pattern is stored in self.muster ("solid"/"linien").
+    The parameter `typ="solid"|"linien"` is still accepted as an alias for
+    compatibility reasons (old import code, old files).
     """
     MUSTER = ("solid", "linien")
 
     def __init__(self, punkte, muster="solid", winkel=45.0, abstand=5.0,
                  typ=None, **kw):
         super().__init__("schraffur", **kw)
-        if typ in self.MUSTER:          # Alias / Altformat
+        if typ in self.MUSTER:          # Alias / legacy format
             muster = typ
         self.punkte = [tuple(p) for p in punkte]
         self.muster = muster if muster in self.MUSTER else "solid"
@@ -1877,26 +1877,26 @@ class Schraffur(Element):
             pass
 
     def geometrie_linien(self):
-        """Berechnet die Schnittpunkte fuer die Linien-Schraffur (Scanline)."""
+        """Computes the intersection points for the line hatching (scan line)."""
         if self.muster != "linien" or len(self.punkte) < 3:
             return []
-        abstand = max(float(self.abstand or 0), 0.05)   # Endlosschleife vermeiden
+        abstand = max(float(self.abstand or 0), 0.05)   # Avoid an endless loop
 
-        # Die Scanlines laufen im gedrehten System waagerecht. Hin-Drehung
-        # um -winkel, Rueck-Drehung um +winkel => Linienrichtung (cos w, sin w),
-        # d.h. 45 Grad zeigt bei y-oben nach rechts oben ("/").
+        # The scan lines run horizontally in the rotated system. Forward rotation
+        # by -angle, back-rotation by +angle => line direction (cos w, sin w),
+        # i.e. 45 degrees points up-right ("/") with y up.
         rad = math.radians(self.winkel)
         ca, sa = math.cos(rad), math.sin(rad)
         rot_pts = [(x * ca + y * sa, -x * sa + y * ca) for (x, y) in self.punkte]
         min_y = min(p[1] for p in rot_pts)
         max_y = max(p[1] for p in rot_pts)
-        if (max_y - min_y) / abstand > 20000:           # absurd dichte Schraffur
+        if (max_y - min_y) / abstand > 20000:           # absurdly dense hatching
             return []
 
         rad_back = math.radians(-self.winkel)
         cb, sb = math.cos(rad_back), math.sin(rad_back)
         linien = []
-        # halber Abstand als Start: Linien liegen nicht exakt auf Eckpunkten
+        # half the spacing as start: lines do not lie exactly on corner points
         y = min_y + abstand / 2.0 if (max_y - min_y) > abstand else min_y
         while y <= max_y:
             schnitte = []
@@ -1916,7 +1916,7 @@ class Schraffur(Element):
 
 
 # ------------------------------------------------------------
-# Konturerkennung fuer Schraffuren
+# Contour detection for hatchings
 # ------------------------------------------------------------
 def _kreis_polygon(cx, cy, r, n=None):
     if n is None:
@@ -1926,16 +1926,16 @@ def _kreis_polygon(cx, cy, r, n=None):
 
 
 def konturen_aus_elementen(elemente, tol=0.05):
-    """Findet geschlossene Konturen in einer Elementliste.
+    """Finds closed contours in an element list.
 
-    Rueckgabe: Liste von (punkte, quell_elemente).
-      - Kreis, Rechteck, geschlossene Polylinie -> je eine eigene Kontur
-      - Linie, Bogen, offene Polylinie          -> werden an ihren
-        Endpunkten (Abstand <= tol) zu Ketten verbunden; nur Ketten,
-        die sich schliessen, ergeben eine Kontur.
+    Returns: list of (points, source_elements).
+      - circle, rectangle, closed polyline -> one contour each
+      - line, arc, open polyline           -> joined into chains at their
+        end points (distance <= tol); only chains that close yield a
+        contour.
     """
     ergebnis = []
-    offene = []                                   # (punkte, quelle)
+    offene = []                                   # (points, source)
     for el in elemente:
         if isinstance(el, Kreis):
             ergebnis.append((_kreis_polygon(el.cx, el.cy, el.r), [el]))
@@ -1988,8 +1988,8 @@ def konturen_aus_elementen(elemente, tol=0.05):
 
 
 # ============================================================
-# Layout (ein Zeichnungsblatt mit eigenem Format, Hintergrund
-# und eigenen Layout-Elementen — analog zu AutoCAD-Layouts)
+# Layout (a drawing sheet with its own format, background
+# and its own layout elements - analogous to AutoCAD layouts)
 # ============================================================
 class Layout:
     STANDARD_FORMAT = "A3 (420x297)"
@@ -2031,17 +2031,17 @@ class Layout:
 
 
 # ============================================================
-# NEU (Elektro): Leitung, Verbindungspunkt, Querverweis
+# NEW (electrical): wire, connection point, cross reference
 # ============================================================
 LEITUNG_FARBE = "#ff0000"
-# ANNAHME: 0.35 mm (Standard-Strichstaerke). Wunsch war "3.5" - das waere eine
-# 3.5 mm breite Linie. Hier zentral aendern, falls wirklich gewollt.
+# ASSUMPTION: 0.35 mm (default line width). The wish was "3.5" - that would be a
+# 3.5 mm wide line. Change centrally here if really intended.
 LEITUNG_STAERKE = 0.35
 
 
 class Leitung(Linie):
-    """Rote Verbindungslinie zwischen zwei Anschlusspunkten.
-    auto=True: wird automatisch erzeugt/entfernt (siehe
+    """Red connecting line between two connection points.
+    auto=True: is created/removed automatically (see
     katiecad.electrical.logic.leitungen_automatisch)."""
 
     def __init__(self, x1, y1, x2, y2, auto=False, **kw):
@@ -2054,16 +2054,16 @@ class Leitung(Linie):
 
 
 class Verbindungspunkt(AttributDefinition):
-    """Anschlusspunkt: Kreis (Durchmesser 1 mm) + Beschriftung rechts davon
-    (Texthoehe 2.0 mm).
+    """Connection point: circle (diameter 1 mm) + label to its right
+    (text height 2.0 mm).
 
-    Der Kreis wird nur im Modell gezeichnet; Layout und PDF zeigen nur die
-    Beschriftung. In Bloecken verhaelt er sich wie ein Attribut: der Text
-    (self.wert) ist je Blockinstanz editierbar.
+    The circle is drawn only in the model; layout and PDF show only the
+    label. In blocks it behaves like an attribute: the text
+    (self.wert) is editable per block instance.
     """
     DURCHMESSER = 1.0
     TEXT_HOEHE = 2.0
-    TEXT_ABSTAND = 1.0          # Abstand Kreisrand -> Text (mm)
+    TEXT_ABSTAND = 1.0          # Distance circle edge -> text (mm)
 
     def __init__(self, x, y, inhalt=None, hoehe=2.0, winkel=0.0,
                  schriftart="Arial", einfuegepunkt=None, tag="VP",
@@ -2073,9 +2073,9 @@ class Verbindungspunkt(AttributDefinition):
                          "mitte_links", tag=tag, prompt=prompt, wert=wert,
                          sichtbar=sichtbar, **kw)
         self.typ = "vpunkt"
-        # Aktive Anschlussrichtungen (0 Ost, 90 Nord, 180 West, 270 Sued).
-        # None = nicht festgelegt (aeltere Dateien): frei -> alle, im Geraet
-        # -> naechste Aussenkante des Symbols.
+        # Active connection directions (0 east, 90 north, 180 west, 270 south).
+        # None = not set (older files): free -> all, in the device
+        # -> nearest outer edge of the symbol.
         self.richtungen = (None if richtungen is None else
                            sorted({int(round(float(r) / 90.0)) * 90 % 360
                                    for r in richtungen}))
@@ -2090,7 +2090,7 @@ class Verbindungspunkt(AttributDefinition):
                                       for r in self.richtungen})
 
     def text_element(self):
-        """Beschriftung als normales Text-Element (oder None)."""
+        """Label as a normal text element (or None)."""
         if not self.sichtbar or self.wert == "":
             return None
         a = math.radians(self.winkel)
@@ -2118,7 +2118,7 @@ class Verbindungspunkt(AttributDefinition):
         return (min(xs), min(ys), max(xs), max(ys))
 
     def trifft(self, x, y, tol):
-        """Treffer auf den Kreis oder die Beschriftung."""
+        """Hit on the circle or the label."""
         if math.hypot(x - self.x, y - self.y) <= max(self.radius, tol):
             return True
         t = self.text_element()
@@ -2126,8 +2126,8 @@ class Verbindungspunkt(AttributDefinition):
 
 
 def vp_tags_eindeutig(elemente):
-    """Vergibt fuer alle Verbindungspunkte einer Blockdefinition eindeutige
-    Tags (VP1, VP2, ...), damit jeder einen eigenen Wert je Instanz hat."""
+    """Assigns unique tags (VP1, VP2, ...) to all connection points of a block
+    definition so that each has its own value per instance."""
     belegt = {e.tag for e in elemente
               if isinstance(e, AttributDefinition)
               and not isinstance(e, Verbindungspunkt)}
@@ -2143,22 +2143,22 @@ def vp_tags_eindeutig(elemente):
 
 
 class Querverweis(Element):
-    """Pfeilsymbol fuer Verweise zwischen Stromlaufplan-Blaettern.
+    """Arrow symbol for references between schematic sheets.
 
-    Pfeil 2 x 5 mm, Einfuegepunkt = Mitte der Pfeilbasis.
-    richtung: 0 = Ost, 90 = Nord, 180 = West, 270 = Sued (Pfeilspitze).
-    art:      "abgehend"  -> Text hinter der Pfeilspitze
-              "ankommend" -> Text hinter der Pfeilbasis
-    text:     editierbare Kennung (z. B. "L1")
-    ziel:     (nicht gespeichert) Blattnummern der Gegenstuecke mit gleichem
-              Text; wird von der Anwendung berechnet.
+    Arrow 2 x 5 mm, insertion point = centre of the arrow base.
+    richtung: 0 = east, 90 = north, 180 = west, 270 = south (arrow tip).
+    art:      "abgehend"  -> text behind the arrow tip
+              "ankommend" -> text behind the arrow base
+    text:     editable identifier (e.g. "L1")
+    ziel:     (not saved) sheet numbers of the counterparts with the same
+              text; computed by the application.
     """
     ARTEN = ("abgehend", "ankommend")
     BREITE = 2.0
     LAENGE = 5.0
     ABSTAND = 1.0
-    TEXT_HOEHE = 2.0            # Kennung
-    ZIEL_HOEHE = 1.0            # Zielangabe
+    TEXT_HOEHE = 2.0            # Identifier
+    ZIEL_HOEHE = 1.0            # Target specification
     _VEKTOR = {0: (1.0, 0.0), 90: (0.0, 1.0), 180: (-1.0, 0.0), 270: (0.0, -1.0)}
 
     def __init__(self, x, y, text="", art="abgehend", richtung=0, **kw):
@@ -2181,11 +2181,11 @@ class Querverweis(Element):
         return "(" + tr("qv.blatt") + " " + ", ".join(ort_text(o) for o in self.ziel) + ")"
 
     def basis_punkt(self):
-        """Anschluss an der Pfeilbasis (= Einfuegepunkt)."""
+        """Connection at the arrow base (= insertion point)."""
         return (self.x, self.y)
 
     def spitze_punkt(self):
-        """Anschluss an der Pfeilspitze."""
+        """Connection at the arrow tip."""
         dx, dy = self._VEKTOR[self.richtung]
         return (self.x + dx * self.LAENGE, self.y + dy * self.LAENGE)
 
@@ -2198,13 +2198,13 @@ class Querverweis(Element):
                 (self.x + dx * self.LAENGE, self.y + dy * self.LAENGE)]
 
     def aufgeloest(self):
-        """Pfeil (Schraffur solid) + Text(e) als einfache Elemente."""
+        """Arrow (solid hatching) + text(s) as simple elements."""
         out = [Schraffur(self.pfeil_punkte(), "solid", layer=self.layer,
                          farbe=LEITUNG_FARBE, eig_farbe=True)]
         dx, dy = self._VEKTOR[self.richtung]
         a = 0.0 if self.richtung in (0, 180) else 90.0
         ex, ey = math.cos(math.radians(a)), math.sin(math.radians(a))
-        nx, ny = -ey, ex                       # "oben" im Textsystem
+        nx, ny = -ey, ex                       # "up" in the text system
         if self.art == "abgehend":
             sx, sy = dx, dy
             qx = self.x + dx * (self.LAENGE + self.ABSTAND)
@@ -2255,19 +2255,19 @@ class Querverweis(Element):
 
 
 # ============================================================
-# NEU (Elektro): Verbindung, Elektro-Maske, Klemme
+# NEW (electrical): junction, electrical mask, terminal
 # ============================================================
 class Verbindung(Element):
-    """Leitungsverbindung (rot, gehoert fest zur Leitung) mit 2, 3 oder 4
-    Anschluessen wie in Eplan.
+    """Wire junction (red, firmly belongs to the wire) with 2, 3 or 4
+    connections as in Eplan.
 
-    art 2: Ecke      - Arme in zwei benachbarte Richtungen
-    art 3: T-Stueck  - drei Arme, einer fehlt
-    art 4: Kreuzung  - vier Arme, optional mit Punkt (= verbunden)
-    ausrichtung (0..3, gegen den Uhrzeigersinn, 0 = Ost):
-        art 2: Arme bei  a*90  und  a*90+90
-        art 3/4: gerader Arm bei a*90, Knickarm gegenueber (siehe _lokal)
-    Die Armenden sind die Anschlusspunkte fuer Leitungen."""
+    art 2: corner      - arms in two adjacent directions
+    art 3: T-piece     - three arms, one missing
+    art 4: crossing    - four arms, optionally with a dot (= connected)
+    ausrichtung (0..3, counter-clockwise, 0 = east):
+        art 2: arms at  a*90  and  a*90+90
+        art 3/4: straight arm at a*90, kinked arm opposite (see _lokal)
+    The arm ends are the connection points for wires."""
     ARM = 2.5
     PUNKT_RADIUS = 1.25
     ARTEN = (2, 3, 4)
@@ -2284,14 +2284,14 @@ class Verbindung(Element):
         self.punkt = bool(punkt)
 
     def _lokal(self):
-        """Linienzuege (lokal, ausrichtung 0) und Armenden (x, y, richtung)
-        wie in Eplan. U = ARM.
-        art 2: Ecke (Arme Ost + Nord)
-        art 3/4 ohne Punkt: gerader Arm nach Ost, gegenueberliegender Arm
-          laeuft mit einem Knick (45 Grad) auf die senkrechte Durchgangs-
-          linie; art 3 hat die Durchgangslinie nur nach Nord, art 4 nach
-          Nord und Sued.  Ausrichtung dreht das Ganze um a*90 Grad.
-        art 4 mit Punkt: Kreuz mit ausgefuelltem Punkt."""
+        """Polylines (local, ausrichtung 0) and arm ends (x, y, direction)
+        as in Eplan. U = ARM.
+        art 2: corner (arms east + north)
+        art 3/4 without dot: straight arm to the east, opposite arm
+          runs with a kink (45 degrees) onto the vertical through-line;
+          art 3 has the through-line only to the north, art 4 to the
+          north and south.  Ausrichtung rotates the whole thing by a*90 degrees.
+        art 4 with dot: cross with a filled dot."""
         u = self.ARM
         if self.art == 2:
             return ([[(u, 0.0), (0.0, 0.0), (0.0, u)]],
@@ -2299,8 +2299,8 @@ class Verbindung(Element):
         if self.art == 4 and self.punkt:
             return ([[(u, 0.0), (-u, 0.0)], [(0.0, u), (0.0, -u)]],
                     [(u, 0.0, 0), (0.0, u, 90), (-u, 0.0, 180), (0.0, -u, 270)])
-        zuege = [[(0.0, 0.0), (u, 0.0)],                      # gerader Arm
-                 [(-u, 0.0), (-0.5 * u, 0.0), (0.0, 0.5 * u)]]  # Knickarm
+        zuege = [[(0.0, 0.0), (u, 0.0)],                      # straight arm
+                 [(-u, 0.0), (-0.5 * u, 0.0), (0.0, 0.5 * u)]]  # kinked arm
         enden = [(u, 0.0, 0), (-u, 0.0, 180), (0.0, u, 90)]
         if self.art == 4:
             zuege.append([(0.0, u), (0.0, -u)])
@@ -2315,12 +2315,12 @@ class Verbindung(Element):
         return (self.x + px * c - py * sn, self.y + px * sn + py * c)
 
     def arme(self):
-        """Richtungen (Grad) der Anschluesse."""
+        """Directions (degrees) of the connections."""
         return [(d + self.ausrichtung * 90) % 360
                 for (_x, _y, d) in self._lokal()[1]]
 
     def anschluesse(self):
-        """Armenden (x, y, richtung)."""
+        """Arm ends (x, y, direction)."""
         out = []
         for (px, py, d) in self._lokal()[1]:
             wx, wy = self._welt(px, py)
@@ -2366,10 +2366,10 @@ class Verbindung(Element):
 
 
 class _FestMaske(Element):
-    """Basis fuer Elemente mit FEST vorgegebenen Textfeldern (nur ausfuellbar,
-    nicht in ihrem Aufbau veraenderbar): Elektro-Maske und Klemme."""
+    """Base for elements with FIXED text fields (fill-in only, structure
+    cannot be changed): electrical mask and terminal."""
     FELDER = ()
-    ZEILEN = ()            # (tag, dx, dy, hoehe, anker)
+    ZEILEN = ()            # (tag, dx, dy, height, anchor)
 
     def __init__(self, typ, x, y, werte=None, ausgeblendet=None,
                  platzhalter=True, **kw):
@@ -2380,8 +2380,8 @@ class _FestMaske(Element):
             if t in self.FELDER:
                 self.werte[t] = "" if v is None else str(v)
         self.ausgeblendet = {t for t in (ausgeblendet or []) if t in self.FELDER}
-        self.platzhalter = bool(platzhalter)     # leere Felder als <TAG> zeigen
-        self.refs = []                           # Blattnummern (berechnet)
+        self.platzhalter = bool(platzhalter)     # show empty fields as <TAG>
+        self.refs = []                           # Sheet numbers (computed)
 
     def to_dict(self):
         d = super().to_dict()
@@ -2443,21 +2443,21 @@ class _FestMaske(Element):
 
 
 class ElektroMaske(_FestMaske):
-    """Basis fuer Elektrogeraete: <IND> (2.5), <TYP>, <PER>, <REF> (je 1.5).
+    """Base for electrical devices: <IND> (2.5), <TYP>, <PER>, <REF> (1.5 each).
 
-    Der Einfuegepunkt (x, y) ist die UNTERE RECHTE Ecke der Maske; alle
-    Texte sind rechtsbuendig und wachsen nach oben, damit die Maske an ein
-    Symbol 'angehaengt' werden kann.  REF steht ganz unten und waechst mit
-    der Zahl der Verweise nach oben (die uebrigen Zeilen ruecken mit).
+    The insertion point (x, y) is the LOWER RIGHT corner of the mask; all
+    texts are right-aligned and grow upwards so that the mask can be
+    'attached' to a symbol.  REF is at the very bottom and grows upwards
+    with the number of references (the other lines move up with it).
 
-    IND/TYP/PER werden ausgefuellt. REF entsteht automatisch: Geraete mit
-    gleichem PER verweisen aufeinander (Hauptsymbol -> alle Hilfsbausteine,
-    Hilfsbaustein -> nur das Hauptsymbol), siehe katiecad.electrical.logic."""
+    IND/TYP/PER are filled in. REF is created automatically: devices with
+    the same PER refer to each other (main symbol -> all auxiliary parts,
+    auxiliary part -> only the main symbol), see katiecad.electrical.logic."""
     FELDER = ("IND", "TYP", "PER")
     ROLLEN = ("haupt", "hilfs")
     HOEHEN = {"IND": 2.5, "TYP": 1.5, "PER": 1.5}
     REF_HOEHE = 1.5
-    ABSTAND = {"PER": 1.1, "TYP": 2.0, "IND": 3.0}   # Mitte zu Mitte nach oben
+    ABSTAND = {"PER": 1.1, "TYP": 2.0, "IND": 3.0}   # centre to centre upwards
     ZEILEN = ()
 
     def __init__(self, x, y, werte=None, rolle="haupt", **kw):
@@ -2465,10 +2465,9 @@ class ElektroMaske(_FestMaske):
         self.rolle = rolle if rolle in self.ROLLEN else "haupt"
 
     def aufgeloest(self, platzhalter=None):
-        """Leere Felder bleiben leer. Nur auf dem Bildschirm (platzhalter)
-        erscheint ein kleines Kreuz, solange die Maske gar keinen Text hat,
-        damit sie auffindbar und markierbar bleibt. REF erscheint nur, wenn
-        es Verweise gibt."""
+        """Empty fields stay empty. Only on screen (platzhalter) a small cross
+        appears as long as the mask has no text at all, so that it remains
+        findable and selectable. REF appears only if there are references."""
         ph = self.platzhalter if platzhalter is None else platzhalter
         st = self._stil()
         refs = ["(%s %s)" % (tr("qv.blatt"), ort_text(o)) for o in self.refs]
@@ -2476,9 +2475,9 @@ class ElektroMaske(_FestMaske):
                    self.REF_HOEHE, 0.0, "Arial",
                    einfuegepunkt="unten_rechts", **st)
         out = [ref] if refs else []
-        y = ref.bbox()[3]                # Oberkante der (reservierten) REF-Zeile
+        y = ref.bbox()[3]                # Top edge of the (reserved) REF line
         for tag in ("PER", "TYP", "IND"):
-            y += self.ABSTAND[tag]       # Mitte der jeweiligen Zeile
+            y += self.ABSTAND[tag]       # Centre of the respective line
             w = self.werte.get(tag, "")
             if tag in self.ausgeblendet or w == "":
                 continue
@@ -2492,23 +2491,23 @@ class ElektroMaske(_FestMaske):
 
 
 class Kabel(_FestMaske):
-    """Kabel: waagerechte Linie, die nach rechts gezogen wird. Links davon die
-    Maske <CAB> (2.5), <TYP> und <REF> (je 1.5). Wo eine senkrechte Leitung
-    die Linie kreuzt, entsteht automatisch ein Adermarkierungs-Strich mit
-    Bezeichnung (L1, L2, L3, N, PE, 6, 7 ...), die je Ader aenderbar ist.
+    """Cable: horizontal line that is dragged to the right. To its left the
+    mask <CAB> (2.5), <TYP> and <REF> (1.5 each). Where a vertical wire
+    crosses the line, a core marking stroke with a designation (L1, L2,
+    L3, N, PE, 6, 7 ...) is created automatically, changeable per core.
 
-    (x, y) = linkes Ende der Linie, `laenge` = Laenge nach rechts.
-    CAB verhaelt sich wie IND bei Geraeten (Kennung fuer spaetere Listen);
-    REF entsteht automatisch aus anderen Kabeln mit gleichem CAB.
-    kreuzungen: (nicht gespeichert) x-Positionen der Kreuzungen, wird von
-    katiecad.electrical.logic.kabel_kreuzungen berechnet.
-    adern: {Abstand vom Kabelanfang ("%.1f"): Bezeichnung} (Aenderungen)."""
+    (x, y) = left end of the line, `laenge` = length to the right.
+    CAB behaves like IND for devices (identifier for later lists);
+    REF is created automatically from other cables with the same CAB.
+    kreuzungen: (not saved) x positions of the crossings, computed by
+    katiecad.electrical.logic.kabel_kreuzungen.
+    adern: {distance from cable start ("%.1f"): designation} (changes)."""
     FELDER = ("CAB", "TYP")
     HOEHEN = {"CAB": 2.5, "TYP": 1.5}
     REF_HOEHE = 1.5
     ADER_HOEHE = 2.0
-    STRICH = 1.25                     # halbe Strichlaenge (45 Grad)
-    TEXT_ABSTAND = 1.2                # Maske <-> Kabelanfang
+    STRICH = 1.25                     # half stroke length (45 degrees)
+    TEXT_ABSTAND = 1.2                # Mask <-> cable start
     ADER_NAMEN = ("L1", "L2", "L3", "N", "PE")
     ZEILEN = ()
 
@@ -2536,7 +2535,7 @@ class Kabel(_FestMaske):
                 else str(index + 1))
 
     def adern_liste(self):
-        """[(schluessel, aktuelle Bezeichnung)] der gefundenen Kreuzungen."""
+        """[(key, current designation)] of the crossings found."""
         out = []
         for i, cx in enumerate(sorted(self.kreuzungen)):
             a = cx - self.x
@@ -2560,8 +2559,8 @@ class Kabel(_FestMaske):
             out.append(Text(tx, self.y + dy, w, self.HOEHEN[tag], 0.0, "Arial",
                             einfuegepunkt=anker, **st))
         refs = ["(%s %s)" % (tr("qv.blatt"), ort_text(o)) for o in self.refs]
-        if refs or ph:
-            out.append(Text(tx, self.y - 2.3, "\n".join(refs) if refs else "<REF>",
+        if refs:                                  # REF only if there is something
+            out.append(Text(tx, self.y - 2.3, "\n".join(refs),
                             self.REF_HOEHE, 0.0, "Arial",
                             einfuegepunkt="oben_rechts", **st))
         h = self.STRICH
@@ -2593,12 +2592,12 @@ class Kabel(_FestMaske):
 
 
 class Klemme(_FestMaske):
-    """Klemme: sichtbarer Kreis mit zwei Anschluessen (oben / unten) und den
-    festen Feldern <IND> (2.5), <TYP>, <PER> (1.5) und <NUM> (1.0)."""
+    """Terminal: visible circle with two connections (top / bottom) and the
+    fixed fields <IND> (2.5), <TYP>, <PER> (1.5) and <NUM> (1.0)."""
     FELDER = ("IND", "TYP", "PER", "NUM")
     DURCHMESSER = 2.0
-    # Beschriftung: rechtsbuendig direkt links neben dem Kreis. IND steht auf
-    # Hoehe der Kreismitte, TYP und PER darunter.
+    # Label: right-aligned directly left of the circle. IND is at the
+    # height of the circle centre, TYP and PER below it.
     ZEILEN = (("IND", -3.0, 0.0, 2.5, "mitte_rechts"),
               ("TYP", -3.0, -3.0, 1.5, "mitte_rechts"),
               ("PER", -3.0, -5.5, 1.5, "mitte_rechts"),
@@ -2608,7 +2607,7 @@ class Klemme(_FestMaske):
         super().__init__("klemme", x, y, werte, **kw)
 
     def aufgeloest(self, platzhalter=None):
-        # Leere Felder bleiben leer (Klemmen sollen eng gereiht werden koennen)
+        # Empty fields stay empty (terminals should be able to sit close together)
         return _FestMaske.aufgeloest(self, False)
 
     def anschluss_oben(self):
@@ -2622,19 +2621,19 @@ class Klemme(_FestMaske):
                       staerke=0.25, **st)]
 
 
-# Elemente, die sich aus einfachen Elementen zusammensetzen (aufgeloest())
+# Elements composed of simple elements (aufgeloest())
 class Koordinatenfeld(Element):
-    """Zonenraster (Koordinatensystem) eines Schaltplan-Blattes.
+    """Zone grid (coordinate system) of a schematic sheet.
 
-    (x, y) ist die linke untere Ecke des Zeichenbereichs `breite` x `hoehe`
-    (Standard: DIN-A4-Blattrahmen ohne Schriftkopf = Viewport-Groesse bei 1:1).
-    Oben stehen die Spaltennummern 1..spalten, links die Zeilenbuchstaben
-    A.. (A = oben). Der gestrichelte Umriss (nur in der Modellansicht) zeigt
-    die Viewport-Flaeche; er erscheint weder im Layout noch im Druck/DXF.
-    Das Feld wird nur per Klick auf seinen Rahmen markiert, nie durch ein
-    Auswahlrechteck (NUR_KLICK)."""
+    (x, y) is the lower left corner of the drawing area `breite` x `hoehe`
+    (default: DIN A4 sheet frame without title block = viewport size at 1:1).
+    At the top are the column numbers 1..spalten, on the left the row letters
+    A.. (A = top). The dashed outline (model view only) shows the viewport
+    area; it appears neither in the layout nor in print/DXF.
+    The field is selected only by clicking its frame, never by a selection
+    rectangle (NUR_KLICK)."""
     NUR_KLICK = True
-    INSET = 1.0                       # Abstand Rahmen <-> Viewport-Umriss
+    INSET = 1.0                       # Distance frame <-> viewport outline
     UMRISS_FARBE = "#8b7ea8"
 
     def __init__(self, x, y, breite=287.0, hoehe=164.0, spalten=6, zeilen=4,
@@ -2649,7 +2648,7 @@ class Koordinatenfeld(Element):
         self.text_hoehe = float(text_hoehe)
         self.raster = bool(raster)
 
-    # ---- Geometrie
+    # Geometry
     def umriss_rect(self):
         return (self.x, self.y, self.x + self.breite, self.y + self.hoehe)
 
@@ -2669,7 +2668,7 @@ class Koordinatenfeld(Element):
         return chr(ord("A") + j)
 
     def zone(self, px, py):
-        """-> "Spalte/Zeile" (z.B. "2/B") oder None ausserhalb des Feldes."""
+        """-> "column/row" (e.g. "2/B") or None outside the field."""
         ux1, uy1, ux2, uy2 = self.umriss_rect()
         if not (ux1 <= px <= ux2 and uy1 <= py <= uy2):
             return None
@@ -2684,7 +2683,7 @@ class Koordinatenfeld(Element):
         j = max(0, min(self.zeilen - 1, j))
         return f"{self.spalten_name(i)}/{self.zeilen_name(j)}"
 
-    # ---- Darstellung
+    # Appearance
     def aufgeloest(self, umriss=False):
         st = dict(layer=self.layer, farbe=self.farbe,
                   linientyp="Volllinie (schmal)", eig_farbe=self.eig_farbe,
@@ -2698,8 +2697,8 @@ class Koordinatenfeld(Element):
         cx1, cy1, cx2, cy2 = self.zellen_rect()
         linie(x1, y1, x2, y1); linie(x2, y1, x2, y2)
         linie(x2, y2, x1, y2); linie(x1, y2, x1, y1)
-        linie(cx1, y1, cx1, y2)             # Trennung Zeilen-Beschriftung
-        linie(x1, cy2, x2, cy2)             # Trennung Spalten-Beschriftung
+        linie(cx1, y1, cx1, y2)             # Separation of row labels
+        linie(x1, cy2, x2, cy2)             # Separation of column labels
         bw = (cx2 - cx1) / self.spalten
         bh = (cy2 - cy1) / self.zeilen
         for k in range(1, self.spalten):
@@ -2729,8 +2728,8 @@ class Koordinatenfeld(Element):
         return out
 
     def auswahl_linien(self):
-        """Linienzuege, auf denen ein Klick das Feld markiert (Rahmen und
-        Umriss, nicht das Innere)."""
+        """Polylines on which a click selects the field (frame and outline, not
+        the interior)."""
         out = []
         for rect in (self.umriss_rect(), self.rahmen_rect()):
             a, b, c, d = rect
