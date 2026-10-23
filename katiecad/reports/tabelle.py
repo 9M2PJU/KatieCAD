@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-katiecad/reports/tabelle.py - Tabellen aus Linien und Texten mit
-automatischem Seitenumbruch (KEIN Tkinter).
+katiecad/reports/tabelle.py - Tables made of lines and texts with
+automatic page breaks (NO Tkinter).
 
-Die Tabellen bestehen aus gewoehnlichen Linien und Texten. Sie sind damit
-im Layout des Berichtsblatts sichtbar, druckbar und im PDF enthalten.
+The tables consist of ordinary lines and texts. They are therefore
+visible in the layout of the report sheet, printable and included in the PDF.
 """
 
 from katiecad.model.core import (Linie, Text, Rechteck, pdf_textbreite,
@@ -13,11 +13,11 @@ from katiecad.model.core import (Linie, Text, Rechteck, pdf_textbreite,
 LINIE = dict(layer="0", eig_farbe=False, linientyp="Volllinie (schmal)")
 TEXT = dict(layer="Schrift", eig_farbe=False, linientyp="Volllinie (schmal)")
 
-MIN_TEXT = 1.6          # mm, kleinste Texthoehe beim Verkleinern
-RAND_X = 1.5            # mm Abstand Text <-> Spaltenlinie
-RAND_Y = 1.0            # mm Abstand Text <-> Zeilenlinie
-TITEL_HOEHE = 4.0       # mm Texthoehe der Tabellenueberschrift
-TITEL_PLATZ = 9.0       # mm Platz fuer die Ueberschrift
+MIN_TEXT = 1.6          # mm, smallest text height when shrinking
+RAND_X = 1.5            # mm distance text <-> column line
+RAND_Y = 1.0            # mm distance text <-> row line
+TITEL_HOEHE = 4.0       # mm text height of the table heading
+TITEL_PLATZ = 9.0       # mm space for the heading
 
 
 class Spalte:
@@ -48,7 +48,7 @@ def _teile(wert):
 
 
 def _zerhacken(s, breite, hoehe):
-    """Zu breites Wort zeichenweise auf mehrere Zeilen verteilen."""
+    """Distribute a word that is too wide over several lines character by character."""
     out, akt = [], ""
     for ch in s:
         if akt and _breite(akt + ch, hoehe) > breite:
@@ -62,8 +62,8 @@ def _zerhacken(s, breite, hoehe):
 
 
 def umbrechen(wert, breite, hoehe):
-    """-> (zeilen: list[str], effektive Texthoehe). Verkleinert die Schrift
-    bis MIN_TEXT, wenn ein unteilbares Stueck sonst nicht passt."""
+    """-> (lines: list[str], effective text height). Shrinks the font
+    down to MIN_TEXT if an indivisible piece would not fit otherwise."""
     teile, ist_liste = _teile(wert)
     if not teile:
         return [], hoehe
@@ -73,7 +73,7 @@ def umbrechen(wert, breite, hoehe):
     zeilen, akt = [], ""
     for i, t in enumerate(teile):
         tt = t + ("," if ist_liste and i < len(teile) - 1 else "")
-        if _breite(tt, h) > breite:                    # auch verkleinert zu breit
+        if _breite(tt, h) > breite:                    # too wide even when shrunk
             if akt:
                 zeilen.append(akt)
                 akt = ""
@@ -102,8 +102,8 @@ def _text(x, y, s, h, ausr):
 
 
 def zeilen_vorbereiten(zeilen, gruppe=None, leer_bei_wiederholung=()):
-    """Markiert Gruppenanfaenge (`_gruppe`) und leert bei Wiederholung die
-    Spalten `leer_bei_wiederholung` (Klemmleiste nur in der ersten Zeile)."""
+    """Marks group starts (`_gruppe`) and, on repetition, empties the
+    columns `leer_bei_wiederholung` (terminal strip only in the first row)."""
     out, vorher = [], object()
     for z in zeilen:
         z = dict(z)
@@ -120,9 +120,9 @@ def zeilen_vorbereiten(zeilen, gruppe=None, leer_bei_wiederholung=()):
 
 def tabellen_seiten(spalten, zeilen, flaeche, titel="", textgroesse=2.5,
                     zeilenhoehe=6.0, leer_text=""):
-    """Zeichnet die Tabelle in `flaeche` = (x1, y1, x2, y2) und bricht bei
-    Bedarf auf mehrere Seiten um (Kopfzeile wird wiederholt).
-    -> Liste von Seiten; jede Seite ist eine Liste von Elementen."""
+    """Draws the table in `flaeche` = (x1, y1, x2, y2) and, if needed, breaks
+    it across several pages (header row is repeated).
+    -> list of pages; each page is a list of elements."""
     x1, y1, x2, y2 = flaeche
     breiten = spaltenbreiten(spalten, x2 - x1)
     xs = [x1]
@@ -130,11 +130,11 @@ def tabellen_seiten(spalten, zeilen, flaeche, titel="", textgroesse=2.5,
         xs.append(xs[-1] + b)
 
     kopf_h = max(zeilenhoehe, 1.4 * textgroesse + 2 * RAND_Y)
-    for sp, b in zip(spalten, breiten):             # Kopfzeile darf umbrechen
+    for sp, b in zip(spalten, breiten):             # Header row may wrap
         lines, h = umbrechen(sp.titel, b - 2 * RAND_X, textgroesse)
         if lines:
             kopf_h = max(kopf_h, _blockhoehe(len(lines), h) + 2 * RAND_Y)
-    # Zeilen vermessen
+    # Measure rows
     gemessen = []
     for z in zeilen:
         zellen, hoehe = [], zeilenhoehe
@@ -168,7 +168,7 @@ def tabellen_seiten(spalten, zeilen, flaeche, titel="", textgroesse=2.5,
             el.append(Text(x1, y2, titel, TITEL_HOEHE, 0.0, "Arial",
                            einfuegepunkt="oben_links", **TEXT))
         unten = oben - kopf_h - sum(e[2] for e in seite)
-        # Kopfzeile
+        # Header row
         for sp, xa, b in zip(spalten, xs, breiten):
             lines, h = umbrechen(sp.titel, b - 2 * RAND_X, textgroesse)
             if lines:
@@ -176,7 +176,7 @@ def tabellen_seiten(spalten, zeilen, flaeche, titel="", textgroesse=2.5,
                       "c": xa + b / 2.0}[sp.ausr]
                 el.append(_text(tx, oben - kopf_h / 2.0, "\n".join(lines),
                                 h, sp.ausr))
-        # Zeilen
+        # Rows
         y = oben - kopf_h
         for z, zellen, hoehe in seite:
             yc = y - hoehe / 2.0
@@ -190,11 +190,12 @@ def tabellen_seiten(spalten, zeilen, flaeche, titel="", textgroesse=2.5,
             if y > unten + 1e-6:
                 st = 0.35 if (z.get("_gruppe") is True) else 0.13
                 el.append(Linie(x1, y, x2, y, staerke=st, **LINIE))
-        # Gruppenlinie oberhalb der ersten Zeile braucht keine Extra-Linie
-        # (Kopf-Unterkante). Gitter:
+        # Group line above the first row needs no extra line
+        # (header bottom edge). Grid:
         for xa in xs[1:-1]:
             el.append(Linie(xa, oben, xa, unten, staerke=0.25, **LINIE))
         el.append(Linie(x1, oben - kopf_h, x2, oben - kopf_h, staerke=0.5, **LINIE))
         el.append(Rechteck(x1, unten, x2, oben, staerke=0.5, **LINIE))
         ergebnis.append(el)
     return ergebnis
+
