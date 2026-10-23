@@ -49,7 +49,7 @@ from katiecad.model.project import (Projekt, ProjektFehler, PROJEKT_ENDUNG,
                               BLOCK_ENDUNG)
 from katiecad.model.blocks import (block_speichern, block_laden,
                               vorschlag_dateiname, BlockDateiFehler,
-                              vorschau_geometrie, standard_ordner)
+                              vorschau_geometrie, standard_ordner, symbol_ordner)
 from katiecad.ui.sidebar import Seitenleiste
 from katiecad.ui.widgets import FlatButton, farb_swatch
 from katiecad.model.core import (
@@ -8136,6 +8136,8 @@ class CadApp:
             os.makedirs(standard_ordner(), exist_ok=True)
         except OSError:
             pass
+        if os.path.isdir(symbol_ordner()):
+            wurzeln.append((tr("dlg.bb.wurzel_symbole"), symbol_ordner()))
         wurzeln.append((tr("dlg.bb.wurzel_eigene"), standard_ordner()))
         if os.path.normpath(eigene) != os.path.normpath(standard_ordner()):
             wurzeln.append((os.path.basename(eigene) or eigene, eigene))
