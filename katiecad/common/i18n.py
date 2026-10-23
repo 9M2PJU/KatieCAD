@@ -255,6 +255,14 @@ TEXTE = {
         "menu.projekt.speichern": "Projekt speichern",
         "menu.projekt.schliessen": "Projekt schließen",
         "menu.projekt.loeschen": "Projekt löschen...",
+        "menu.projekt.umbenennen": "Projekt umbenennen...",
+        "msg.projekt.umbenennen": "Projekt umbenennen",
+        "msg.projekt.umbenannt": "Projekt '{alt}' umbenannt in '{name}'.",
+        "msg.projekt.name_leer": "Der Projektname darf nicht leer sein.",
+        "msg.projekt.name_zeichen": "Der Projektname enthält ungültige Zeichen (\\ / : * ? \" < > |).",
+        "msg.projekt.name_ende": "Der Projektname darf nicht mit Punkt oder Leerzeichen enden.",
+        "msg.projekt.name_reserviert": "Dieser Name ist vom Betriebssystem reserviert.",
+        "msg.projekt.name_existiert": "Ein Projekt oder Ordner mit diesem Namen existiert bereits.",
         "menu.projekt.blatt_neu": "Neues Blatt",
         "menu.projekt.blatt_umbenennen": "Blatt umbenennen...",
         "menu.projekt.blatt_loeschen": "Blatt löschen",
@@ -874,6 +882,14 @@ TEXTE = {
         "menu.projekt.speichern": "Save project",
         "menu.projekt.schliessen": "Close project",
         "menu.projekt.loeschen": "Delete project...",
+        "menu.projekt.umbenennen": "Rename project...",
+        "msg.projekt.umbenennen": "Rename project",
+        "msg.projekt.umbenannt": "Project '{alt}' renamed to '{name}'.",
+        "msg.projekt.name_leer": "The project name must not be empty.",
+        "msg.projekt.name_zeichen": "The project name contains invalid characters (\\ / : * ? \" < > |).",
+        "msg.projekt.name_ende": "The project name must not end with a dot or a space.",
+        "msg.projekt.name_reserviert": "This name is reserved by the operating system.",
+        "msg.projekt.name_existiert": "A project or folder with this name already exists.",
         "menu.projekt.blatt_neu": "New sheet",
         "menu.projekt.blatt_umbenennen": "Rename sheet...",
         "menu.projekt.blatt_loeschen": "Delete sheet",
@@ -1268,4 +1284,3 @@ def tr(schluessel, **kwargs):
 def setze_sprache(code):
     if code in TEXTE:
         SPRACHE["aktuell"] = code
-
