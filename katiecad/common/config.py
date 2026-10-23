@@ -1,15 +1,15 @@
 # -*- coding: utf-8 -*-
 """
-katiecad/common/config.py - Persistente Anwender-Einstellungen (z. B. Sprache).
-Speichert in einem benutzerspezifischen Konfigverzeichnis:
+katiecad/common/config.py - Persistent user settings (e.g. language).
+Stores them in a user-specific configuration directory:
 
     Windows:  %APPDATA%\\KatieCAD\\config.json
     macOS:    ~/Library/Application Support/KatieCAD/config.json
     Linux:    $XDG_CONFIG_HOME/KatieCAD/config.json
-              (meist ~/.config/KatieCAD/config.json)
+              (usually ~/.config/KatieCAD/config.json)
 
-Fehlertolerant: fehlende oder kaputte Dateien führen still zum
-Standardwert (Englisch).
+Fault tolerant: missing or broken files silently fall back to the
+default value (English).
 """
 
 import json
@@ -17,12 +17,12 @@ import os
 import sys
 
 KONFIG_DATEI = "config.json"
-STANDARD_SPRACHE = "en"                 # Erststart: Englisch
+STANDARD_SPRACHE = "en"                 # First start: English
 _UNTERSTUETZTE_SPRACHEN = ("de", "en")
 
 
 def _konfig_verzeichnis():
-    """Liefert ein plattformgerechtes Konfigverzeichnis."""
+    """Returns a platform-appropriate configuration directory."""
     if sys.platform.startswith("win"):
         basis = os.environ.get("APPDATA") or os.path.expanduser("~")
         return os.path.join(basis, "KatieCAD")
@@ -33,12 +33,12 @@ def _konfig_verzeichnis():
 
 
 def konfig_pfad():
-    """Vollständiger Pfad zur Konfigurationsdatei."""
+    """Full path to the configuration file."""
     return os.path.join(_konfig_verzeichnis(), KONFIG_DATEI)
 
 
 def lade_konfiguration():
-    """Gibt ein dict zurück. Fehlertolerant (immer mit gültiger 'sprache')."""
+    """Returns a dict. Fault tolerant (always with a valid 'sprache')."""
     pfad = konfig_pfad()
     try:
         with open(pfad, "r", encoding="utf-8") as f:
@@ -55,7 +55,7 @@ def lade_konfiguration():
 
 
 def speichere_konfiguration(daten):
-    """Schreibt die Konfiguration atomar. Fehler werden leise geloggt."""
+    """Writes the configuration atomically. Errors are logged quietly."""
     pfad = konfig_pfad()
     try:
         os.makedirs(os.path.dirname(pfad), exist_ok=True)
@@ -68,7 +68,7 @@ def speichere_konfiguration(daten):
 
 
 def speichere_sprache(sprache):
-    """Speichert nur den Sprachschlüssel; andere Felder bleiben erhalten."""
+    """Stores only the language key; other fields are preserved."""
     if sprache not in _UNTERSTUETZTE_SPRACHEN:
         return
     daten = lade_konfiguration()
