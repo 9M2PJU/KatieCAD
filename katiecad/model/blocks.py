@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 """
-katiecad/model/blocks.py - Blockdefinitionen als eigene Dateien (*.katieblock).
-Enthaelt KEIN Tkinter.
+katiecad/model/blocks.py - Block definitions as separate files (*.katieblock).
+Contains NO Tkinter.
 
-Dateiformat (JSON):
+File format (JSON):
     {"format": "katiecad-block", "version": 1, "block": {<BlockDefinition>}}
 
-Die Definition enthaelt die Elemente in lokalen Koordinaten inkl.
-Attributdefinitionen (AttributDefinition), siehe katiecad.model.core.
+The definition contains the elements in local coordinates incl.
+attribute definitions (AttributDefinition), see katiecad.model.core.
 """
 
 import json
@@ -28,7 +28,7 @@ class BlockDateiFehler(Exception):
 
 
 def vorschlag_dateiname(blockname):
-    """Dateiname (ohne Ordner) passend zum Blocknamen."""
+    """File name (without folder) matching the block name."""
     n = _UNGUELTIG.sub("_", (blockname or "Block").strip()) or "Block"
     return n.rstrip(". ") + BLOCK_ENDUNG
 
@@ -47,7 +47,7 @@ def block_speichern(pfad, definition):
 
 
 def block_laden(pfad, element_factory):
-    """Liest eine Blockdatei und gibt eine BlockDefinition zurueck."""
+    """Reads a block file and returns a BlockDefinition."""
     try:
         with open(pfad, "r", encoding="utf-8") as f:
             daten = json.load(f)
@@ -57,7 +57,7 @@ def block_laden(pfad, element_factory):
         raise BlockDateiFehler("kein_block")
     if daten.get("format") == FORMAT_KENNUNG:
         bd = daten.get("block")
-    elif "elemente" in daten and "name" in daten:   # nackte Definition
+    elif "elemente" in daten and "name" in daten:   # bare definition
         bd = daten
     else:
         raise BlockDateiFehler("kein_block")
@@ -70,15 +70,15 @@ def block_laden(pfad, element_factory):
 
 
 # ------------------------------------------------------------
-# Ordner (Blockdateien direkt im Dateisystem)
+# Folder (block files directly in the file system)
 # ------------------------------------------------------------
 def standard_ordner():
-    """Standardordner fuer eigene Bloecke: <Benutzerordner>/KatieCAD/Blocks."""
+    """Default folder for custom blocks: <user folder>/KatieCAD/Blocks."""
     return os.path.join(os.path.expanduser("~"), "KatieCAD", "Blocks")
 
 
 def unterordner(pfad):
-    """Sortierte Unterordner (ohne versteckte)."""
+    """Sorted sub-folders (without hidden ones)."""
     try:
         return sorted((n for n in os.listdir(pfad)
                        if not n.startswith(".")
@@ -89,7 +89,7 @@ def unterordner(pfad):
 
 
 def blockdateien(pfad):
-    """Sortierte Blockdateien eines Ordners: [(dateiname, voller_pfad)]."""
+    """Sorted block files of a folder: [(file_name, full_path)]."""
     try:
         return sorted(((n, os.path.join(pfad, n)) for n in os.listdir(pfad)
                        if n.lower().endswith(BLOCK_ENDUNG)
@@ -100,7 +100,7 @@ def blockdateien(pfad):
 
 
 # ------------------------------------------------------------
-# Vorschau-Geometrie (ohne Tk)
+# Preview geometry (without Tk)
 # ------------------------------------------------------------
 def _farbe(el):
     f = getattr(el, "farbe", None) if getattr(el, "eig_farbe", False) else None
@@ -110,7 +110,7 @@ def _farbe(el):
         r, g, b = int(f[1:3], 16), int(f[3:5], 16), int(f[5:7], 16)
     except ValueError:
         return "#e8e0ff"
-    if 0.3 * r + 0.59 * g + 0.11 * b < 70:       # zu dunkel fuer dunklen Grund
+    if 0.3 * r + 0.59 * g + 0.11 * b < 70:       # too dark for a dark background
         return "#e8e0ff"
     return f
 
@@ -127,9 +127,9 @@ def _flach(el, out):
 
 
 def vorschau_geometrie(definition):
-    """Zeichenbare Darstellung einer BlockDefinition:
-    {"linien": [(punkte, geschlossen, farbe)], "texte": [(x, y, text, hoehe,
-    farbe)], "flaechen": [(punkte, farbe)], "bbox": (x1, y1, x2, y2) oder None}."""
+    """Drawable representation of a BlockDefinition:
+    {"linien": [(points, closed, colour)], "texte": [(x, y, text, height,
+    colour)], "flaechen": [(points, colour)], "bbox": (x1, y1, x2, y2) or None}."""
     ref = BlockReferenz(0.0, 0.0, definition.name, definition.elemente)
     flach = []
     for k in ref.aufgeloest():
@@ -179,4 +179,5 @@ def vorschau_geometrie(definition):
                           el.hoehe, f)); punkte([(b[0], b[1]), (b[2], b[3])])
     bbox = (min(xs), min(ys), max(xs), max(ys)) if xs else None
     return {"linien": linien, "texte": texte, "flaechen": flaechen, "bbox": bbox}
+
 
