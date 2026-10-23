@@ -1565,6 +1565,100 @@ class ProjektDruckDialog(tk.Toplevel):
         self.destroy()
 
 
+class DokumentationDialog(tk.Toplevel):
+    """Berichtsblaetter (Deckblatt, Inhaltsverzeichnis, Geraeteliste,
+    Klemmenplan, Kabelplan) und Projektdaten waehlen.
+
+    vorlagen: [(Anzeigename, Pfad|None)] - None = ohne Schriftkopf
+    einst:    gespeicherte Einstellungen {"berichte", "vorlage", "klemmen_geraete"}
+    daten:    Projektdaten {"anlage", "kunde", ...}
+    result:   {"berichte": [...], "daten": {...}, "vorlage": Pfad|None,
+               "klemmen_geraete": bool} oder None"""
+
+    FELDER = ("anlage", "kunde", "auftrag", "zeichnungsnummer", "firma",
+              "gezeichnet", "geprueft", "revision", "datum")
+    TYPEN = ("deckblatt", "inhalt", "geraete", "klemmen", "kabel")
+
+    def __init__(self, parent, vorlagen, einst, daten, projektname,
+                 vorlage_vorgabe=None):
+        super().__init__(parent)
+        self.result = None
+        self._pfade = [pf for _n, pf in vorlagen]
+        self.title(tr("dlg.doku.titel"))
+        self.transient(parent)
+        _modal(self)
+        self.configure(bg=FARBEN["bg_mittel"])
+        f = ttk.Frame(self, padding=14)
+        f.pack(fill=tk.BOTH, expand=True)
+
+        ttk.Label(f, text=tr("dlg.doku.berichte"), style="Title.TLabel").pack(anchor=tk.W)
+        aktiv = einst.get("berichte")
+        if not isinstance(aktiv, list):
+            aktiv = list(self.TYPEN)
+        self.v_typ = {}
+        for t in self.TYPEN:
+            self.v_typ[t] = tk.BooleanVar(value=t in aktiv)
+            ttk.Checkbutton(f, text=tr("rep." + t),
+                            variable=self.v_typ[t]).pack(anchor=tk.W, padx=10)
+        self.v_klg = tk.BooleanVar(value=bool(einst.get("klemmen_geraete", True)))
+        ttk.Checkbutton(f, text=tr("dlg.doku.klemmen_geraete"),
+                        variable=self.v_klg).pack(anchor=tk.W, padx=10, pady=(4, 0))
+
+        ttk.Label(f, text=tr("dlg.doku.daten"), style="Title.TLabel").pack(
+            anchor=tk.W, pady=(12, 2))
+        g = ttk.Frame(f)
+        g.pack(fill=tk.X)
+        g.columnconfigure(1, weight=1)
+        self.v_f = {}
+        for i, k in enumerate(self.FELDER):
+            ttk.Label(g, text=tr("dlg.doku.f." + k)).grid(
+                row=i, column=0, sticky=tk.W, padx=(10, 8), pady=1)
+            wert = daten.get(k, "")
+            if k == "anlage" and not wert:
+                wert = projektname
+            self.v_f[k] = tk.StringVar(value=wert)
+            ttk.Entry(g, textvariable=self.v_f[k], width=34).grid(
+                row=i, column=1, sticky=tk.EW, pady=1)
+
+        ttk.Label(f, text=tr("dlg.doku.vorlage"), style="Title.TLabel").pack(
+            anchor=tk.W, pady=(12, 2))
+        self.v_vorlage = tk.StringVar()
+        namen = [n for n, _p in vorlagen]
+        self.cb = ttk.Combobox(f, textvariable=self.v_vorlage, values=namen,
+                               state="readonly", width=40)
+        self.cb.pack(anchor=tk.W, padx=10)
+        wunsch = einst.get("vorlage", vorlage_vorgabe)
+        idx = 0
+        if wunsch in self._pfade:
+            idx = self._pfade.index(wunsch)
+        elif len(vorlagen) > 1:
+            idx = 1
+        if namen:
+            self.cb.current(idx)
+
+        ttk.Label(f, text=tr("dlg.doku.hinweis"), style="Hint.TLabel",
+                  wraplength=430, justify=tk.LEFT).pack(anchor=tk.W, pady=(12, 4))
+        bf = ttk.Frame(f)
+        bf.pack(pady=(8, 0))
+        ttk.Button(bf, text=tr("dlg.doku.erzeugen"), command=self._ok).pack(side=tk.LEFT, padx=4)
+        ttk.Button(bf, text=tr("dlg.abbrechen"), command=self.destroy).pack(side=tk.LEFT, padx=4)
+        self.bind("<Escape>", lambda e: self.destroy())
+        _zentrieren(self, parent)
+        self.wait_window(self)
+
+    def _ok(self):
+        typen = [t for t in self.TYPEN if self.v_typ[t].get()]
+        i = self.cb.current()
+        pfad = self._pfade[i] if 0 <= i < len(self._pfade) else None
+        self.result = {
+            "berichte": typen,
+            "daten": {k: v.get().strip() for k, v in self.v_f.items()},
+            "vorlage": pfad,
+            "klemmen_geraete": bool(self.v_klg.get()),
+        }
+        self.destroy()
+
+
 class VerbindungspunktDialog(tk.Toplevel):
     """Bezeichnung eines Verbindungspunkts + Schalter 'Text anzeigen'.
     result: {'wert': str, 'sichtbar': bool, 'richtungen': [0|90|180|270]}
