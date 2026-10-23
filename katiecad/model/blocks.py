@@ -77,6 +77,12 @@ def standard_ordner():
     return os.path.join(os.path.expanduser("~"), "KatieCAD", "Blocks")
 
 
+def symbol_ordner():
+    """Symbol library shipped with the program: <program folder>/symbols."""
+    root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    return os.path.join(root, "symbols")
+
+
 def unterordner(pfad):
     """Sorted sub-folders (without hidden ones)."""
     try:
@@ -179,5 +185,3 @@ def vorschau_geometrie(definition):
                           el.hoehe, f)); punkte([(b[0], b[1]), (b[2], b[3])])
     bbox = (min(xs), min(ys), max(xs), max(ys)) if xs else None
     return {"linien": linien, "texte": texte, "flaechen": flaechen, "bbox": bbox}
-
-
