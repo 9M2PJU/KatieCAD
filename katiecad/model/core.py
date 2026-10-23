@@ -2491,6 +2491,107 @@ class ElektroMaske(_FestMaske):
         return out
 
 
+class Kabel(_FestMaske):
+    """Kabel: waagerechte Linie, die nach rechts gezogen wird. Links davon die
+    Maske <CAB> (2.5), <TYP> und <REF> (je 1.5). Wo eine senkrechte Leitung
+    die Linie kreuzt, entsteht automatisch ein Adermarkierungs-Strich mit
+    Bezeichnung (L1, L2, L3, N, PE, 6, 7 ...), die je Ader aenderbar ist.
+
+    (x, y) = linkes Ende der Linie, `laenge` = Laenge nach rechts.
+    CAB verhaelt sich wie IND bei Geraeten (Kennung fuer spaetere Listen);
+    REF entsteht automatisch aus anderen Kabeln mit gleichem CAB.
+    kreuzungen: (nicht gespeichert) x-Positionen der Kreuzungen, wird von
+    katiecad.electrical.logic.kabel_kreuzungen berechnet.
+    adern: {Abstand vom Kabelanfang ("%.1f"): Bezeichnung} (Aenderungen)."""
+    FELDER = ("CAB", "TYP")
+    HOEHEN = {"CAB": 2.5, "TYP": 1.5}
+    REF_HOEHE = 1.5
+    ADER_HOEHE = 2.0
+    STRICH = 1.25                     # halbe Strichlaenge (45 Grad)
+    TEXT_ABSTAND = 1.2                # Maske <-> Kabelanfang
+    ADER_NAMEN = ("L1", "L2", "L3", "N", "PE")
+    ZEILEN = ()
+
+    def __init__(self, x, y, werte=None, laenge=40.0, adern=None, **kw):
+        super().__init__("kabel", x, y, werte, **kw)
+        self.laenge = max(1.0, float(laenge))
+        self.adern = {str(k): str(v) for k, v in (adern or {}).items()}
+        self.kreuzungen = []
+
+    def to_dict(self):
+        d = super().to_dict()
+        d.pop("kreuzungen", None)
+        d["adern"] = dict(self.adern)
+        return d
+
+    @staticmethod
+    def ader_schluessel(abstand):
+        return "%.1f" % abstand
+
+    def ader_name(self, index, abstand):
+        n = self.adern.get(self.ader_schluessel(abstand))
+        if n:
+            return n
+        return (self.ADER_NAMEN[index] if index < len(self.ADER_NAMEN)
+                else str(index + 1))
+
+    def adern_liste(self):
+        """[(schluessel, aktuelle Bezeichnung)] der gefundenen Kreuzungen."""
+        out = []
+        for i, cx in enumerate(sorted(self.kreuzungen)):
+            a = cx - self.x
+            out.append((self.ader_schluessel(a), self.ader_name(i, a)))
+        return out
+
+    def aufgeloest(self, platzhalter=None):
+        ph = self.platzhalter if platzhalter is None else platzhalter
+        st = self._stil()
+        out = [Linie(self.x, self.y, self.x + self.laenge, self.y, **st)]
+        tx = self.x - self.TEXT_ABSTAND
+        for tag, dy, anker in (("CAB", 0.6, "unten_rechts"),
+                               ("TYP", -1.2, "mitte_rechts")):
+            w = self.werte.get(tag, "")
+            if tag in self.ausgeblendet:
+                continue
+            if w == "":
+                if not ph:
+                    continue
+                w = "<" + tag + ">"
+            out.append(Text(tx, self.y + dy, w, self.HOEHEN[tag], 0.0, "Arial",
+                            einfuegepunkt=anker, **st))
+        refs = ["(%s %s)" % (tr("qv.blatt"), ort_text(o)) for o in self.refs]
+        if refs or ph:
+            out.append(Text(tx, self.y - 2.3, "\n".join(refs) if refs else "<REF>",
+                            self.REF_HOEHE, 0.0, "Arial",
+                            einfuegepunkt="oben_rechts", **st))
+        h = self.STRICH
+        for i, cx in enumerate(sorted(self.kreuzungen)):
+            if not (self.x < cx <= self.x + self.laenge):
+                continue
+            out.append(Linie(cx - h, self.y - h, cx + h, self.y + h, **st))
+            out.append(Text(cx + h + 0.3, self.y + 1.0,
+                            self.ader_name(i, cx - self.x), self.ADER_HOEHE,
+                            0.0, "Arial", einfuegepunkt="unten_links", **st))
+        return out
+
+    def bbox(self):
+        xs, ys = [self.x, self.x + self.laenge], [self.y]
+        for k in self.aufgeloest(True):
+            b = k.bbox()
+            xs += [b[0], b[2]]
+            ys += [b[1], b[3]]
+        return (min(xs), min(ys), max(xs), max(ys))
+
+    def griffe(self):
+        return [("p", self.x, self.y), ("e", self.x + self.laenge, self.y)]
+
+    def griff_bewegen(self, griff_id, x, y):
+        if griff_id == "p":
+            self.x, self.y = x, y
+        elif griff_id == "e":
+            self.laenge = max(1.0, x - self.x)
+
+
 class Klemme(_FestMaske):
     """Klemme: sichtbarer Kreis mit zwei Anschluessen (oben / unten) und den
     festen Feldern <IND> (2.5), <TYP>, <PER> (1.5) und <NUM> (1.0)."""
@@ -2655,4 +2756,5 @@ class Koordinatenfeld(Element):
 
 
 ZUSAMMENGESETZT = (BlockReferenz, Querverweis, Verbindung, ElektroMaske, Klemme,
-                   Koordinatenfeld)
+                   Kabel, Koordinatenfeld)
+
