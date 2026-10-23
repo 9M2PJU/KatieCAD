@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-katiecad/electrical/logic.py - Logik fuer Elektro-Plaene (KEIN Tkinter).
+katiecad/electrical/logic.py - Logic for electrical diagrams (NO Tkinter).
 
-Querverweise: Zwei oder mehr Querverweis-Pfeile mit gleichem Text gehoeren
-zusammen. Jeder zeigt als Ziel die Blattnummer(n) der anderen.
+Cross references: two or more cross-reference arrows with the same text
+belong together. Each shows the sheet number(s) of the others as its target.
 """
 
 from collections import Counter, defaultdict
@@ -18,12 +18,12 @@ from katiecad.common.i18n import tr
 
 
 def felder_aus_elementen(elemente):
-    """Alle Koordinatenfelder (Zonenraster) einer Elementliste."""
+    """All coordinate fields (zone grids) of an element list."""
     return [e for e in elemente if isinstance(e, Koordinatenfeld)]
 
 
 def felder_aus_blattdaten(daten):
-    """Koordinatenfelder aus den JSON-Daten eines (nicht geladenen) Blattes."""
+    """Coordinate fields from the JSON data of a (not loaded) sheet."""
     out = []
     if not isinstance(daten, dict):
         return out
@@ -38,7 +38,7 @@ def felder_aus_blattdaten(daten):
 
 
 def feld_an(felder, x, y):
-    """"Spalte/Zeile" der Stelle (x, y) im ersten passenden Feld, sonst ""."""
+    """"Column/row" of the location (x, y) in the first matching field, otherwise ""."""
     for f in felder:
         z = f.zone(x, y)
         if z:
@@ -51,8 +51,8 @@ def _pos(obj):
 
 
 def qv_texte_aus_blattdaten(daten):
-    """Querverweise aus den JSON-Daten eines Blattes (ohne Objekte):
-    Liste von (text, "Spalte/Zeile")."""
+    """Cross references from the JSON data of a sheet (without objects):
+    list of (text, "column/row")."""
     texte = []
     if not isinstance(daten, dict):
         return texte
@@ -70,39 +70,39 @@ def qv_texte_aus_blattdaten(daten):
 
 
 def qv_texte_aus_elementen(elemente):
-    """Querverweise einer Elementliste: Liste von (text, "Spalte/Zeile")."""
+    """Cross references of an element list: list of (text, "column/row")."""
     felder = felder_aus_elementen(elemente)
     return [(e.text.strip(), feld_an(felder, *_pos(e))) for e in elemente
             if isinstance(e, Querverweis) and e.text.strip()]
 
 
 def _text_feld(eintrag):
-    """Akzeptiert "text" oder (text, feld)."""
+    """Accepts "text" or (text, field)."""
     if isinstance(eintrag, (tuple, list)):
         return str(eintrag[0]), (eintrag[1] if len(eintrag) > 1 else "")
     return str(eintrag), ""
 
 
 def querverweis_ziele(elemente, blatt_nr, andere_blaetter):
-    """Setzt `ziel` an allen Querverweisen von `elemente`.
+    """Sets `ziel` on all cross references of `elemente`.
 
-    ziel = sortierte Liste von (blatt_nr, "Spalte/Zeile") der Gegenstuecke;
-    "Spalte/Zeile" ist leer, wenn das Blatt kein Koordinatenfeld an dieser
-    Stelle hat.
-    elemente:        Elemente des Blattes mit der Nummer `blatt_nr`
-    andere_blaetter: {blatt_nr: [text oder (text, feld), ...]} fuer alle
-                     uebrigen Blaetter
+    ziel = sorted list of (sheet_no, "column/row") of the counterparts;
+    "column/row" is empty if the sheet has no coordinate field at this
+    location.
+    elemente:        elements of the sheet with number `blatt_nr`
+    andere_blaetter: {sheet_no: [text or (text, field), ...]} for all
+                     other sheets
     """
     qvs = [e for e in elemente if isinstance(e, Querverweis)]
     if not qvs:
         return
     felder = felder_aus_elementen(elemente)
-    eigene = []                                  # (qv, text, feld)
+    eigene = []                                  # (qv, text, field)
     for qv in qvs:
         t = qv.text.strip()
         if t:
             eigene.append((qv, t, feld_an(felder, *_pos(qv))))
-    vorkommen = defaultdict(list)                # text -> [(blatt, feld, qv|None)]
+    vorkommen = defaultdict(list)                # text -> [(sheet, field, qv|None)]
     for qv, t, feld in eigene:
         vorkommen[t].append((blatt_nr, feld, qv))
     for nr, eintraege in andere_blaetter.items():
@@ -119,7 +119,7 @@ def querverweis_ziele(elemente, blatt_nr, andere_blaetter):
 
 
 def ziele_fuer_alle_blaetter(blaetter):
-    """blaetter: {blatt_nr: [elemente]} -> setzt `ziel` in allen Blaettern."""
+    """blaetter: {sheet_no: [elements]} -> sets `ziel` in all sheets."""
     texte = {nr: qv_texte_aus_elementen(el) for nr, el in blaetter.items()}
     for nr, el in blaetter.items():
         andere = {n: t for n, t in texte.items() if n != nr}
@@ -127,7 +127,7 @@ def ziele_fuer_alle_blaetter(blaetter):
 
 
 def verbindungspunkte(elemente, sichtbar=lambda el: True):
-    """Alle Verbindungspunkte (auch aus Bloecken) als aufgeloeste Elemente."""
+    """All connection points (including those in blocks) as resolved elements."""
     out = []
     for el in elemente:
         if not sichtbar(el):
@@ -141,7 +141,7 @@ def verbindungspunkte(elemente, sichtbar=lambda el: True):
 
 
 class Anschluss:
-    """Ein Punkt, an dem eine Leitung enden darf."""
+    """A point where a wire may end."""
     __slots__ = ("x", "y", "name")
 
     def __init__(self, x, y, name):
@@ -149,7 +149,7 @@ class Anschluss:
 
 
 def _anschluesse_von(el):
-    """Anschlusspunkte eines einzelnen (aufgeloesten) Elements."""
+    """Connection points of a single (resolved) element."""
     out = []
     if isinstance(el, Querverweis):
         t = el.text or "-"
@@ -173,11 +173,11 @@ def _anschluesse_von(el):
 
 
 def anschlusspunkte(elemente, sichtbar=lambda el: True):
-    """Alle Leitungs-Anschlusspunkte:
-       - Pins (auch aus Bloecken)
-       - Querverweise: NUR Basis und Spitze des Pfeils
-       - Verbindungen: die Armenden
-       - Klemmen: oben und unten"""
+    """All wire connection points:
+       - pins (also from blocks)
+       - cross references: ONLY base and tip of the arrow
+       - junctions: the arm ends
+       - terminals: top and bottom"""
     out = []
     for el in elemente:
         if not sichtbar(el):
@@ -191,7 +191,7 @@ def anschlusspunkte(elemente, sichtbar=lambda el: True):
 
 
 def naechster_anschluss(elemente, x, y, tol, sichtbar=lambda el: True):
-    """Naechster Anschlusspunkt innerhalb `tol` (mm) oder None."""
+    """Nearest connection point within `tol` (mm) or None."""
     best, bd = None, None
     for a in anschlusspunkte(elemente, sichtbar):
         d = ((a.x - x) ** 2 + (a.y - y) ** 2) ** 0.5
@@ -201,7 +201,7 @@ def naechster_anschluss(elemente, x, y, tol, sichtbar=lambda el: True):
 
 
 def naechster_vp(elemente, x, y, tol, sichtbar=lambda el: True):
-    """Naechster Verbindungspunkt innerhalb `tol` (mm) oder None."""
+    """Nearest connection point (pin) within `tol` (mm) or None."""
     best, bd = None, None
     for vp in verbindungspunkte(elemente, sichtbar):
         d = ((vp.x - x) ** 2 + (vp.y - y) ** 2) ** 0.5
@@ -222,16 +222,16 @@ def naechste_bezeichnung(zuletzt):
 
 
 # ============================================================
-# Geraete (Elektro-Maske): automatische Verweise ueber PER
+# Devices (electrical mask): automatic references via PER
 # ============================================================
-# Feld, ueber das Geraete einander zugeordnet werden (gleicher Wert = gleiches
-# Geraet, z. B. Hauptschuetz K1 und seine Hilfskontakte K1).
+# Field used to match devices with each other (same value = same
+# device, e.g. main contactor K1 and its auxiliary contacts K1).
 REF_FELD = "IND"
 
 
 def geraete(elemente, blatt_nr):
-    """Alle Geraete eines Blattes: freie Elektro-Masken und Bloecke mit
-    Elektro-Maske. -> Liste von Dicts {obj, per, ind, rolle, blatt}."""
+    """All devices of a sheet: free electrical masks and blocks with an
+    electrical mask. -> list of dicts {obj, per, ind, rolle, blatt}."""
     out = []
     felder = felder_aus_elementen(elemente)
     for el in elemente:
@@ -256,8 +256,8 @@ def geraete(elemente, blatt_nr):
 
 
 def geraete_aus_blattdaten(daten):
-    """Geraete eines (nicht geladenen) Blattes aus den JSON-Daten:
-    Liste von (per, rolle, ind, "Spalte/Zeile")."""
+    """Devices of a (not loaded) sheet from the JSON data:
+    list of (per, role, ind, "column/row")."""
     res = []
     if not isinstance(daten, dict):
         return res
@@ -291,14 +291,14 @@ def geraete_aus_blattdaten(daten):
 
 
 def geraete_referenzen(eigene, blatt_nr, andere_blaetter):
-    """Setzt `refs` (sortierte, eindeutige (Blatt, "Spalte/Zeile")) an allen
-    Geraeten.
+    """Sets `refs` (sorted, unique (sheet, "column/row")) on all
+    devices.
 
-    Hauptsymbol  -> verweist auf alle Hilfsbausteine mit gleichem PER
-    Hilfsbaustein-> verweist nur auf das Hauptsymbol mit gleichem PER
-    eigene:          Ergebnis von geraete()
-    andere_blaetter: {blatt_nr: [(per, rolle, ind[, feld]), ...]}"""
-    kandidaten = []                       # (per, rolle, (blatt, feld), id)
+    main symbol      -> refers to all auxiliary parts with the same PER
+    auxiliary part   -> refers only to the main symbol with the same PER
+    eigene:          result of geraete()
+    andere_blaetter: {sheet_no: [(per, role, ind[, field]), ...]}"""
+    kandidaten = []                       # (per, role, (sheet, field), id)
     for g in eigene:
         kandidaten.append((g["per"], g["rolle"],
                            (g["blatt"], g.get("feld", "")), id(g["obj"])))
@@ -319,14 +319,14 @@ def geraete_referenzen(eigene, blatt_nr, andere_blaetter):
 
 
 # ============================================================
-# Leitungen: teilen und Verbindungen bereinigen
+# Wires: split and clean up connections
 # ============================================================
 TOL = 0.05
 
 
 def naechster_leitungspunkt(elemente, x, y, tol):
-    """Liegt (x, y) innerhalb `tol` auf dem INNEREN einer Leitung?
-    -> (leitung, px, py) mit dem Lotfusspunkt, sonst None."""
+    """Does (x, y) lie within `tol` on the INTERIOR of a wire?
+    -> (wire, px, py) with the foot of the perpendicular, otherwise None."""
     best, bd = None, None
     for el in elemente:
         if not isinstance(el, Leitung):
@@ -339,7 +339,7 @@ def naechster_leitungspunkt(elemente, x, y, tol):
         px, py = el.x1 + t * dx, el.y1 + t * dy
         d = math.hypot(x - px, y - py)
         laenge = math.sqrt(l2)
-        # Endpunkte sind keine Teilungspunkte
+        # End points are not split points
         if d <= tol and TOL / laenge < t < 1 - TOL / laenge:
             if bd is None or d < bd:
                 best, bd = (el, px, py), d
@@ -347,8 +347,8 @@ def naechster_leitungspunkt(elemente, x, y, tol):
 
 
 def leitung_teilen(elemente, x, y, tol=TOL):
-    """Teilt eine Leitung, auf deren Inneren (x, y) liegt, in zwei Leitungen.
-    Rueckgabe: True, wenn geteilt wurde."""
+    """Splits a wire, on whose interior (x, y) lies, into two wires.
+    Returns True if it was split."""
     hit = naechster_leitungspunkt(elemente, x, y, tol)
     if hit is None:
         return False
@@ -363,7 +363,7 @@ def leitung_teilen(elemente, x, y, tol=TOL):
 
 
 def _ankerpunkte(elemente, ausser=None):
-    """Alle Punkte, an denen eine Leitung enden darf (inkl. Verbindungsmitte)."""
+    """All points where a wire may end (incl. junction centres)."""
     pts = []
     for el in elemente:
         if el is ausser:
@@ -387,8 +387,8 @@ def _verb_punkte(v):
 
 
 def _gueltige_leitungen(v, elemente):
-    """Leitungen, die an `v` enden UND am anderen Ende einen Gegenpart
-    (Pin, Verbindung, Klemme, Querverweis) haben."""
+    """Wires that end at `v` AND have a counterpart (pin, junction, terminal,
+    cross reference) at the other end."""
     anker = _ankerpunkte(elemente, ausser=v)
     mein = _verb_punkte(v)
     res = []
@@ -398,7 +398,7 @@ def _gueltige_leitungen(v, elemente):
         e1, e2 = (l.x1, l.y1), (l.x2, l.y2)
         an1 = any(_nahe(e1, p) for p in mein)
         an2 = any(_nahe(e2, p) for p in mein)
-        if an1 == an2:                       # beide oder keins -> irrelevant
+        if an1 == an2:                       # both or none -> irrelevant
             continue
         fern = e2 if an1 else e1
         if any(_nahe(fern, p) for p in anker):
@@ -407,8 +407,8 @@ def _gueltige_leitungen(v, elemente):
 
 
 def vollstaendige_verbindungen(elemente):
-    """ids der Verbindungen, die aktuell mindestens zwei Leitungen mit
-    Gegenpart haben (= 'verbunden')."""
+    """ids of the junctions that currently have at least two wires with a
+    counterpart (= 'connected')."""
     return {id(v) for v in elemente
             if isinstance(v, Verbindung)
             and len(_gueltige_leitungen(v, elemente)) >= 2}
@@ -420,22 +420,22 @@ def _anker_enden(l, anker):
 
 
 def vollstaendige_leitungen(elemente):
-    """ids der Leitungen, die an BEIDEN Enden einen Gegenpart haben
-    (Pin, Verbindung, Klemme oder Querverweis)."""
+    """ids of the wires that have a counterpart at BOTH ends
+    (pin, junction, terminal or cross reference)."""
     anker = _ankerpunkte(elemente)
     return {id(l) for l in elemente
             if isinstance(l, Leitung) and _anker_enden(l, anker)}
 
 
 def verbindungen_bereinigen(elemente, vorher, vorher_leitungen=()):
-    """Raeumt nach dem Loeschen auf (in place, kaskadierend):
-      - Leitungen, die vorher an beiden Enden angeschlossen waren
-        (`vorher_leitungen` = Ergebnis von vollstaendige_leitungen) und
-        jetzt an einem Ende keinen Gegenpart mehr haben, verschwinden;
-      - Verbindungen, die vorher verbunden waren (`vorher` = Ergebnis von
-        vollstaendige_verbindungen) und weniger als zwei gueltige Leitungen
-        haben, verschwinden samt der daran haengenden Leitungen.
-    Rueckgabe: (anzahl_verbindungen, anzahl_leitungen)."""
+    """Cleans up after deleting (in place, cascading):
+      - wires that were connected at both ends before
+        (`vorher_leitungen` = result of vollstaendige_leitungen) and now
+        have no counterpart at one end disappear;
+      - junctions that were connected before (`vorher` = result of
+        vollstaendige_verbindungen) and now have fewer than two valid wires
+        disappear together with the wires attached to them.
+    Returns: (number_of_junctions, number_of_wires)."""
     n_v = n_l = 0
     while True:
         geaendert = False
@@ -464,12 +464,12 @@ def verbindungen_bereinigen(elemente, vorher, vorher_leitungen=()):
 
 
 # ============================================================
-# Automatisches Unterbrechen von Leitungen durch aufgesetzte Geraete
+# Wires are automatically interrupted by devices placed on top of them
 # ============================================================
 def einrast_punkte(el):
-    """Punkte eines Objekts, an denen eine darunterliegende Leitung
-    unterbrochen und angeschlossen wird: Pin, Verbindung (Mitte), Klemme
-    (oben/unten) und alle diese Punkte in Bloecken (Geraeten)."""
+    """Points of an object where an underlying wire is interrupted and
+    connected: pin, junction (centre), terminal (top/bottom) and all such
+    points in blocks (devices)."""
     if isinstance(el, Verbindungspunkt):
         return [(el.x, el.y)]
     if isinstance(el, Verbindung):
@@ -485,14 +485,14 @@ def einrast_punkte(el):
 
 
 def leitungen_einrasten(elemente, neue, tol=0.5):
-    """Setzt man ein Objekt (Pin, Verbindung, Klemme, Geraet) auf eine
-    Leitung, wird diese unterbrochen:
-      - ein Punkt auf der Leitung  -> Leitung in zwei Teile, beide am Punkt
-      - mehrere Punkte (z. B. oben/unten am Geraet) -> die Leitung endet am
-        ersten Punkt und beginnt am letzten wieder; dazwischen (im Geraet)
-        entfaellt sie.
-    Jedes neue Objekt wird einzeln behandelt. Rueckgabe: Anzahl der
-    unterbrochenen Leitungen."""
+    """If an object (pin, junction, terminal, device) is placed on a wire,
+    the wire is interrupted:
+      - one point on the wire    -> wire in two parts, both at the point
+      - several points (e.g. top/bottom of a device) -> the wire ends at the
+        first point and starts again at the last; in between (inside the
+        device) it is omitted.
+    Each new object is handled individually. Returns the number of
+    interrupted wires."""
     n = 0
     for obj in neue:
         pts = einrast_punkte(obj)
@@ -525,7 +525,7 @@ def leitungen_einrasten(elemente, neue, tol=0.5):
 
 
 # ============================================================
-# Automatische Leitungen (wie Eplan P8)
+# Automatic wires (like Eplan P8)
 # ============================================================
 def _block_kanten(kinder):
     xs, ys = [], []
@@ -542,10 +542,10 @@ def _block_kanten(kinder):
 
 
 def _pin_richtung(pin, kanten):
-    """Erlaubte Richtung eines Pins in einem Geraet: die naechstgelegene
-    Aussenkante des Symbols (bei Gleichstand senkrecht vor waagerecht).
-    Ohne Kanten (freier Pin): alle Richtungen. Ausdruecklich eingestellte
-    Richtungen des Pins (`richtungen`) haben immer Vorrang."""
+    """Allowed direction of a pin in a device: the nearest outer edge of the
+    symbol (on a tie, vertical before horizontal).
+    Without edges (free pin): all directions. Explicitly set directions of
+    the pin (`richtungen`) always take precedence."""
     if getattr(pin, "richtungen", None) is not None:
         return set(pin.richtungen)
     x, y = pin.x, pin.y
@@ -558,7 +558,7 @@ def _pin_richtung(pin, kanten):
 
 
 def _auto_anker(elemente):
-    """[(x, y, erlaubte_richtungen|None, besitzer_id, besitzer, bindet_ein)]"""
+    """[(x, y, allowed_directions|None, owner_id, owner, binds_in)]"""
     out = []
 
     def sammle(k, besitzer, kanten):
@@ -574,7 +574,7 @@ def _auto_anker(elemente):
             out.append((ox, oy, {90}, bid, besitzer))
             out.append((ux, uy, {270}, bid, besitzer))
         elif isinstance(k, Querverweis):
-            # Anschluss liegt auf der vom Text abgewandten Seite
+            # Connection lies on the side facing away from the text
             if k.art == "abgehend":
                 bx, by = k.basis_punkt()
                 out.append((bx, by, {(k.richtung + 180) % 360}, bid, besitzer))
@@ -594,7 +594,7 @@ def _auto_anker(elemente):
 
 
 def _cluster(werte, key):
-    """Gruppiert Eintraege mit (fast) gleichem key(eintrag)."""
+    """Groups entries with (almost) the same key(entry)."""
     werte = sorted(werte, key=key)
     gruppen, akt = [], []
     for w in werte:
@@ -608,21 +608,21 @@ def _cluster(werte, key):
 
 
 def gewuenschte_leitungen(elemente):
-    """Alle Leitungsstuecke, die es automatisch geben muss:
-    [(x1, y1, x2, y2, besitzer)]. Zwei benachbarte Anschlusspunkte auf einer
-    waagerechten/senkrechten Linie werden verbunden, wenn sie zu
-    verschiedenen Objekten gehoeren und ihre Richtungen zueinander passen.
-    Ein dazwischenliegender Anschluss (auch eines Geraetes) unterbricht."""
+    """All wire pieces that must exist automatically:
+    [(x1, y1, x2, y2, owner)]. Two neighbouring connection points on a
+    horizontal/vertical line are connected if they belong to
+    different objects and their directions match.
+    A connection point in between (also of a device) interrupts it."""
     anker = _auto_anker(elemente)
     soll = []
-    for gr in _cluster(anker, key=lambda a: a[0]):          # senkrecht
+    for gr in _cluster(anker, key=lambda a: a[0]):          # vertical
         gr.sort(key=lambda a: a[1])
         for lo, hi in zip(gr, gr[1:]):
             if lo[3] == hi[3] or hi[1] - lo[1] < TOL:
                 continue
             if (lo[2] is None or 90 in lo[2]) and (hi[2] is None or 270 in hi[2]):
                 soll.append((lo[0], lo[1], lo[0], hi[1], lo[4]))
-    for gr in _cluster(anker, key=lambda a: a[1]):          # waagerecht
+    for gr in _cluster(anker, key=lambda a: a[1]):          # horizontal
         gr.sort(key=lambda a: a[0])
         for lo, hi in zip(gr, gr[1:]):
             if lo[3] == hi[3] or hi[0] - lo[0] < TOL:
@@ -638,30 +638,50 @@ def _seg_key(x1, y1, x2, y2):
 
 
 def leitungen_automatisch(elemente):
-    """Gleicht die automatischen Leitungen mit den Anschlusspunkten ab (in
-    place): fehlende werden erzeugt, nicht mehr moegliche entfernt. Von Hand
-    gezeichnete Leitungen (aeltere Dateien), die genau einem gewuenschten
-    Stueck entsprechen, werden zu automatischen Leitungen. Bestehende
-    Leitungen bleiben (gleiche Objekte), solange sie noch gelten.
-    Rueckgabe: (erzeugt, entfernt, entfernte_objekte)."""
+    """Reconciles the automatic wires with the connection points (in
+    place): missing ones are created, no longer possible ones removed.
+    Hand-drawn wires (older files) that exactly match a desired piece
+    become automatic wires. Existing wires are kept (same objects) as long
+    as they still apply.
+    Returns: (created, removed, removed_objects)."""
     soll = {}
     for (x1, y1, x2, y2, bes) in gewuenschte_leitungen(elemente):
         soll.setdefault(_seg_key(x1, y1, x2, y2), (x1, y1, x2, y2, bes))
     vorhanden = {}
     weg = []
+    uebrig = []                                  # do not match exactly
     for l in elemente:
         if not isinstance(l, Leitung):
             continue
         k = _seg_key(l.x1, l.y1, l.x2, l.y2)
         if k in soll:
-            if k in vorhanden:                   # doppelt
-                if l.auto:
-                    weg.append(l)
+            if k in vorhanden:                   # duplicate
+                weg.append(l)
                 continue
             l.auto = True
             vorhanden[k] = l
+        else:
+            uebrig.append(l)
+    # Wires that are off by a fraction of a mm (e.g. drawn by hand)
+    # count as the same piece or as a duplicate
+    for l in uebrig:
+        treffer = None
+        for k, (x1, y1, x2, y2, _b) in soll.items():
+            if ((abs(l.x1 - x1) <= 0.3 and abs(l.y1 - y1) <= 0.3
+                 and abs(l.x2 - x2) <= 0.3 and abs(l.y2 - y2) <= 0.3)
+                    or (abs(l.x1 - x2) <= 0.3 and abs(l.y1 - y2) <= 0.3
+                        and abs(l.x2 - x1) <= 0.3 and abs(l.y2 - y1) <= 0.3)):
+                treffer = k
+                break
+        if treffer is not None:
+            if treffer in vorhanden:
+                weg.append(l)                    # duplication
+            else:
+                l.x1, l.y1, l.x2, l.y2 = soll[treffer][:4]
+                l.auto = True
+                vorhanden[treffer] = l
         elif l.auto:
-            weg.append(l)                        # nicht mehr moeglich
+            weg.append(l)                        # no longer possible
     for l in weg:
         elemente.remove(l)
     neu = 0
@@ -675,9 +695,8 @@ def leitungen_automatisch(elemente):
 
 
 def kabel_kreuzungen(elemente):
-    """Setzt `kreuzungen` an allen Kabeln: x-Positionen, an denen eine
-    senkrechte Leitung die Kabellinie echt kreuzt (Leitungen, die auf der
-    Linie enden, zaehlen nicht)."""
+    """Sets `kreuzungen` on all cables: x positions where a vertical wire
+    truly crosses the cable line (wires ending on the line do not count)."""
     kabel = [k for k in elemente if isinstance(k, Kabel)]
     if not kabel:
         return
@@ -689,4 +708,11 @@ def kabel_kreuzungen(elemente):
             lo, hi = sorted((l.y1, l.y2))
             if lo + TOL < k.y < hi - TOL and k.x + TOL < l.x1 <= k.x + k.laenge + TOL:
                 xs.add(round(l.x1, 2))
-        k.kreuzungen = sorted(xs)
+        # Wires lying (almost) on the same vertical line are one core
+        gruppen = []
+        for x in sorted(xs):
+            if gruppen and x - gruppen[-1][-1] <= 0.5:
+                gruppen[-1].append(x)
+            else:
+                gruppen.append([x])
+        k.kreuzungen = [g[0] for g in gruppen]
