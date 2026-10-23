@@ -1,49 +1,67 @@
 # KatieCAD
 
-KatieCAD is a lightweight CAD system built with Python and Tkinter, aimed primarily at electrical engineering—especially switchgear construction, distribution boards, and building installation. Projects can contain multiple drawings that are edited side by side. It deliberately adds electrical-specific features such as cross-references and wires, and is gradually gaining real electrical “intelligence” for generating device lists, terminal plans, and similar outputs (currently work in progress). At the same time, it remains a general-purpose CAD with the familiar basics: you can draw freely without using project mode, and create and save blocks individually.
+**KatieCAD is an open-source electrical CAD for switchgear construction, distribution boards and building installation – built with Python and Tkinter.**
+
+It covers the complete workflow of an electrical project: draw circuit diagrams across several sheets, connect devices with wires, let cross references and device designations be generated automatically, and produce the documentation (cover sheet, table of contents, device list, terminal plan, cable plan) at the push of a button. At the same time it is a full 2D CAD: you can draw freely without a project and create, save and reuse your own blocks.
+
+KatieCAD is under active development. The electrical "intelligence" is growing with every release; further checks and reports will follow.
 
 ![Screenshot1](Shot1.png)
 
 ![Screenshot2](Shot2.png)
 
-![Screenshot2](Shot3.png)
+![Screenshot3](Shot3.png)
 
-![Screenshot2](Shot4.png)
+![Screenshot4](Shot4.png)
 
 ## Features
 
-- **Drawing tools:** Line, Polyline, Circle, Arc, Rectangle, Text
-- **Editing tools:** Move, Copy, Rotate, Stretch, Array, Grip editing
-- **Object snap:** Endpoint, Midpoint, Center, Intersection, Quadrant,
-  Perpendicular, Nearest
-- **Layers & styles:** Layer management, line types, line weights,
-  element colors
+### Electrical engineering
+- **Projects with several sheets** – edited side by side, with title blocks and automatic fields
+- **Wires, pins and junctions** – T-pieces, corners and crossings (with or without dot); wires are traced across sheets
+- **Cross references** between sheets (outgoing / incoming)
+- **Devices with electrical mask** – designation (IND), type (TYP) and function (PER); main and auxiliary contacts, automatic device references
+- **Terminals and cables**, coordinate field, automatic wiring of connected points
+- **Symbol library** with about 40 standard symbols (contactors, relays, fuses, switches, motors, transformers, …) and your own block library with a block browser
+- **Documentation generator:** cover sheet, table of contents, device list, terminal plan, cable plan; customisable columns via `report_templates/`, CSV export and PDF output
+
+### General CAD
+- **Drawing tools:** Line, Polyline, Circle, Arc, Rectangle, Text, Hatching
+- **Editing tools:** Move, Copy, Rotate, Stretch, Array, Trim, Break, Grip editing
+- **Object snap:** Endpoint, Midpoint, Center, Intersection, Quadrant, Perpendicular, Nearest
+- **Layers & styles:** Layer management, line types, line weights, element colours
 - **Dimensions:** Linear, aligned, radius, diameter, decimal comma toggle
+- **Blocks with attributes:** create, save (`*.katieblock`) and reuse
 - **Layout view:** Paper space with viewports, standard scales, title block
-- **DXF import/export** (via `ezdxf`)
-- **DWG import** (via `ezdwg`)
+- **DXF import/export** (via `ezdxf`), **DWG import** (via `ezdwg`)
 - **Bilingual UI:** German and English (switchable at runtime)
 
-## Requirements
+## Download
 
-- **Python 3.10+** (required by `ezdwg`)
+Ready-made installers for **Windows**, **Linux** (`.deb` / `.tar.gz`) and **macOS** are available on the [Releases](../../releases) page.
+
+## Run from source
+
+Requirements:
+- **Python 3.10+**
 - `tkinter` (included in standard Python on Windows/macOS; on Linux install `python3-tk`)
-
-The following packages are installed automatically via `requirements.txt`:
-- `ezdxf` – for DXF import/export
-- `ezdwg` – for DWG import
-
-## Installation
 
 ```bash
 git clone https://github.com/Merecete/KatieCAD.git
 cd KatieCAD
-
-# Recommended: use a virtual environment
 python -m venv venv
-source venv/bin/activate        # Linux/macOS
-venv\Scripts\activate           # Windows
-
+# Windows: venv\Scripts\activate      Linux/macOS: source venv/bin/activate
 pip install -r requirements.txt
-
 python main.py
+```
+
+`requirements.txt` installs `ezdxf` (DXF) and `ezdwg` (DWG) and the other dependencies.
+
+## Documentation
+
+- [User guide (English)](docs/USER_GUIDE.md) · [Anleitung (Deutsch)](docs/ANLEITUNG.md)
+- [Building installers](docs/BUILD.md) · [Making a release](docs/RELEASE.md)
+
+## License
+
+KatieCAD is released under the [MIT License](LICENSE).
