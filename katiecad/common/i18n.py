@@ -166,6 +166,7 @@ TEXTE = {
         "dlg.bb.ordner_fehler": "Ordner kann nicht angelegt werden: {fehler}",
         "dlg.bb.wurzel_projekt": "Projekt-Blöcke",
         "dlg.bb.wurzel_eigene": "Eigene Blöcke",
+        "dlg.bb.wurzel_symbole": "Symbolbibliothek",
         "dlg.bb.hinweis": "Doppelklick auf einen Block fügt ihn ein. Die Blöcke sind normale Dateien (*.katieblock) in diesen Ordnern, du kannst sie auch im Dateimanager kopieren oder sortieren.",
         "dlg.bb.migration": "Deine bisherige Blockbibliothek enthält {n} Block/Blöcke. Als Dateien in den Ordner\n{ordner}\nablegen?",
         "dlg.bs.titel": "Block speichern",
@@ -793,6 +794,7 @@ TEXTE = {
         "dlg.bb.ordner_fehler": "Folder cannot be created: {fehler}",
         "dlg.bb.wurzel_projekt": "Project blocks",
         "dlg.bb.wurzel_eigene": "My blocks",
+        "dlg.bb.wurzel_symbole": "Symbol library",
         "dlg.bb.hinweis": "Double-click a block to insert it. Blocks are plain files (*.katieblock) in these folders; you can also copy or sort them in your file manager.",
         "dlg.bb.migration": "Your previous block library contains {n} block(s). Save them as files in the folder\n{ordner}\n?",
         "dlg.bs.titel": "Save block",
@@ -1284,4 +1286,3 @@ def tr(schluessel, **kwargs):
 def setze_sprache(code):
     if code in TEXTE:
         SPRACHE["aktuell"] = code
-
