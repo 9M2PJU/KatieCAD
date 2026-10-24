@@ -2624,26 +2624,26 @@ class ElektroMaske(_FestMaske):
             out += [L(cx, yt, cx, yt - 5), L(cx, yt - 10, cx, yb)]
             if art == "schliesser":
                 out.append(L(cx - 2.5, yt - 5, cx, yt - 10))
-                out += [self._txt(cx - 3, yt + 0.55, r[0], st),
-                        self._txt(cx - 4, yb - 2.0, r[1], st)]
+                out += [self._txt(cx + 0.8, yt + 0.55, r[0], st),
+                        self._txt(cx + 0.8, yb - 2.0, r[1], st)]
                 breite = 8.0
             else:
                 out += [L(cx, yt - 5, cx + 3, yt - 5), L(cx + 2, yt - 4, cx, yt - 10)]
                 if art == "oeffner":
-                    out += [self._txt(cx - 3, yt + 0.55, r[0], st),
-                            self._txt(cx - 4, yb - 2.0, r[1], st)]
+                    out += [self._txt(cx + 0.8, yt + 0.55, r[0], st),
+                            self._txt(cx + 0.8, yb - 2.0, r[1], st)]
                     breite = 9.0
                 else:
                     com, nc, no = r
                     out += [L(cx + 5, yt, cx + 5, yt - 5),
-                            self._txt(cx - 3, yt + 0.55, nc, st),
-                            self._txt(cx + 2, yt + 0.55, no, st),
-                            self._txt(cx - 4, yb - 2.0, com, st)]
+                            self._txt(cx + 0.8, yt + 0.55, nc, st),
+                            self._txt(cx + 5.8, yt + 0.55, no, st),
+                            self._txt(cx + 0.8, yb - 2.0, com, st)]
                     breite = 14.0
         else:
-            out.append(self._txt(cx - 3, yt, "/".join(p for p in pins if p), st))
+            out.append(self._txt(cx + 0.8, yt, "/".join(p for p in pins if p), st))
             breite = 9.0
-        out.append(self._txt(cx - 4, yb - 4.3, "(" + ort_text(ort) + ")", st))
+        out.append(self._txt(cx + 0.8, yb - 4.3, "(" + ort_text(ort) + ")", st))
         return out, max(breite, 10.0)
 
     def _spiegel_elemente(self, st):
