@@ -1701,7 +1701,7 @@ class ProjektEigenschaftenDialog(tk.Toplevel):
     result: the new project data dict (all other keys are kept) or None"""
 
     FELDER = ("anlage", "kunde", "auftrag", "zeichnungsnummer", "firma",
-              "gezeichnet", "geprueft", "revision", "datum")
+              "gezeichnet", "datum", "geprueft", "geprueft_datum", "revision")
     REV_SPALTEN = ("stand", "aenderung", "name", "datum")
     REV_ZEILEN = 4
 
@@ -1722,7 +1722,7 @@ class ProjektEigenschaftenDialog(tk.Toplevel):
         g.columnconfigure(1, weight=1)
         self.v_f = {}
         for i, k in enumerate(self.FELDER):
-            ttk.Label(g, text=tr("dlg.doku.f." + k)).grid(
+            ttk.Label(g, text=tr("dlg.pe.f." + k)).grid(
                 row=i, column=0, sticky=tk.W, padx=(10, 8), pady=1)
             wert = self._daten.get(k, "")
             if k == "anlage" and not wert:
