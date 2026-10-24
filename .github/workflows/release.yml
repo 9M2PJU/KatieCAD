@@ -71,6 +71,7 @@ jobs:
       - name: macOS disk image
         if: runner.os == 'macOS'
         run: |
+          python tools/macos_plist.py dist/KatieCAD.app "${{ steps.ver.outputs.v }}"
           mkdir -p release dmg
           cp -R dist/KatieCAD.app dmg/
           ln -s /Applications dmg/Applications
