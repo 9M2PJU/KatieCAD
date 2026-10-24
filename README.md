@@ -10,7 +10,7 @@ KatieCAD is under active development. The electrical "intelligence" is growing w
 
 ![Screenshot2](Screenshots/Shot2.png)
 
-![Screenshot3](Screeenshots/Shot3.png)
+![Screenshot3](Screenshots/Shot3.png)
 
 ![Screenshot4](Screenshots/Shot4.png)
 
