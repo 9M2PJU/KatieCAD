@@ -19,7 +19,7 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, colorchooser, simpledialog
 import math, json, re, zlib
 from copy import deepcopy
-import os, sys, tempfile, subprocess
+import os, sys, tempfile, subprocess, datetime
 _PROJEKT_WURZEL = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import tkinter.font as tkfont
 
@@ -980,6 +980,8 @@ class CadApp:
                               command=self.projekt_umbenennen)
         m_projekt.add_command(label=tr("menu.projekt.eigenschaften"),
                               command=self.projekt_eigenschaften)
+        m_projekt.add_command(label=tr("menu.projekt.tbfelder"),
+                              command=self.schriftkopf_felder_pruefen)
         m_projekt.add_separator()
         m_projekt.add_command(label=tr("menu.projekt.blatt_neu"),
                               command=self.blatt_neu)
@@ -1180,6 +1182,7 @@ class CadApp:
                           bg=FARBEN["bg_mittel"], fg=FARBEN["cyan"],
                           activebackground=FARBEN["cyan"],
                           activeforeground=FARBEN["bg_dunkel"])
+        m_hilfe.add_command(label=tr("menu.hilfe.felder"), command=self.schriftkopf_felder_pruefen)
         m_hilfe.add_command(label=tr("menu.hilfe.info"), command=self.zeige_info_fenster)
         menubar.add_cascade(label=tr("menu.hilfe"), menu=m_hilfe)
 
@@ -4223,7 +4226,10 @@ class CadApp:
 
     def _attr_ausschluss(self, ref):
         """Tags that are not prompted for (title block: automatic fields)."""
-        return TB.RESERVED if TB.is_title_block(ref) else ()
+        if not TB.is_title_block(ref):
+            return ()
+        return {ad.tag for ad in ref.attribut_definitionen()
+                if TB.is_auto_tag(ad.tag)}
 
     def _titelfelder_aktualisieren(self):
         """Automatic title block fields (page, date, ...) of all layouts."""
@@ -6791,6 +6797,14 @@ class CadApp:
         self.root.bind("<Unmap>", fokus_weg, add="+")
         self.root.bind_all("<ButtonPress>", klick, add="+")
 
+    def schriftkopf_felder_pruefen(self):
+        """Shows the field names (tags) of the title block in the current
+        layout and whether KatieCAD fills them in automatically."""
+        text = TB.feld_bericht(self.layout_elemente)
+        if not text:
+            text = tr("msg.felder.keiner")
+        messagebox.showinfo(tr("dlg.felder.titel"), text, parent=self.root)
+
     def projekt_eigenschaften(self):
         """Project data + revision table (used for title blocks on all sheets)."""
         p = self.projekt
@@ -6800,7 +6814,16 @@ class CadApp:
         dlg = ProjektEigenschaftenDialog(self.root, p.daten, p.name)
         if dlg.result is None:
             return
-        p.daten = dlg.result
+        d = dlg.result
+        # Fix the dates once (instead of "today" changing every day)
+        heute = datetime.date.today()
+        heute = (heute.strftime("%d.%m.%Y") if SPRACHE["aktuell"] == "de"
+                 else heute.strftime("%Y-%m-%d"))
+        if d.get("gezeichnet") and not d.get("datum"):
+            d["datum"] = heute
+        if d.get("geprueft") and not d.get("geprueft_datum"):
+            d["geprueft_datum"] = d.get("datum") or heute
+        p.daten = d
         try:
             p.speichern()
         except Exception as e:
@@ -6810,6 +6833,26 @@ class CadApp:
         self.redraw()
         self._mark_dirty()
         self.status.set(tr("msg.pe.gespeichert"))
+
+    def schriftkopf_felder_pruefen(self):
+        """Shows the fields of the title block on this sheet and whether
+        they are filled in automatically (helps with own templates)."""
+        zeilen = []
+        for lay in self.layouts:
+            for el in lay.elemente:
+                if TB.is_title_block(el):
+                    for ad in el.attribut_definitionen():
+                        zeilen.append((round(-ad.y, 1), round(ad.x, 1), ad.tag))
+        if not zeilen:
+            messagebox.showinfo(tr("dlg.tbf.titel"), tr("msg.tbf.keiner"),
+                                parent=self.root)
+            return
+        zeilen.sort(key=lambda t: (t[0], t[1]))
+        text = "\n".join("%-26s %s" % (tag, tr("dlg.tbf.auto") if TB.is_auto_tag(tag)
+                                       else tr("dlg.tbf.manuell"))
+                         for _y, _x, tag in zeilen)
+        messagebox.showinfo(tr("dlg.tbf.titel"), tr("msg.tbf.kopf") + "\n\n" + text,
+                            parent=self.root)
 
     def projekt_umbenennen(self):
         """Rename project (project file and, if possible, the folder too)."""
