@@ -83,7 +83,7 @@ from katiecad.ui.dialogs import (
     QuerverweisDialog, VerbindungspunkteDialog, ProjektDruckDialog,
     VerbindungspunktDialog, VerbindungDialog, FestMaskeDialog,
     KoordinatenfeldDialog,
-    TitleBlockDialog, DokumentationDialog,
+    TitleBlockDialog, DokumentationDialog, ProjektEigenschaftenDialog,
 )
 from katiecad.reports import seiten as SEI, anwenden as ANW
 from katiecad.fileio.pdf import pdf_erzeugen, pdf_senden, pdf_mehrseitig_erzeugen
@@ -956,6 +956,7 @@ class CadApp:
         m_datei.add_command(label=tr("menu.datei.import_dxf"), command=self.import_dxf)
         m_datei.add_command(label=tr("menu.datei.import_dwg"), command=self.import_dwg)
         m_datei.add_command(label=tr("menu.datei.export_dxf"), command=self.export_dxf)
+        m_datei.add_command(label=tr("menu.datei.export_dwg"), command=self.export_dwg)
         m_datei.add_separator()
         m_datei.add_command(label=tr("menu.datei.drucken"), command=self.drucken)
         m_datei.add_separator()
@@ -977,6 +978,8 @@ class CadApp:
                               command=self.projekt_schliessen)
         m_projekt.add_command(label=tr("menu.projekt.umbenennen"),
                               command=self.projekt_umbenennen)
+        m_projekt.add_command(label=tr("menu.projekt.eigenschaften"),
+                              command=self.projekt_eigenschaften)
         m_projekt.add_separator()
         m_projekt.add_command(label=tr("menu.projekt.blatt_neu"),
                               command=self.blatt_neu)
@@ -1434,6 +1437,7 @@ class CadApp:
         if neues in ZEICHNUNGSFORMATE:
             self._snapshot()
             self.layout.format = neues
+            self._titelfelder_aktualisieren()
             self.redraw()
             self._mark_dirty()
 
@@ -4606,31 +4610,47 @@ class CadApp:
             print(f"Fehler beim Laden: {e} - {d}")
         return None
 
+    def _dxf_dokument(self):
+        """Builds an ezdxf document from the current drawing."""
+        doc = ezdxf.new(dxfversion="R2010")
+        for name, l in self.layers.items():
+            if name not in doc.layers:
+                doc.layers.add(name, color=self._hex_zu_aci(l.farbe))
+        msp = doc.modelspace()
+        for el in self.elemente:
+            self._element_zu_dxf(msp, el)
+        return doc
+
     def export_dxf(self):
+        self._export_cad("dxf")
+
+    def export_dwg(self):
+        self._export_cad("dwg")
+
+    def _export_cad(self, art):
         de = SPRACHE["aktuell"] == "de"
+        titel = art.upper()
         if not EZDXF_VERFUEGBAR:
-            messagebox.showwarning("DXF",
+            messagebox.showwarning(titel,
                 ("ezdxf nicht installiert." if de else "ezdxf is not installed."))
             return
         pfad = filedialog.asksaveasfilename(
-            defaultextension=".dxf",
-            filetypes=[("DXF-Datei" if de else "DXF file", "*.dxf"),
+            defaultextension="." + art,
+            filetypes=[((titel + "-Datei") if de else (titel + " file"), "*." + art),
                        ("Alle Dateien" if de else "All files", "*.*")])
         if not pfad:
             return
         try:
-            doc = ezdxf.new(dxfversion="R2010")
-            for name, l in self.layers.items():
-                if name not in doc.layers:
-                    doc.layers.add(name, color=self._hex_zu_aci(l.farbe))
-            msp = doc.modelspace()
-            for el in self.elemente:
-                self._element_zu_dxf(msp, el)
-            doc.saveas(pfad)
-            self.status.set((f"DXF exportiert: {pfad}" if de
-                             else f"DXF exported: {pfad}"))
+            doc = self._dxf_dokument()
+            if art == "dwg":
+                from katiecad.fileio.cad_import import dxf_doc_als_dwg_speichern
+                dxf_doc_als_dwg_speichern(doc, pfad)
+            else:
+                doc.saveas(pfad)
+            self.status.set((f"{titel} exportiert: {pfad}" if de
+                             else f"{titel} exported: {pfad}"))
         except Exception as e:
-            messagebox.showerror("DXF",
+            messagebox.showerror(titel,
                 (f"Fehler:\n{e}" if de else f"Error:\n{e}"))
 
     def _hex_zu_aci(self, hexfarbe):
@@ -6771,6 +6791,26 @@ class CadApp:
         self.root.bind("<Unmap>", fokus_weg, add="+")
         self.root.bind_all("<ButtonPress>", klick, add="+")
 
+    def projekt_eigenschaften(self):
+        """Project data + revision table (used for title blocks on all sheets)."""
+        p = self.projekt
+        if p is None:
+            self.status.set(tr("msg.projekt.kein_projekt"))
+            return
+        dlg = ProjektEigenschaftenDialog(self.root, p.daten, p.name)
+        if dlg.result is None:
+            return
+        p.daten = dlg.result
+        try:
+            p.speichern()
+        except Exception as e:
+            messagebox.showerror(tr("msg.projekt.titel"),
+                                 tr("msg.projekt.fehler", fehler=e), parent=self.root)
+        self._titelfelder_aktualisieren()
+        self.redraw()
+        self._mark_dirty()
+        self.status.set(tr("msg.pe.gespeichert"))
+
     def projekt_umbenennen(self):
         """Rename project (project file and, if possible, the folder too)."""
         p = self.projekt
@@ -7913,7 +7953,7 @@ class CadApp:
         if not res["berichte"]:
             self.status.set(tr("msg.doku.keine_auswahl"))
             return
-        p.daten = res["daten"]
+        p.daten = {**p.daten, **res["daten"]}      # keeps the revision table
         p.doku = {"berichte": res["berichte"], "vorlage": res["vorlage"],
                   "klemmen_geraete": res["klemmen_geraete"]}
         vorlage = None
