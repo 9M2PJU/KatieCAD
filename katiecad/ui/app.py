@@ -4602,6 +4602,8 @@ class CadApp:
             d.pop("aktiv", None)
         if "staerke" not in d:
             d["staerke"] = None
+        for _k in ("refs", "kontakte", "sym_bbox", "kreuzungen", "ziel"):
+            d.pop(_k, None)             # computed values, also from files of 1.0.1
         try:
             if typ == "linie":      return Linie(**d)
             if typ == "kreis":      return Kreis(**d)
