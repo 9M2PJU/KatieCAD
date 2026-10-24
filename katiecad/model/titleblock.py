@@ -41,8 +41,9 @@ from katiecad.model.core import (
 PREFIX = "TITLEBLOCK:"
 FOLDER_NAME = "title_blocks"
 # Keys of the project data -> tags in the title block (German / English).
-# They are filled in automatically on EVERY sheet (Project > Project
-# properties); empty values never overwrite what was typed in by hand.
+# They are filled in automatically on EVERY sheet of a project (Project >
+# Project properties); an empty value clears the field again. Without a
+# project nothing is touched.
 DATA_TAGS = {
     "gezeichnet": ("GEZEICHNET", "DRAWN"),
     "gezeichnet_datum": ("GEZEICHNET_DATUM", "DRAWN_DATE"),
@@ -275,7 +276,8 @@ def make_block(name, elements, width, height, **style):
 def daten_werte(daten, projekt, sheet, lang="en", today=None):
     """Tag values from the project data (title block fields of every sheet).
     Title: customer, then project name, then sheet name."""
-    daten = daten or {}
+    if daten is None:                  # no project: leave all fields alone
+        return {}
     today = today or datetime.date.today()
     kurz = today.strftime("%d.%m.%Y") if lang == "de" else today.strftime("%Y-%m-%d")
     d = dict(daten)
@@ -287,18 +289,16 @@ def daten_werte(daten, projekt, sheet, lang="en", today=None):
     out = {}
     for key, tags in DATA_TAGS.items():
         v = str(d.get(key, "") or "")
-        if v:
-            for t in tags:
-                out[t] = v
+        for t in tags:                 # empty = clears the field again
+            out[t] = v
     rev = d.get("rev")
     rev = rev if isinstance(rev, list) else []
     for r in range(1, REV_ROWS + 1):
         zeile = rev[r - 1] if r - 1 < len(rev) and isinstance(rev[r - 1], dict) else {}
         for key, tags in rev_tags(r).items():
             v = str(zeile.get(key, "") or "")
-            if v:
-                for t in tags:
-                    out[t] = v
+            for t in tags:
+                out[t] = v
     kunde = str(d.get("kunde", "") or "")
     proj = str(d.get("anlage", "") or projekt or "")
     teile = [kunde, proj, sheet or ""]
@@ -362,9 +362,8 @@ def refresh_fields(layout_elements, info, fallback_scale=""):
                 continue
             key, val = hit
             new = str(val)
-            if key in DATA_ONLY and not new:
-                continue                         # keep manual entries
             if el.attribute.get(ad.tag) != new:
                 el.attribute[ad.tag] = new
                 changed += 1
     return changed
+
