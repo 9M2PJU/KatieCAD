@@ -229,6 +229,29 @@ def naechste_bezeichnung(zuletzt):
 REF_FELD = "IND"
 
 
+def kontakt_art(pins):
+    """Contact type from the pin labels of an auxiliary part (function
+    digits per IEC: 1-2 break, 3-4 make, 5-6 break, 7-8 make).
+    -> 'schliesser' | 'oeffner' | 'wechsler' | 'spule' | 'unbekannt'"""
+    ps = [str(p).strip() for p in pins if str(p).strip()]
+    if not ps:
+        return "unbekannt"
+    if any(p[:1].upper() == "A" for p in ps):
+        return "spule"
+    ziffern = {p[-1] for p in ps if p[-1:].isdigit()}
+    if {"1", "2", "4"} <= ziffern:
+        return "wechsler"
+    for a, b, art in (("3", "4", "schliesser"), ("7", "8", "schliesser"),
+                      ("1", "2", "oeffner"), ("5", "6", "oeffner")):
+        if a in ziffern and b in ziffern:
+            return art
+    return "unbekannt"
+
+
+def _pins_von(block):
+    return [str(v.wert) for v in verbindungspunkte([block])]
+
+
 def geraete(elemente, blatt_nr):
     """All devices of a sheet: free electrical masks and blocks with an
     electrical mask. -> list of dicts {obj, per, ind, rolle, blatt}."""
@@ -251,6 +274,7 @@ def geraete(elemente, blatt_nr):
                             "per": str(el.attribute.get(REF_FELD, "")).strip(),
                             "ind": str(el.attribute.get("IND", "")),
                             "rolle": m.rolle, "blatt": blatt_nr,
+                            "pins": _pins_von(el),
                             "feld": feld_an(felder, *_pos(el))})
     return out
 
@@ -283,9 +307,12 @@ def geraete_aus_blattdaten(daten):
             for k in d.get("elemente", []) or []:
                 if isinstance(k, dict) and k.get("typ") == "maske":
                     a = d.get("attribute", {}) or {}
+                    pins = [str(a.get(v.get("tag"), v.get("wert", "")))
+                            for v in d.get("elemente", []) or []
+                            if isinstance(v, dict) and v.get("typ") == "vpunkt"]
                     res.append((str(a.get(REF_FELD, "")).strip(),
                                 k.get("rolle", "haupt"), str(a.get("IND", "")),
-                                feld_von(d)))
+                                feld_von(d), pins))
                     break
     return res
 
@@ -298,22 +325,35 @@ def geraete_referenzen(eigene, blatt_nr, andere_blaetter):
     auxiliary part   -> refers only to the main symbol with the same PER
     eigene:          result of geraete()
     andere_blaetter: {sheet_no: [(per, role, ind[, field]), ...]}"""
-    kandidaten = []                       # (per, role, (sheet, field), id)
+    kandidaten = []          # (per, role, (sheet, field), id, pins)
     for g in eigene:
         kandidaten.append((g["per"], g["rolle"],
-                           (g["blatt"], g.get("feld", "")), id(g["obj"])))
+                           (g["blatt"], g.get("feld", "")), id(g["obj"]),
+                           g.get("pins", [])))
     for nr, liste in andere_blaetter.items():
         for e in liste:
             per, rolle = e[0], e[1]
             feld = e[3] if len(e) > 3 else ""
-            kandidaten.append((str(per).strip(), rolle, (nr, feld), None))
+            pins = e[4] if len(e) > 4 else []
+            kandidaten.append((str(per).strip(), rolle, (nr, feld), None, pins))
     for g in eigene:
         if not g["per"]:
             g["obj"].refs = []
+            g["obj"].kontakte = []
             continue
+        kont = []
+        if g["rolle"] == "haupt":
+            for per, rolle, blatt, oid, pins in kandidaten:
+                if per == g["per"] and rolle == "hilfs" and oid != id(g["obj"]):
+                    art = kontakt_art(pins)
+                    if art != "spule":
+                        ptxt = "/".join(str(p).strip() for p in pins if str(p).strip())
+                        kont.append((art, ptxt, blatt))
+            kont.sort(key=lambda k: (k[1], str(k[2])))
+        g["obj"].kontakte = kont
         gesucht = ("kabel" if g["rolle"] == "kabel"
                    else "hilfs" if g["rolle"] == "haupt" else "haupt")
-        g["obj"].refs = sorted({blatt for per, rolle, blatt, oid in kandidaten
+        g["obj"].refs = sorted({blatt for per, rolle, blatt, oid, _p in kandidaten
                                 if per == g["per"] and rolle == gesucht
                                 and oid != id(g["obj"])})
 
@@ -716,3 +756,4 @@ def kabel_kreuzungen(elemente):
             else:
                 gruppen.append([x])
         k.kreuzungen = [g[0] for g in gruppen]
+
