@@ -80,7 +80,7 @@ from katiecad.ui.dialogs import (
     _BlockNameDialog, _BlockAuswahlDialog, BlockBrowserDialog,
     BlockSpeichernDialog,
     ProjektNeuDialog, AttributDefinitionDialog, BlockAttributeDialog,
-    QuerverweisDialog, PruefungDialog, VerbindungspunkteDialog, ProjektDruckDialog,
+    QuerverweisDialog, PruefungDialog, EigenschaftenPalette, VerbindungspunkteDialog, ProjektDruckDialog,
     VerbindungspunktDialog, VerbindungDialog, FestMaskeDialog,
     KoordinatenfeldDialog,
     TitleBlockDialog, DokumentationDialog, ProjektEigenschaftenDialog,
@@ -1022,6 +1022,8 @@ class CadApp:
         m_bearb.add_command(label=tr("menu.bearbeiten.ausschneiden"), command=self.ausschneiden)
         m_bearb.add_command(label=tr("menu.bearbeiten.einfuegen"), command=self.einfuegen)
         m_bearb.add_command(label=tr("menu.bearbeiten.duplizieren"), command=self.duplizieren)
+        m_bearb.add_command(label=tr("menu.bearbeiten.eigenschaften"),
+                            command=self.eigenschaften_fenster)
         m_bearb.add_separator()
         m_bearb.add_command(label=tr("menu.bearbeiten.verschieben"),
                             command=lambda: self._op_start("move"))
@@ -2109,6 +2111,7 @@ class CadApp:
         self.root.bind("<Control-v>", self.einfuegen)
         self.root.bind("<Control-V>", self.einfuegen)
         self.root.bind("<Control-d>", self.duplizieren)
+        self.root.bind("<Control-Key-1>", self.eigenschaften_fenster)
         self.root.bind("<Control-D>", self.duplizieren)
         self.root.bind("<Control-p>", lambda e: self.drucken())
         self.root.bind("<Control-P>", lambda e: self.drucken())
@@ -4085,6 +4088,7 @@ class CadApp:
                 self._zeichne_element(el)
             self._zeichne_auswahl_highlights()
             self._zeichne_raster()
+            self._eig_palette_nachziehen()
         else:
             self._zeichne_blatt()
             for el in self.layout_elemente:
@@ -5774,6 +5778,42 @@ class CadApp:
         self._zeichnen_werkzeug_anwenden(*pt)
         self.redraw()
 
+    def _eig_palette_nachziehen(self):
+        pal = getattr(self, "_eig_palette", None)
+        if pal is not None:
+            sig = tuple(id(e) for e in self.auswahl)
+            if sig != getattr(self, "_eig_sig", None):
+                self._eig_sig = sig
+                try:
+                    pal.aktualisieren()
+                except tk.TclError:
+                    self._eig_palette = None
+
+    def eigenschaften_fenster(self, event=None):
+        """Properties window (Ctrl+1) for the selection."""
+        pal = getattr(self, "_eig_palette", None)
+        if pal is not None:
+            try:
+                pal.lift()
+                pal.aktualisieren()
+                return "break"
+            except tk.TclError:
+                pass
+        self._eig_palette = EigenschaftenPalette(self.root, self)
+        return "break"
+
+    def eigenschaft_anwenden(self, feld, wert):
+        from katiecad.model.eigenschaften import anwenden
+        if not self.auswahl:
+            return
+        self._snapshot()
+        n = anwenden(self.auswahl, feld, wert)
+        self.redraw()
+        pal = getattr(self, "_eig_palette", None)
+        if pal is not None:
+            pal.aktualisieren()
+        self.status.set(tr("msg.eig.angewendet", n=n))
+
     def _stil_auf_auswahl(self, event=None):
         ziele = [e for e in self.auswahl
                  if not isinstance(e, (Viewport, Text, Bemassung, BlockReferenz,
@@ -7158,6 +7198,8 @@ class CadApp:
             if m is not None and dlg.rolle:
                 m.rolle = dlg.rolle
             if m is not None and dlg.spiegel:
+                if m.spiegel != dlg.spiegel:
+                    ref.sp_dx = ref.sp_dy = 0.0
                 m.spiegel = dlg.spiegel
 
     def attribute_bearbeiten(self, ref=None):
@@ -7184,6 +7226,8 @@ class CadApp:
         if m is not None and dlg.rolle:
             m.rolle = dlg.rolle
         if m is not None and dlg.spiegel:
+            if m.spiegel != dlg.spiegel:
+                ref.sp_dx = ref.sp_dy = 0.0
             m.spiegel = dlg.spiegel
         self._geraete_aktualisieren()
         self.redraw()
@@ -7599,7 +7643,10 @@ class CadApp:
         el.setze_werte(dlg.result["werte"])
         if ist_maske and dlg.result["rolle"]:
             el.rolle = dlg.result["rolle"]
-            el.spiegel = dlg.result["spiegel"] or "liste"
+            neu = dlg.result["spiegel"] or "liste"
+            if neu != el.spiegel:
+                el.sp_dx = el.sp_dy = 0.0
+            el.spiegel = neu
         self._geraete_aktualisieren()
         self.redraw()
 
