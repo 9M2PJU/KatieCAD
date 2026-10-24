@@ -6,13 +6,13 @@ It covers the complete workflow of an electrical project: draw circuit diagrams 
 
 KatieCAD is under active development. The electrical "intelligence" is growing with every release; further checks and reports will follow.
 
-![Screenshot1](Shot1.png)
+![Screenshot1](Screenshots/Shot1.png)
 
-![Screenshot2](Shot2.png)
+![Screenshot2](Screenshots/Shot2.png)
 
-![Screenshot3](Shot3.png)
+![Screenshot3](Screeenshots/Shot3.png)
 
-![Screenshot4](Shot4.png)
+![Screenshot4](Screenshots/Shot4.png)
 
 ## Features
 
