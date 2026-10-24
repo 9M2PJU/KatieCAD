@@ -17,7 +17,15 @@ Rules for a template drawing
         DATE   today                 SCALE  scale of the first viewport
         FORMAT paper format (e.g. A3)
     Aliases (German / other templates): SEITE = PAGE, SEITEN = PAGES,
-    SIZE = FORMAT.
+    SIZE / BLATTFORMAT / PAPIERFORMAT = FORMAT.
+    From Project > Project properties (on every sheet):
+        GEZEICHNET / DRAWN (+ _DATUM / _DATE), GEPRUEFT / VERIFIED (+ _DATUM),
+        ZEICHNUNGSNUMMER / DRAWINGNUMBER, FIRMA / COMPANY, KUNDE / CUSTOMER,
+        AUFTRAG / ORDER, ANLAGE / PLANT, REVISION
+        REV1_STAND/AENDERUNG/NAME/DATUM ... REV4_*   (English: INDEX, CHANGE,
+        NAME, DATE)
+        TITLE / TITEL = customer - project - sheet name; the parts alone are
+        TITEL1 / TITEL2 / TITEL3 (TITLE1..3)
 """
 
 import json
@@ -32,8 +40,55 @@ from katiecad.model.core import (
 
 PREFIX = "TITLEBLOCK:"
 FOLDER_NAME = "title_blocks"
-RESERVED = ("PAGE", "PAGES", "SHEET", "PROJECT", "DATE", "SCALE", "FORMAT",
-            "SEITE", "SEITEN", "SIZE")
+# Keys of the project data -> tags in the title block (German / English).
+# They are filled in automatically on EVERY sheet (Project > Project
+# properties); empty values never overwrite what was typed in by hand.
+DATA_TAGS = {
+    "gezeichnet": ("GEZEICHNET", "DRAWN"),
+    "gezeichnet_datum": ("GEZEICHNET_DATUM", "DRAWN_DATE"),
+    "geprueft": ("GEPRUEFT", "VERIFIED"),
+    "geprueft_datum": ("GEPRUEFT_DATUM", "VERIFIED_DATE"),
+    "zeichnungsnummer": ("ZEICHNUNGSNUMMER", "DRAWINGNUMBER"),
+    "firma": ("FIRMA", "COMPANY"),
+    "kunde": ("KUNDE", "CUSTOMER"),
+    "auftrag": ("AUFTRAG", "ORDER"),
+    "anlage": ("ANLAGE", "PLANT"),
+    "revision": ("REVISION",),
+}
+REV_ROWS = 4                                   # rows of the revision table
+REV_FIELDS = (("stand", ("STAND", "INDEX")),   # project key -> tag suffixes
+              ("aenderung", ("AENDERUNG", "CHANGE")),
+              ("name", ("NAME",)),
+              ("datum", ("DATUM", "DATE")))
+FORMAT_TAGS = ("FORMAT", "SIZE", "BLATTFORMAT", "PAPIERFORMAT", "PAPER")
+TITLE_TAGS = ("TITLE", "TITEL")                # kunde - project - sheet
+TITLE_PARTS = (("TITEL1", "TITLE1"), ("TITEL2", "TITLE2"), ("TITEL3", "TITLE3"))
+TITLE_SEPARATOR = " - "
+
+
+def rev_tags(row):
+    """All tag spellings of revision row 1..REV_ROWS: {key: (tags)}.
+    German: REV1_STAND, REV1_AENDERUNG, REV1_NAME, REV1_DATUM
+    English: REV1_INDEX, REV1_CHANGE, REV1_NAME, REV1_DATE"""
+    return {k: tuple("REV%d_%s" % (row, sfx) for sfx in sfxs)
+            for k, sfxs in REV_FIELDS}
+
+
+def _alle_data_tags():
+    out = set()
+    for tags in DATA_TAGS.values():
+        out.update(tags)
+    for r in range(1, REV_ROWS + 1):
+        for tags in rev_tags(r).values():
+            out.update(tags)
+    return out
+
+
+_BASIS = {"PAGE", "PAGES", "SHEET", "PROJECT", "DATE", "SCALE", "SEITE",
+          "SEITEN"} | set(FORMAT_TAGS)
+_TITEL = set(TITLE_TAGS) | {t for pair in TITLE_PARTS for t in pair}
+DATA_ONLY = frozenset(_alle_data_tags())        # empty value = keep as is
+RESERVED = tuple(sorted(_BASIS | _TITEL | DATA_ONLY))
 
 MARGIN_LEFT = 20.0        # mm, binding margin (A3 and larger)
 MARGIN_OTHER = 5.0        # mm, top / right / bottom
@@ -184,26 +239,69 @@ def make_block(name, elements, width, height, **style):
     return BlockReferenz(x, y, PREFIX + name, elements, **style)
 
 
-def info_values(nr, total, sheet, project, lang="en", paper_format="", today=None):
+def daten_werte(daten, projekt, sheet, lang="en", today=None):
+    """Tag values from the project data (title block fields of every sheet).
+    Title: customer, then project name, then sheet name."""
+    daten = daten or {}
+    today = today or datetime.date.today()
+    kurz = today.strftime("%d.%m.%Y") if lang == "de" else today.strftime("%Y-%m-%d")
+    d = dict(daten)
+    if d.get("gezeichnet") or d.get("datum"):
+        d["gezeichnet_datum"] = (d.get("gezeichnet_datum") or d.get("datum")
+                                 or kurz)
+    out = {}
+    for key, tags in DATA_TAGS.items():
+        v = str(d.get(key, "") or "")
+        if v:
+            for t in tags:
+                out[t] = v
+    rev = d.get("rev")
+    rev = rev if isinstance(rev, list) else []
+    for r in range(1, REV_ROWS + 1):
+        zeile = rev[r - 1] if r - 1 < len(rev) and isinstance(rev[r - 1], dict) else {}
+        for key, tags in rev_tags(r).items():
+            v = str(zeile.get(key, "") or "")
+            if v:
+                for t in tags:
+                    out[t] = v
+    kunde = str(d.get("kunde", "") or "")
+    proj = str(d.get("anlage", "") or projekt or "")
+    teile = [kunde, proj, sheet or ""]
+    for (de, en), v in zip(TITLE_PARTS, teile):
+        out[de] = out[en] = v
+    kombi = TITLE_SEPARATOR.join(t for t in teile if t)
+    for t in TITLE_TAGS:
+        out[t] = kombi
+    return out
+
+
+def info_values(nr, total, sheet, project, lang="en", paper_format="", today=None,
+                daten=None):
     """Values for the reserved tags from plain numbers / names."""
     today = today or datetime.date.today()
     date = today.strftime("%d.%m.%Y") if lang == "de" else today.strftime("%Y-%m-%d")
     short = (paper_format or "").split(" ")[0]
-    return {"PAGE": str(nr), "PAGES": str(total), "SHEET": sheet,
-            "PROJECT": project, "DATE": date, "FORMAT": short,
-            "SEITE": str(nr), "SEITEN": str(total), "SIZE": short}
+    out = daten_werte(daten, project, sheet, lang, today)
+    out.update({"PAGE": str(nr), "PAGES": str(total), "SHEET": sheet,
+                "PROJECT": project, "DATE": date,
+                "SEITE": str(nr), "SEITEN": str(total)})
+    for t in FORMAT_TAGS:
+        out[t] = short
+    return out
 
 
 def make_info(project, sheet_index, lang="en", paper_format="", today=None):
     """Values for the reserved tags (SCALE is determined per layout)."""
+    daten = None
     if project is not None:
         nr = sheet_index + 1
         total = len(project.blaetter)
         sheet = project.blaetter[sheet_index].name if 0 <= sheet_index < total else ""
         proj = project.name
+        daten = project.daten
     else:
         nr, total, sheet, proj = 1, 1, "", ""
-    return info_values(nr, total, sheet, proj, lang, paper_format, today)
+    return info_values(nr, total, sheet, proj, lang, paper_format, today, daten)
 
 
 def refresh_fields(layout_elements, info, fallback_scale=""):
@@ -220,6 +318,8 @@ def refresh_fields(layout_elements, info, fallback_scale=""):
         for ad in el.attribut_definitionen():
             if ad.tag in RESERVED and ad.tag in values:
                 new = str(values[ad.tag])
+                if ad.tag in DATA_ONLY and not new:
+                    continue                 # keep manual entries
                 if el.attribute.get(ad.tag) != new:
                     el.attribute[ad.tag] = new
                     changed += 1
