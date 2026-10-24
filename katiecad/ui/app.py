@@ -1190,6 +1190,12 @@ class CadApp:
                           activeforeground=FARBEN["bg_dunkel"])
         m_hilfe.add_command(label=tr("menu.hilfe.felder"), command=self.schriftkopf_felder_pruefen)
         m_hilfe.add_command(label=tr("menu.hilfe.info"), command=self.zeige_info_fenster)
+        if _MAC:        # app menu "About KatieCAD" -> our own info window
+            for _name in ("tkAboutDialog", "::tk::mac::ShowAbout"):
+                try:
+                    self.root.createcommand(_name, self.zeige_info_fenster)
+                except tk.TclError:
+                    pass
         menubar.add_cascade(label=tr("menu.hilfe"), menu=m_hilfe)
 
         self.root.config(menu=menubar)
@@ -4412,31 +4418,34 @@ class CadApp:
         title_row = tk.Frame(frame, bg=FARBEN["bg_mittel"])
         title_row.pack(anchor="w", fill="x")
 
-        logo_path = None
-        kandidaten = [
-            "KatieCAD.png",
-            os.path.join(os.getcwd(), "KatieCAD.png"),
-            os.path.join(_PROJEKT_WURZEL, "KatieCAD.png"),
-            os.path.join(_PROJEKT_WURZEL, "assets", "KatieCAD.png"),
-        ]
-        for k in kandidaten:
-            k_abs = os.path.abspath(k)
-            if os.path.isfile(k_abs):
-                logo_path = k_abs
-                break
-
-        if logo_path is not None and PILLOW_VERFUEGBAR:
-            try:
-                logo_img = Image.open(logo_path).convert("RGBA")
-                logo_img = logo_img.resize((96, 96), Image.Resampling.LANCZOS)
-                logo_photo = ImageTk.PhotoImage(logo_img)
+        logo_path = _symbol_datei("KatieCAD.png")
+        if logo_path is None:
+            for k in ("KatieCAD.png", os.path.join(os.getcwd(), "KatieCAD.png")):
+                if os.path.isfile(k):
+                    logo_path = os.path.abspath(k)
+                    break
+        if logo_path is not None:
+            logo_photo = None
+            if PILLOW_VERFUEGBAR:
+                try:
+                    logo_img = Image.open(logo_path).convert("RGBA")
+                    logo_img = logo_img.resize((96, 96), Image.Resampling.LANCZOS)
+                    logo_photo = ImageTk.PhotoImage(logo_img)
+                except Exception as e:
+                    print(f"[KatieCAD] Logo (Pillow): {e}")
+            if logo_photo is None:           # without Pillow/ImageTk: plain Tk
+                try:
+                    p = tk.PhotoImage(file=logo_path)
+                    n = max(1, round(p.width() / 96))
+                    logo_photo = p.subsample(n, n) if n > 1 else p
+                except tk.TclError as e:
+                    print(f"[KatieCAD] Logo konnte nicht geladen werden: {e}")
+            if logo_photo is not None:
                 logo_lbl = tk.Label(title_row, image=logo_photo,
                                     bg=FARBEN["bg_mittel"], bd=0,
                                     highlightthickness=0)
                 logo_lbl.image = logo_photo
                 logo_lbl.pack(side="left", padx=(0, 20))
-            except Exception as e:
-                print(f"[KatieCAD] Logo konnte nicht geladen werden: {e}")
 
         tk.Label(title_row, text="KatieCAD",
                  font=("Helvetica", 18, "bold"),
