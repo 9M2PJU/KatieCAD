@@ -530,7 +530,26 @@ def dwg_zu_dxf_doc(pfad):
             fehler.append(f"LibreDWG: {ex}")
     else:
         fehler.append("LibreDWG (dwg2dxf) nicht gefunden")
+    # 3) ezdwg (pure Python package, installed with requirements.txt):
+    #    DWG -> temporary DXF, then the normal DXF import
+    try:
+        doc = _ezdwg_zu_dxf_doc(pfad)
+        return doc, "ezdwg"
+    except Exception as ex:
+        fehler.append(f"ezdwg: {ex}")
     raise RuntimeError("; ".join(fehler))
+
+
+def _ezdwg_zu_dxf_doc(pfad):
+    """Converts a DWG with ezdwg into a DXF file and reads it with ezdxf."""
+    import ezdwg
+    with tempfile.TemporaryDirectory() as td:
+        ziel = os.path.join(td, "out.dxf")
+        ezdwg.to_dxf(pfad, ziel,
+                     types="LINE ARC LWPOLYLINE CIRCLE ELLIPSE POINT TEXT "
+                           "MTEXT DIMENSION INSERT MINSERT HATCH SPLINE",
+                     dxf_version="R2010")
+        return dxf_lesen(ziel)[0]
 
 
 # ---- ezdwg last resort (API not stable -> tolerant) ---------------
@@ -631,9 +650,9 @@ def importiere_datei(pfad, layers):
             doc, erg.quelle = dwg_zu_dxf_doc(pfad)
         except RuntimeError as konv_fehler:
             raise RuntimeError(
-                "DWG kann nicht zuverlässig gelesen werden, weil kein "
-                "Konverter gefunden wurde.\n\n"
-                "Installiere den kostenlosen 'ODA File Converter' "
+                "Die DWG-Datei konnte nicht gelesen werden (weder ezdwg noch "
+                "ein Konverter war erfolgreich).\n\n"
+                "Installiere ggf. den kostenlosen 'ODA File Converter' "
                 "(opendesign.com/guestfiles/oda_file_converter) und starte "
                 "KatieCAD neu - er wird dann automatisch gefunden.\n"
                 "Alternativ: Datei in AutoCAD/LibreCAD/DraftSight als DXF "
