@@ -13,7 +13,9 @@ line weights, units ($INSUNITS -> mm), OCS (extrusion -Z),
 damaged files via ezdxf.recover.
 
 DWG: converted to DXF via the ODA File Converter (via ezdxf.addons.odafc) or
-LibreDWG (dwg2dxf); ezdwg only as a last resort.
+LibreDWG (dwg2dxf), ezdwg. ODA and LibreDWG are OPTIONAL external programs that the user may
+install separately (KatieCAD only starts them, nothing is bundled);
+ezdwg is a pip dependency and the built-in fallback.
 """
 
 import math
@@ -485,9 +487,22 @@ def dxf_lesen(pfad):
 
 def _oda_pfad_setzen():
     """Looks for the ODA File Converter in the usual locations (Windows)."""
-    if not sys.platform.startswith("win"):
-        return
     import glob
+    if not sys.platform.startswith("win"):
+        # macOS / Linux: usual install locations (the PATH is searched by ezdxf)
+        kand = ["/Applications/ODAFileConverter.app/Contents/MacOS/ODAFileConverter",
+                "/usr/bin/ODAFileConverter", "/usr/local/bin/ODAFileConverter"]
+        kand += glob.glob("/opt/ODAFileConverter*/ODAFileConverter")
+        kand += glob.glob("/opt/ODAFileConverter*/usr/bin/ODAFileConverter")
+        kand += glob.glob(os.path.expanduser("~/ODAFileConverter*.AppImage"))
+        for k in kand:
+            if os.path.isfile(k) and os.access(k, os.X_OK):
+                try:
+                    ezdxf.options.set("odafc-addon", "unix_exec_path", k)
+                except Exception:
+                    pass
+                return
+        return
     kandidaten = []
     for basis in (os.environ.get("ProgramFiles", r"C:\Program Files"),
                   os.environ.get("ProgramFiles(x86)",
@@ -503,9 +518,33 @@ def _oda_pfad_setzen():
             pass
 
 
+def oda_verfuegbar():
+    """True if the ODA File Converter is installed (needed for DWG export)."""
+    try:
+        from ezdxf.addons import odafc
+        _oda_pfad_setzen()
+        return bool(odafc.is_installed())
+    except Exception:
+        return False
+
+
+def dxf_doc_als_dwg_speichern(doc, pfad, version="R2018"):
+    """Writes an ezdxf document as DWG (ODA File Converter required).
+    Raises RuntimeError with a readable text if the converter is missing."""
+    if not oda_verfuegbar():
+        raise RuntimeError(
+            "Für den DWG-Export wird der kostenlose 'ODA File Converter' "
+            "benötigt (opendesign.com/guestfiles/oda_file_converter). "
+            "Installieren und KatieCAD neu starten.\n"
+            "Alternativ als DXF exportieren.")
+    from ezdxf.addons import odafc
+    odafc.export_dwg(doc, pfad, version=version, replace=True)
+
+
 def dwg_zu_dxf_doc(pfad):
     """Converts DWG -> ezdxf document.
-    Order: ODA File Converter, LibreDWG (dwg2dxf).
+    Order: ODA File Converter (optional, most accurate), LibreDWG (optional),
+    ezdwg (always available).
     Returns: (doc, source) or raises RuntimeError with help text."""
     fehler = []
     # 1) ODA File Converter
@@ -530,11 +569,10 @@ def dwg_zu_dxf_doc(pfad):
             fehler.append(f"LibreDWG: {ex}")
     else:
         fehler.append("LibreDWG (dwg2dxf) nicht gefunden")
-    # 3) ezdwg (pure Python package, installed with requirements.txt):
-    #    DWG -> temporary DXF, then the normal DXF import
+    # 3) ezdwg: ships with KatieCAD (pip package), so DWG import works out of
+    #    the box; DWG -> temporary DXF -> normal DXF import
     try:
-        doc = _ezdwg_zu_dxf_doc(pfad)
-        return doc, "ezdwg"
+        return _ezdwg_zu_dxf_doc(pfad), "ezdwg"
     except Exception as ex:
         fehler.append(f"ezdwg: {ex}")
     raise RuntimeError("; ".join(fehler))
@@ -545,83 +583,12 @@ def _ezdwg_zu_dxf_doc(pfad):
     import ezdwg
     with tempfile.TemporaryDirectory() as td:
         ziel = os.path.join(td, "out.dxf")
-        # No "types" filter: export everything ezdwg supports (a fixed
-        # list would drop e.g. old POLYLINE/VERTEX, SOLID or LEADER).
+        # No "types" filter: export everything ezdwg supports
         try:
             ezdwg.to_dxf(pfad, ziel, dxf_version="R2010")
         except TypeError:
             ezdwg.to_dxf(pfad, ziel)
         return dxf_lesen(ziel)[0]
-
-
-# ---- ezdwg last resort (API not stable -> tolerant) ---------------
-def _g(obj, name, default=None):
-    """Reads an attribute OR dict entry from e / e.dxf."""
-    for quelle in (getattr(obj, "dxf", None), obj):
-        if quelle is None:
-            continue
-        if isinstance(quelle, dict):
-            if name in quelle:
-                return quelle[name]
-        elif hasattr(quelle, name):
-            v = getattr(quelle, name)
-            return v() if callable(v) else v
-    return default
-
-
-def _xy(p):
-    if hasattr(p, "x"):
-        return float(p.x), float(p.y)
-    return float(p[0]), float(p[1])
-
-
-def ezdwg_lesen(pfad, layers):
-    import ezdwg
-    doc = ezdwg.read(pfad)
-    msp = doc.modelspace()
-    elemente, fehler = [], 0
-    try:
-        liste = list(msp.query("LINE LWPOLYLINE CIRCLE ARC TEXT MTEXT"))
-    except Exception:
-        liste = list(msp)
-    for e in liste:
-        try:
-            t = e.dxftype() if callable(getattr(e, "dxftype", None)) \
-                else getattr(e, "dxftype", "")
-            layer = _g(e, "layer", "0") or "0"
-            if layer not in layers:
-                layers[layer] = Layer(layer, FARBEN["cyan"], 0.35)
-            kw = {"layer": layer, "farbe": FARBEN["cyan"],
-                  "linientyp": "Volllinie (schmal)"}
-            if t == "LINE":
-                a, b = _xy(_g(e, "start")), _xy(_g(e, "end"))
-                elemente.append(Linie(a[0], a[1], b[0], b[1], **kw))
-            elif t == "CIRCLE":
-                c = _xy(_g(e, "center"))
-                elemente.append(Kreis(c[0], c[1], float(_g(e, "radius")), **kw))
-            elif t == "ARC":
-                c = _xy(_g(e, "center"))
-                elemente.append(Bogen(c[0], c[1], float(_g(e, "radius")),
-                                      float(_g(e, "start_angle")),
-                                      float(_g(e, "end_angle")), **kw))
-            elif t == "LWPOLYLINE":
-                pts = _g(e, "points") or _g(e, "get_points")
-                pts = [_xy(p) for p in pts]
-                geschl = bool(_g(e, "closed", False)) or bool(
-                    int(_g(e, "flags", 0) or 0) & 1)
-                elemente.append(Polylinie(pts, geschlossen=geschl, **kw))
-            elif t in ("TEXT", "MTEXT"):
-                p = _xy(_g(e, "insert"))
-                s = _g(e, "text", "") or ""
-                h = float(_g(e, "height", None) or _g(e, "char_height", 3.5))
-                elemente.append(Text(p[0], p[1], _cleanup_text(s), h, 0.0,
-                                     "Arial", **kw))
-            else:
-                fehler += 1
-        except Exception as ex:
-            fehler += 1
-            print(f"[DWG/ezdwg] Element uebersprungen: {ex}")
-    return elemente, fehler
 
 
 # ============================================================
@@ -652,11 +619,10 @@ def importiere_datei(pfad, layers):
             doc, erg.quelle = dwg_zu_dxf_doc(pfad)
         except RuntimeError as konv_fehler:
             raise RuntimeError(
-                "Die DWG-Datei konnte nicht gelesen werden (weder ezdwg noch "
-                "ein Konverter war erfolgreich).\n\n"
-                "Installiere ggf. den kostenlosen 'ODA File Converter' "
-                "(opendesign.com/guestfiles/oda_file_converter) und starte "
-                "KatieCAD neu - er wird dann automatisch gefunden.\n"
+                "Die DWG-Datei konnte nicht gelesen werden.\n\n"
+                "Tipp: Mit dem kostenlosen 'ODA File Converter' "
+                "(opendesign.com/guestfiles/oda_file_converter, optional) "
+                "werden schwierige DWG-Dateien genauer gelesen.\n"
                 "Alternativ: Datei in AutoCAD/LibreCAD/DraftSight als DXF "
                 "speichern und den DXF-Import verwenden.\n\n"
                 "Details: " + str(konv_fehler))
@@ -675,4 +641,3 @@ def importiere_datei(pfad, layers):
     erg.neue_layer = imp.neue_layer
     erg.faktor = imp.faktor
     return erg
-
