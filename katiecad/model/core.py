@@ -1535,8 +1535,9 @@ class BlockReferenz(Element):
 
     def __init__(self, x, y, block_name, elemente,
                  skalierung=1.0, winkel=0.0, attribute=None,
-                 ausgeblendet=None, **kw):
+                 ausgeblendet=None, sp_dx=0.0, sp_dy=0.0, **kw):
         super().__init__("block", **kw)
+        self.sp_dx, self.sp_dy = float(sp_dx), float(sp_dy)   # contact mirror offset
         self.x, self.y = x, y
         self.block_name = block_name
         # deep copy so that the reference is truly independent
@@ -1668,8 +1669,9 @@ class BlockReferenz(Element):
         sig = (self.x, self.y, self.skalierung, self.winkel,
                tuple(sorted(self.attribute.items())),
                tuple(sorted(self.ausgeblendet)), tuple(self.refs),
-               tuple((a, p, tuple(o) if isinstance(o, (tuple, list)) else o)
-                     for a, p, o in self.kontakte))
+               tuple((a, tuple(p), tuple(o) if isinstance(o, (tuple, list)) else o)
+                     for a, p, o in self.kontakte),
+               self.sp_dx, self.sp_dy)
         if self._cache is not None and self._cache[0] == sig:
             return self._cache[1]
         out = []
@@ -1702,8 +1704,23 @@ class BlockReferenz(Element):
                 if k is None:
                     continue
             out.append(k)
+        # Symbol bbox + mirror offset for the device masks of this instance
+        geo = [e.bbox() for e in out
+               if isinstance(e, (Linie, Kreis, Bogen, Rechteck, Polylinie))]
+        sbb = (min(b[0] for b in geo), min(b[1] for b in geo),
+               max(b[2] for b in geo), max(b[3] for b in geo)) if geo else None
+        for e in out:
+            if isinstance(e, ElektroMaske):
+                e.sym_bbox = sbb
+                e.sp_dx, e.sp_dy = self.sp_dx, self.sp_dy
         self._cache = (sig, out)
         return out
+
+    def _maske_welt(self):
+        for e in self.aufgeloest():
+            if isinstance(e, ElektroMaske) and e._spiegel_aktiv():
+                return e
+        return None
 
     # ---- Element API -------------------------------------------
     def bbox(self):
@@ -1728,9 +1745,20 @@ class BlockReferenz(Element):
         self.winkel = (self.winkel - winkel_deg) % 360.0
 
     def griffe(self):
-        return [("p", self.x, self.y)]
+        g = [("p", self.x, self.y)]
+        m = self._maske_welt()
+        if m is not None:
+            ox, oy = m.spiegel_ursprung()
+            g.append(("sp", ox, oy))
+        return g
 
     def griff_bewegen(self, griff_id, x, y):
+        if griff_id == "sp":
+            m = self._maske_welt()
+            if m is not None:
+                bx, by = m.spiegel_ursprung(False)
+                self.sp_dx, self.sp_dy = x - bx, y - by
+            return
         self.x, self.y = x, y
 
     def to_dict(self):
@@ -2499,59 +2527,155 @@ class ElektroMaske(_FestMaske):
     FELDER = ("IND", "TYP", "PER")
     ROLLEN = ("haupt", "hilfs")
     SPIEGEL = ("liste", "rechts", "unten")      # reference list / contact mirror
-    SP_RASTER = 4.0                              # row pitch of the mirror
     HOEHEN = {"IND": 2.5, "TYP": 1.5, "PER": 1.5}
     REF_HOEHE = 1.5
     ABSTAND = {"PER": 1.1, "TYP": 2.0, "IND": 3.0}   # centre to centre upwards
     ZEILEN = ()
 
-    def __init__(self, x, y, werte=None, rolle="haupt", spiegel="liste", **kw):
+    def __init__(self, x, y, werte=None, rolle="haupt", spiegel="liste",
+                 sp_dx=0.0, sp_dy=0.0, **kw):
         super().__init__("maske", x, y, werte, **kw)
         self.rolle = rolle if rolle in self.ROLLEN else "haupt"
         self.spiegel = spiegel if spiegel in self.SPIEGEL else "liste"
+        self.sp_dx, self.sp_dy = float(sp_dx), float(sp_dy)   # mirror offset
         self.kontakte = []        # (art, pins, ort) of the auxiliary parts (computed)
+        self.sym_bbox = None      # bbox of the symbol (set by the block), computed
 
     def to_dict(self):
         d = super().to_dict()
         d.pop("kontakte", None)
+        d.pop("sym_bbox", None)
         return d
 
     def _spiegel_aktiv(self):
         return (self.spiegel != "liste" and self.rolle == "haupt"
                 and bool(self.kontakte))
 
-    def _spiegel_elemente(self, st):
-        """Contact mirror: one row per contact (symbol, pins, location)."""
-        out = []
-        n = len(self.kontakte)
-        p = self.SP_RASTER
+    # ---- Contact mirror ------------------------------------------
+    @staticmethod
+    def _pin_rollen(art, pins):
+        """Pin labels sorted by role. make/break: (top, bottom);
+        changeover: (common, break, make)."""
+        ps = [str(p).strip() for p in pins if str(p).strip()]
+        if art == "wechsler":
+            d = {p[-1]: p for p in ps if p[-1:].isdigit()}
+            return (d.get("1", ""), d.get("2", ""), d.get("4", ""))
+        ps = sorted(ps, key=lambda p: (p[-1:], p))
+        return (ps[0] if ps else "", ps[1] if len(ps) > 1 else "")
+
+    def spiegel_ursprung(self, mit_versatz=True):
+        """Upper left corner of the mirror (default: beside / below the
+        symbol, depending on the mode) plus the user offset."""
+        bb = self.sym_bbox
+        if bb is None:
+            bb = (self.x, self.y, self.x, self.y)
         if self.spiegel == "rechts":
-            x0 = self.x + 3.0              # right of the symbol, same alignment
-            def zy(i):
-                return self.y + 2.0 + (n - 1 - i) * p
-        else:                              # below (relays)
-            x0 = self.x - 14.0
-            def zy(i):
-                return self.y - 3.0 - i * p
-        for i, (art, pins, ort) in enumerate(self.kontakte):
-            cy = zy(i)
-            cx = x0 + 1.0
-            if art in ("schliesser", "oeffner", "wechsler"):
-                out.append(Linie(cx, cy + 1.6, cx, cy + 0.9, staerke=0.25, **st))
-                out.append(Linie(cx, cy - 1.6, cx, cy - 0.9, staerke=0.25, **st))
-                if art == "schliesser":
-                    out.append(Linie(cx, cy - 0.9, cx + 0.9, cy + 0.7, staerke=0.25, **st))
-                elif art == "oeffner":
-                    out.append(Linie(cx, cy - 0.9, cx, cy + 0.9, staerke=0.25, **st))
-                    out.append(Linie(cx - 0.5, cy + 0.2, cx + 0.5, cy + 0.2, staerke=0.25, **st))
+            ox, oy = bb[2] + 5.0, bb[3]
+        else:
+            ox, oy = (bb[0] + bb[2]) / 2.0 - 7.5, bb[1] - 6.0
+        if mit_versatz:
+            ox, oy = ox + self.sp_dx, oy + self.sp_dy
+        return ox, oy
+
+    def _txt(self, x, y, s, st, anker="unten_links"):
+        return Text(x, y, s, 1.5, 0.0, "Arial", einfuegepunkt=anker, **st)
+
+    def _kontakt_h(self, ox, oy, art, pins, ort, st):
+        """Horizontal contact (below a relay). oy = upper edge of the row.
+        -> (elements, row height)"""
+        L = lambda x1, y1, x2, y2: Linie(x1, y1, x2, y2, staerke=0.35, **st)
+        out = []
+        r = self._pin_rollen(art, pins)
+        if art == "wechsler":
+            ys = oy - 4.5
+            com, nc, no = r
+            out += [L(ox, ys, ox + 5, ys), L(ox + 10, ys, ox + 15, ys),
+                    L(ox, ys + 3, ox + 5, ys + 3), L(ox + 5, ys, ox + 5, ys + 2),
+                    L(ox + 10, ys, ox + 4, ys + 2),
+                    self._txt(ox, ys, nc, st), self._txt(ox + 10, ys, com, st),
+                    self._txt(ox, ys + 3, no, st)]
+            hoehe, ym = 4.5, ys + 1.5
+        elif art in ("schliesser", "oeffner"):
+            ys = oy - 2.0
+            out += [L(ox, ys, ox + 5, ys), L(ox + 10, ys, ox + 15, ys),
+                    self._txt(ox, ys, r[0], st), self._txt(ox + 10, ys, r[1], st)]
+            if art == "schliesser":
+                out.append(L(ox + 10, ys, ox + 5, ys - 2))
+            else:
+                out += [L(ox + 5, ys, ox + 5, ys + 2), L(ox + 10, ys, ox + 4, ys + 2)]
+            hoehe, ym = 4.0, ys
+        else:
+            ys = oy - 2.0
+            out.append(self._txt(ox, ys, "/".join(p for p in pins if p), st))
+            hoehe, ym = 2.0, ys
+        out.append(self._txt(ox + 17.0, ym - 0.7, "(" + ort_text(ort) + ")", st))
+        return out, hoehe
+
+    def _kontakt_v(self, ox, oy, art, pins, ort, st):
+        """Vertical contact (beside the device). oy = upper edge.
+        -> (elements, column width)"""
+        L = lambda x1, y1, x2, y2: Linie(x1, y1, x2, y2, staerke=0.35, **st)
+        out = []
+        r = self._pin_rollen(art, pins)
+        cx = ox + 4.0
+        yt = oy - 2.5                  # top stem begins
+        yb = yt - 15.0                 # bottom stem ends
+        if art in ("schliesser", "oeffner", "wechsler"):
+            out += [L(cx, yt, cx, yt - 5), L(cx, yt - 10, cx, yb)]
+            if art == "schliesser":
+                out.append(L(cx - 2.5, yt - 5, cx, yt - 10))
+                out += [self._txt(cx - 3, yt + 0.55, r[0], st),
+                        self._txt(cx - 4, yb - 2.0, r[1], st)]
+                breite = 8.0
+            else:
+                out += [L(cx, yt - 5, cx + 3, yt - 5), L(cx + 2, yt - 4, cx, yt - 10)]
+                if art == "oeffner":
+                    out += [self._txt(cx - 3, yt + 0.55, r[0], st),
+                            self._txt(cx - 4, yb - 2.0, r[1], st)]
+                    breite = 9.0
                 else:
-                    out.append(Linie(cx, cy - 0.9, cx + 0.9, cy + 0.7, staerke=0.25, **st))
-                    out.append(Linie(cx + 1.6, cy + 1.6, cx + 1.6, cy + 0.9, staerke=0.25, **st))
-            out.append(Text(cx + 2.8, cy, pins, 1.5, 0.0, "Arial",
-                            einfuegepunkt="mitte_links", **st))
-            out.append(Text(cx + 11.0, cy, "(" + ort_text(ort) + ")", 1.5, 0.0,
-                            "Arial", einfuegepunkt="mitte_links", **st))
+                    com, nc, no = r
+                    out += [L(cx + 5, yt, cx + 5, yt - 5),
+                            self._txt(cx - 3, yt + 0.55, nc, st),
+                            self._txt(cx + 2, yt + 0.55, no, st),
+                            self._txt(cx - 4, yb - 2.0, com, st)]
+                    breite = 14.0
+        else:
+            out.append(self._txt(cx - 3, yt, "/".join(p for p in pins if p), st))
+            breite = 9.0
+        out.append(self._txt(cx - 4, yb - 4.3, "(" + ort_text(ort) + ")", st))
+        return out, max(breite, 10.0)
+
+    def _spiegel_elemente(self, st):
+        """Contact mirror: below the relay (horizontal contacts, one below
+        the other) or beside the device (vertical contacts in a row)."""
+        out = []
+        ox, oy = self.spiegel_ursprung()
+        if self.spiegel == "unten":
+            for art, pins, ort in self.kontakte:
+                el, h = self._kontakt_h(ox, oy, art, pins, ort, st)
+                out.extend(el)
+                oy -= h + 3.0
+        else:
+            for art, pins, ort in self.kontakte:
+                el, b = self._kontakt_v(ox, oy, art, pins, ort, st)
+                out.extend(el)
+                ox += b + 3.0
         return out
+
+    def griffe(self):
+        g = [("p", self.x, self.y)]
+        if self._spiegel_aktiv():
+            ox, oy = self.spiegel_ursprung()
+            g.append(("sp", ox, oy))
+        return g
+
+    def griff_bewegen(self, griff_id, x, y):
+        if griff_id == "sp":
+            bx, by = self.spiegel_ursprung(False)
+            self.sp_dx, self.sp_dy = x - bx, y - by
+        else:
+            self.x, self.y = x, y
 
     def aufgeloest(self, platzhalter=None):
         """Empty fields stay empty. Only on screen (platzhalter) a small cross
