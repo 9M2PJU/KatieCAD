@@ -37,6 +37,11 @@ How to make your own:
    | `TITEL1`, `TITEL2`, `TITEL3` (`TITLE1`..`3`) | the three parts alone: customer, project name, sheet name |
    | `REV1_STAND`, `REV1_AENDERUNG`, `REV1_NAME`, `REV1_DATUM` (English: `REV1_INDEX`, `REV1_CHANGE`, `REV1_NAME`, `REV1_DATE`) | revision table, rows `REV1` to `REV4` |
 
+   Spelling is tolerant: case, underscores, hyphens and umlauts do not matter
+   (`Geprüft_Datum` = `GEPRUEFT_DATUM`), and the revision fields are also found as
+   `STAND1`, `AENDERUNG1`, `NAME1`, `DATUM1` (row 1 to 4). The checked-by date
+   `GEPRUEFT_DATUM` is filled from **Project properties** as well.
+
    All other tags are asked for when the title block is inserted and can be changed
    later with the attribute editor.
 4. Save the drawing here, or use **Insert > Save drawing as title block template**.
