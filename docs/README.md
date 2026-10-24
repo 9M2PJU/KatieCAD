@@ -1,45 +1,22 @@
-# KatieCAD
+# Release erstellen
 
-KatieCAD is a lightweight CAD system built with Python and Tkinter, aimed primarily at electrical engineering—especially switchgear construction, distribution boards, and building installation. Projects can contain multiple drawings that are edited side by side. It deliberately adds electrical-specific features such as cross-references and wires, and is gradually gaining real electrical “intelligence” for generating device lists, terminal plans, and similar outputs (currently work in progress). At the same time, it remains a general-purpose CAD with the familiar basics: you can draw freely without using project mode, and create and save blocks individually.
+Die Installer werden automatisch von GitHub gebaut (Windows, Linux, macOS), weil man
+sie nicht auf einem anderen System erzeugen kann.
 
-![Screenshot1](Shot1.png)
+1. Version in `katiecad/manifest.py` (`VERSION`) prüfen und committen.
+2. Tag setzen und hochladen:
+   `git tag v1.0.1 && git push origin v1.0.1`
+   (oder auf GitHub: Actions > Release > Run workflow – dann nur Build, kein Release).
+3. Nach ca. 10-15 Minuten liegen unter *Releases* bzw. *Actions > Artefakte*:
+   - `KatieCAD-<Version>-Windows-Setup.exe` (Installer, Inno Setup)
+   - `KatieCAD-<Version>-macOS.dmg` (Programm in „Programme“ ziehen)
+   - `KatieCAD-<Version>-Linux-amd64.deb` und `KatieCAD-<Version>-Linux.tar.gz`
 
-![Screenshot2](Shot2.png)
+Hinweise
+- Die Programme sind nicht signiert: Windows zeigt „SmartScreen“ (Weitere Informationen >
+  Trotzdem ausführen), macOS verlangt Rechtsklick > Öffnen beim ersten Start.
+- Das Logo kommt aus `KatieCAD.ico` und `KatieCAD.png` im Hauptordner des Repos.
+  Beide Dateien müssen dort liegen. Die `.icns`-Datei für den Mac wird beim Bauen aus der PNG erzeugt.
+- Der Windows-Installer zeigt vor der Installation die MIT-Lizenz (Datei `LICENSE`) zur Zustimmung.
+- Der macOS-Build ist für Apple Silicon (arm64).
 
-## Features
-
-- **Drawing tools:** Line, Polyline, Circle, Arc, Rectangle, Text
-- **Editing tools:** Move, Copy, Rotate, Stretch, Array, Grip editing
-- **Object snap:** Endpoint, Midpoint, Center, Intersection, Quadrant,
-  Perpendicular, Nearest
-- **Layers & styles:** Layer management, line types, line weights,
-  element colors
-- **Dimensions:** Linear, aligned, radius, diameter, decimal comma toggle
-- **Layout view:** Paper space with viewports, standard scales, title block
-- **DXF import/export** (via `ezdxf`)
-- **DWG import** (via `ezdwg`)
-- **Bilingual UI:** German and English (switchable at runtime)
-
-## Requirements
-
-- **Python 3.10+** (required by `ezdwg`)
-- `tkinter` (included in standard Python on Windows/macOS; on Linux install `python3-tk`)
-
-The following packages are installed automatically via `requirements.txt`:
-- `ezdxf` – for DXF import/export
-- `ezdwg` – for DWG import
-
-## Installation
-
-```bash
-git clone https://github.com/Merecete/KatieCAD.git
-cd KatieCAD
-
-# Recommended: use a virtual environment
-python -m venv venv
-source venv/bin/activate        # Linux/macOS
-venv\Scripts\activate           # Windows
-
-pip install -r requirements.txt
-
-python main.py
