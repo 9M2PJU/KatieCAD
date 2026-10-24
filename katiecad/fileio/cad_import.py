@@ -545,10 +545,12 @@ def _ezdwg_zu_dxf_doc(pfad):
     import ezdwg
     with tempfile.TemporaryDirectory() as td:
         ziel = os.path.join(td, "out.dxf")
-        ezdwg.to_dxf(pfad, ziel,
-                     types="LINE ARC LWPOLYLINE CIRCLE ELLIPSE POINT TEXT "
-                           "MTEXT DIMENSION INSERT MINSERT HATCH SPLINE",
-                     dxf_version="R2010")
+        # No "types" filter: export everything ezdwg supports (a fixed
+        # list would drop e.g. old POLYLINE/VERTEX, SOLID or LEADER).
+        try:
+            ezdwg.to_dxf(pfad, ziel, dxf_version="R2010")
+        except TypeError:
+            ezdwg.to_dxf(pfad, ziel)
         return dxf_lesen(ziel)[0]
 
 
@@ -673,3 +675,4 @@ def importiere_datei(pfad, layers):
     erg.neue_layer = imp.neue_layer
     erg.faktor = imp.faktor
     return erg
+
