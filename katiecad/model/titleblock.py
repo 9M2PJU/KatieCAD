@@ -90,6 +90,39 @@ _TITEL = set(TITLE_TAGS) | {t for pair in TITLE_PARTS for t in pair}
 DATA_ONLY = frozenset(_alle_data_tags())        # empty value = keep as is
 RESERVED = tuple(sorted(_BASIS | _TITEL | DATA_ONLY))
 
+
+def norm_tag(tag):
+    """Tolerant spelling of a tag: upper case, umlauts resolved, only letters
+    and digits  ('Geprüft_Datum' -> 'GEPRUEFTDATUM', 'Rev-1 Stand' -> 'REV1STAND')."""
+    t = str(tag or "").upper()
+    for a, b in (("Ä", "AE"), ("Ö", "OE"), ("Ü", "UE"), ("ß", "SS"), ("ẞ", "SS")):
+        t = t.replace(a, b)
+    return "".join(c for c in t if c.isalnum())
+
+
+def _norm_extra():
+    """More accepted spellings of the revision fields, e.g. STAND1, INDEX1,
+    AENDERUNG1, REV1STAND, STAND_REV1  (all compared after norm_tag)."""
+    out = {}
+    for r in range(1, REV_ROWS + 1):
+        for key, sfxs in REV_FIELDS:
+            for f in sfxs + ("STAND",) * (key == "stand") \
+                    + ("DATUM",) * (key == "datum"):
+                for form in ("%s%d", "REV%d%s", "%sREV%d", "REV%s%d", "%s_%d"):
+                    name = form % ((f, r) if form in ("%s%d", "%sREV%d", "REV%s%d",
+                                                      "%s_%d") else (r, f))
+                    out[norm_tag(name)] = ("REV%d_%s" % (r, sfxs[0]))
+    return out
+
+
+_NORM_ALIAS = _norm_extra()
+NORM_RESERVED = {norm_tag(t) for t in RESERVED} | set(_NORM_ALIAS)
+
+
+def is_auto_tag(tag):
+    """True if the attribute with this tag is filled in automatically."""
+    return norm_tag(tag) in NORM_RESERVED
+
 MARGIN_LEFT = 20.0        # mm, binding margin (A3 and larger)
 MARGIN_OTHER = 5.0        # mm, top / right / bottom
 A4_SIZE = (297, 210)      # landscape A4
@@ -249,6 +282,8 @@ def daten_werte(daten, projekt, sheet, lang="en", today=None):
     if d.get("gezeichnet") or d.get("datum"):
         d["gezeichnet_datum"] = (d.get("gezeichnet_datum") or d.get("datum")
                                  or kurz)
+    if d.get("geprueft") or d.get("geprueft_datum"):
+        d["geprueft_datum"] = d.get("geprueft_datum") or d.get("datum") or kurz
     out = {}
     for key, tags in DATA_TAGS.items():
         v = str(d.get(key, "") or "")
@@ -311,16 +346,25 @@ def refresh_fields(layout_elements, info, fallback_scale=""):
     scale = massstab_text(vps[0].zoom) if vps else fallback_scale
     values = dict(info)
     values["SCALE"] = scale
+    norm = {}
+    for k, v in values.items():
+        norm[norm_tag(k)] = (k, v)
+    for nk, kanon in _NORM_ALIAS.items():          # tolerant revision spellings
+        if kanon in values:
+            norm.setdefault(nk, (kanon, values[kanon]))
     changed = 0
     for el in layout_elements:
         if not is_title_block(el):
             continue
         for ad in el.attribut_definitionen():
-            if ad.tag in RESERVED and ad.tag in values:
-                new = str(values[ad.tag])
-                if ad.tag in DATA_ONLY and not new:
-                    continue                 # keep manual entries
-                if el.attribute.get(ad.tag) != new:
-                    el.attribute[ad.tag] = new
-                    changed += 1
+            hit = norm.get(norm_tag(ad.tag))
+            if hit is None:
+                continue
+            key, val = hit
+            new = str(val)
+            if key in DATA_ONLY and not new:
+                continue                         # keep manual entries
+            if el.attribute.get(ad.tag) != new:
+                el.attribute[ad.tag] = new
+                changed += 1
     return changed
