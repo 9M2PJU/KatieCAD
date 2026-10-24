@@ -1,12 +1,3 @@
-# KatieCAD dependencies
-# Python >= 3.10 required (ezdwg requires Python 3.10+)
-
-# DXF import/export (File > Import/Export DXF)
-ezdxf>=1.4
-
-# DWG import (File > Import DWG)
-# Note: ezdwg is a Rust-based parser, wheels are available for most platforms.
-ezdwg>=0.12
-
-# Logo in the info window
-Pillow>=10.0
+ezdxf
+Pillow
+ezdwg
