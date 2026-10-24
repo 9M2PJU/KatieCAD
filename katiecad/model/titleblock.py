@@ -101,28 +101,52 @@ def norm_tag(tag):
     return "".join(c for c in t if c.isalnum())
 
 
-def _norm_extra():
-    """More accepted spellings of the revision fields, e.g. STAND1, INDEX1,
-    AENDERUNG1, REV1STAND, STAND_REV1  (all compared after norm_tag)."""
-    out = {}
-    for r in range(1, REV_ROWS + 1):
-        for key, sfxs in REV_FIELDS:
-            for f in sfxs + ("STAND",) * (key == "stand") \
-                    + ("DATUM",) * (key == "datum"):
-                for form in ("%s%d", "REV%d%s", "%sREV%d", "REV%s%d", "%s_%d"):
-                    name = form % ((f, r) if form in ("%s%d", "%sREV%d", "REV%s%d",
-                                                      "%s_%d") else (r, f))
-                    out[norm_tag(name)] = ("REV%d_%s" % (r, sfxs[0]))
-    return out
+# Accepted words for the four revision columns (compared after norm_tag)
+_REV_WOERTER = {
+    "stand": {"STAND", "STATUS", "INDEX", "IDX", "REV", "REVISION", "ST",
+              "AENDERUNGSINDEX", "AENDERUNGSSTAND", "AENDINDEX", "REVINDEX",
+              "REVSTAND"},
+    "aenderung": {"AENDERUNG", "AENDERUNGEN", "AENDERUNGSTEXT", "AEND",
+                  "CHANGE", "CHANGES", "DESCRIPTION", "BESCHREIBUNG",
+                  "BEZEICHNUNG", "REVCHANGE", "REVAENDERUNG"},
+    "name": {"NAME", "NAM", "BEARBEITER", "AUTHOR", "BY", "REVNAME"},
+    "datum": {"DATUM", "DATE", "DAT", "REVDATUM", "REVDATE"},
+}
+_REV_VORSILBEN = ("REVISIONSTABELLE", "AENDERUNGSTABELLE", "AENDERUNGSINDEX",
+                  "TABELLE", "ZEILE", "ROW", "REV", "AEND", "Z", "R")
 
 
-_NORM_ALIAS = _norm_extra()
-NORM_RESERVED = {norm_tag(t) for t in RESERVED} | set(_NORM_ALIAS)
+def parse_rev_tag(tag):
+    """Revision table field from a free spelling -> (row 1..4, key) or None.
+    Row = the number in the tag, key = stand / aenderung / name / datum.
+    Examples: REV2_NAME, Stand1, 3_Datum, AENDERUNG_4, Status 2, ZEILE1NAME."""
+    import re
+    t = norm_tag(tag)
+    m = re.fullmatch(r"([A-Z]*?)0*(\d)([A-Z]*)", t)
+    if m:
+        row = int(m.group(2))
+        wort = m.group(1) + m.group(3)
+        if not (1 <= row <= REV_ROWS):
+            return None
+        kandidaten = [wort]
+        for v in _REV_VORSILBEN:                 # optional prefix / suffix
+            if wort.startswith(v):
+                kandidaten.append(wort[len(v):])
+            if wort.endswith(v):
+                kandidaten.append(wort[:-len(v)])
+        for k in kandidaten:
+            for key, woerter in _REV_WOERTER.items():
+                if k in woerter and k:
+                    return row, key
+    return None
+
+
+NORM_RESERVED = {norm_tag(t) for t in RESERVED}
 
 
 def is_auto_tag(tag):
     """True if the attribute with this tag is filled in automatically."""
-    return norm_tag(tag) in NORM_RESERVED
+    return norm_tag(tag) in NORM_RESERVED or parse_rev_tag(tag) is not None
 
 MARGIN_LEFT = 20.0        # mm, binding margin (A3 and larger)
 MARGIN_OTHER = 5.0        # mm, top / right / bottom
@@ -349,15 +373,18 @@ def refresh_fields(layout_elements, info, fallback_scale=""):
     norm = {}
     for k, v in values.items():
         norm[norm_tag(k)] = (k, v)
-    for nk, kanon in _NORM_ALIAS.items():          # tolerant revision spellings
-        if kanon in values:
-            norm.setdefault(nk, (kanon, values[kanon]))
     changed = 0
     for el in layout_elements:
         if not is_title_block(el):
             continue
         for ad in el.attribut_definitionen():
             hit = norm.get(norm_tag(ad.tag))
+            if hit is None:
+                pr = parse_rev_tag(ad.tag)         # free spelling of a revision field
+                if pr is not None:
+                    kanon = "REV%d_%s" % (pr[0], dict(REV_FIELDS)[pr[1]][0])
+                    if kanon in values:
+                        hit = (kanon, values[kanon])
             if hit is None:
                 continue
             key, val = hit
@@ -366,4 +393,3 @@ def refresh_fields(layout_elements, info, fallback_scale=""):
                 el.attribute[ad.tag] = new
                 changed += 1
     return changed
-
