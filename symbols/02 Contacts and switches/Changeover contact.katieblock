@@ -28,9 +28,33 @@
         "eig_farbe": true,
         "staerke": 0.35,
         "x1": 0,
+        "y1": 7.5,
+        "x2": 0,
+        "y2": 2.5
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": 5,
+        "y1": 7.5,
+        "x2": 5,
+        "y2": 2.5
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": 0,
         "y1": -2.5,
-        "x2": -2.5,
-        "y2": 2.5
+        "x2": 2.0,
+        "y2": 3.5
       },
       {
         "typ": "linie",
@@ -39,21 +63,9 @@
         "linientyp": "Volllinie (schmal)",
         "eig_farbe": true,
         "staerke": 0.35,
-        "x1": -2.5,
-        "y1": 7.5,
-        "x2": -2.5,
-        "y2": 2.5
-      },
-      {
-        "typ": "linie",
-        "layer": "0",
-        "farbe": "#c29bff",
-        "linientyp": "Volllinie (schmal)",
-        "eig_farbe": true,
-        "staerke": 0.35,
-        "x1": 2.5,
-        "y1": 7.5,
-        "x2": 2.5,
+        "x1": 0,
+        "y1": 2.5,
+        "x2": 3.0,
         "y2": 2.5
       },
       {
@@ -84,7 +96,7 @@
         "linientyp": "Volllinie (schmal)",
         "eig_farbe": true,
         "staerke": 0.25,
-        "x": -2.5,
+        "x": 0,
         "y": 7.5,
         "inhalt": "12",
         "hoehe": 2.0,
@@ -105,7 +117,7 @@
         "linientyp": "Volllinie (schmal)",
         "eig_farbe": true,
         "staerke": 0.25,
-        "x": 2.5,
+        "x": 5,
         "y": 7.5,
         "inhalt": "14",
         "hoehe": 2.0,
@@ -126,7 +138,7 @@
         "linientyp": "Volllinie (schmal)",
         "eig_farbe": true,
         "staerke": null,
-        "x": -5.0,
+        "x": -4.0,
         "y": -5.0,
         "werte": {
           "IND": "IND",
@@ -135,7 +147,10 @@
         },
         "ausgeblendet": [],
         "platzhalter": true,
-        "rolle": "hilfs"
+        "rolle": "hilfs",
+        "spiegel": "liste",
+        "sp_dx": 0.0,
+        "sp_dy": 0.0
       }
     ]
   }
