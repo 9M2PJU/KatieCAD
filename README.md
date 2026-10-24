@@ -47,6 +47,9 @@ Requirements:
 - `tkinter` (included in standard Python on Windows/macOS; on Linux install `python3-tk`)
 
 ```bash
+git clone https://github.com/Merecete/KatieCAD.git
+cd KatieCAD
+
 ## Windows:
 
 python -m venv .venv
