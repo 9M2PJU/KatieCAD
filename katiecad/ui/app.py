@@ -80,7 +80,7 @@ from katiecad.ui.dialogs import (
     _BlockNameDialog, _BlockAuswahlDialog, BlockBrowserDialog,
     BlockSpeichernDialog,
     ProjektNeuDialog, AttributDefinitionDialog, BlockAttributeDialog,
-    QuerverweisDialog, VerbindungspunkteDialog, ProjektDruckDialog,
+    QuerverweisDialog, PruefungDialog, VerbindungspunkteDialog, ProjektDruckDialog,
     VerbindungspunktDialog, VerbindungDialog, FestMaskeDialog,
     KoordinatenfeldDialog,
     TitleBlockDialog, DokumentationDialog, ProjektEigenschaftenDialog,
@@ -203,7 +203,8 @@ def geraete_aus_blattdaten_liste(app, j):
     the others from the file (with cache)."""
     p = app.projekt
     if j == p.aktiv:
-        return [(g["per"], g["rolle"], g["ind"])
+        return [(g["per"], g["rolle"], g["ind"], g.get("feld", ""),
+                 g.get("pins", []))
                 for g in geraete(app.elemente, j + 1)]
     return app._geraete_blatt(p.blatt_pfad(j))
 
@@ -336,6 +337,7 @@ class CadApp:
         self._vp_vorgabe = None
         self._mk_werte = {}
         self._mk_rolle = "haupt"
+        self._mk_spiegel = "liste"
         self._kl_werte = {}
         self._vp_richtungen = (0, 90, 180, 270)
         self._kabel_p1 = None
@@ -982,6 +984,8 @@ class CadApp:
                               command=self.projekt_eigenschaften)
         m_projekt.add_command(label=tr("menu.projekt.tbfelder"),
                               command=self.schriftkopf_felder_pruefen)
+        m_projekt.add_command(label=tr("menu.projekt.pruefen"),
+                              command=self.projekt_pruefen)
         m_projekt.add_separator()
         m_projekt.add_command(label=tr("menu.projekt.blatt_neu"),
                               command=self.blatt_neu)
@@ -7153,6 +7157,8 @@ class CadApp:
             m = ref.geraet_maske()
             if m is not None and dlg.rolle:
                 m.rolle = dlg.rolle
+            if m is not None and dlg.spiegel:
+                m.spiegel = dlg.spiegel
 
     def attribute_bearbeiten(self, ref=None):
         """ATTEDIT: edit the attribute values of a selected block."""
@@ -7177,6 +7183,9 @@ class CadApp:
         m = ref.geraet_maske()
         if m is not None and dlg.rolle:
             m.rolle = dlg.rolle
+        if m is not None and dlg.spiegel:
+            m.spiegel = dlg.spiegel
+        self._geraete_aktualisieren()
         self.redraw()
         self.status.set(tr("msg.attedit.fertig", name=ref.block_name))
 
@@ -7465,17 +7474,19 @@ class CadApp:
         dlg = FestMaskeDialog(self.root, tr("dlg.maske.titel"),
                               ElektroMaske.FELDER, self._mk_werte,
                               rolle=self._mk_rolle,
-                              hinweis=tr("dlg.maske.hinweis"))
+                              hinweis=tr("dlg.maske.hinweis"),
+                              spiegel=getattr(self, "_mk_spiegel", "liste"))
         if dlg.result is None:
             return
         self._mk_werte = dict(dlg.result["werte"])
         self._mk_rolle = dlg.result["rolle"]
+        self._mk_spiegel = dlg.result["spiegel"] or "liste"
         self._snapshot()
         daten = self._layer_daten()
         daten["staerke"] = None
         self._ziel_liste().append(
             ElektroMaske(x, y, dlg.result["werte"], rolle=dlg.result["rolle"],
-                         **daten))
+                         spiegel=getattr(self, "_mk_spiegel", "liste"), **daten))
         self.redraw()
         self.status.set(tr("msg.maske.gesetzt"))
 
@@ -7579,6 +7590,7 @@ class CadApp:
             self.root,
             tr("dlg.maske.titel") if ist_maske else tr("dlg.klemme.titel"),
             el.FELDER, el.werte, rolle=el.rolle if ist_maske else None,
+            spiegel=el.spiegel if ist_maske else None,
             hinweis=tr("dlg.maske.hinweis") if ist_maske
             else tr("dlg.klemme.hinweis"))
         if dlg.result is None:
@@ -7587,6 +7599,8 @@ class CadApp:
         el.setze_werte(dlg.result["werte"])
         if ist_maske and dlg.result["rolle"]:
             el.rolle = dlg.result["rolle"]
+            el.spiegel = dlg.result["spiegel"] or "liste"
+        self._geraete_aktualisieren()
         self.redraw()
 
     def _geister_vorschau(self, event, wz):
@@ -7808,7 +7822,8 @@ class CadApp:
             daten["farbe"] = self.layers["Schrift"].farbe
         daten["eig_farbe"] = True
         daten["staerke"] = None
-        return Querverweis(x, y, v["text"], v["art"], v["richtung"], **daten)
+        return Querverweis(x, y, v["text"], v["art"], v["richtung"],
+                           extern=v.get("extern", False), **daten)
 
     def _qv_platzieren(self, x, y):
         if not self._qv_vorgabe:
@@ -7827,13 +7842,48 @@ class CadApp:
         self._fadenkreuz(event.x, event.y)
         self._qv_status()
 
+    # ========================================================
+    # Project check
+    # ========================================================
+    def _pruefung_ausfuehren(self):
+        from katiecad.electrical.pruefung import pruefe
+        infos, indizes = self._zeichnungsblaetter_einlesen()
+        if infos is None:
+            return []
+        return pruefe([(i, inf.name, inf.elemente)
+                       for i, inf in zip(indizes, infos)])
+
+    def projekt_pruefen(self):
+        if self.projekt is None:
+            self.status.set(tr("msg.projekt.kein_projekt"))
+            return
+        if not self._blatt_sichern():
+            return
+        befunde = self._pruefung_ausfuehren()
+        PruefungDialog(self.root, befunde, self._zu_befund, self._pruefung_ausfuehren)
+
+    def _zu_befund(self, b):
+        if not self.blatt_wechseln(b.blatt):
+            return
+        self.root.update_idletasks()
+        z = self.view["zoom"]
+        cw = max(1, self.canvas.winfo_width())
+        ch = max(1, self.canvas.winfo_height())
+        self.view["ox"] = cw / 2 - b.x * z
+        self.view["oy"] = ch / 2 + b.y * z
+        self.redraw()
+        self._zeichne_raster()
+        self.status.set(b.text)
+
     def _qv_bearbeiten(self, el):
         dlg = QuerverweisDialog(self.root, {"art": el.art,
                                             "richtung": el.richtung,
-                                            "text": el.text})
+                                            "text": el.text,
+                                            "extern": el.extern})
         if dlg.result is None:
             return
         self._snapshot()
+        el.extern = dlg.result.get("extern", False)
         el.art = dlg.result["art"]
         el.richtung = dlg.result["richtung"]
         el.text = dlg.result["text"]
@@ -8166,13 +8216,15 @@ class CadApp:
             if maske is not None:
                 dr = FestMaskeDialog(self.root, tr("dlg.geraet.titel"), (),
                                      rolle=maske.rolle,
-                                     hinweis=tr("dlg.maske.hinweis"))
+                                     hinweis=tr("dlg.maske.hinweis"),
+                                     spiegel=maske.spiegel)
                 if dr.result is None:
                     self.status.set(("Block-Erzeugen abgebrochen." if de
                                      else "Block creation cancelled."))
                     self._update_eingabe_hinweis()
                     return
                 maske.rolle = dr.result["rolle"] or "haupt"
+                maske.spiegel = dr.result["spiegel"] or "liste"
 
         vp_tags_eindeutig(relativ)
         definition = BlockDefinition(name, (0.0, 0.0), relativ)
