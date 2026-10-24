@@ -576,6 +576,8 @@ BEFEHLE = {
     "KOPIERENMITBASISPUNKT": "copybase", "KOPIERENMITBASIS": "copybase",
     "REIHE": "array", "ARRAY": "array", "AR": "array", "ANORDNUNG": "array",
     "DREHEN": "rotate", "DREHE": "rotate", "ROTATE": "rotate", "RO": "rotate",
+    "SKALIEREN": "scale", "SKALIERE": "scale", "SCALE": "scale", "SC": "scale",
+    "SPIEGELN": "mirror", "SPIEGELE": "mirror", "MIRROR": "mirror", "MI": "mirror",
     "STRECKEN": "stretch", "STRETCH": "stretch", "STR": "stretch", "ST": "stretch",
     "EINFÜGEN": "paste", "EINFUEGEN": "paste", "PASTE": "paste",
     "DRUCKEN": "druck", "PLOT": "druck", "PRINT": "druck",
@@ -1535,8 +1537,9 @@ class BlockReferenz(Element):
 
     def __init__(self, x, y, block_name, elemente,
                  skalierung=1.0, winkel=0.0, attribute=None,
-                 ausgeblendet=None, sp_dx=0.0, sp_dy=0.0, **kw):
+                 ausgeblendet=None, sp_dx=0.0, sp_dy=0.0, gespiegelt=False, **kw):
         super().__init__("block", **kw)
+        self.gespiegelt = bool(gespiegelt)     # mirrored about the local y axis
         self.sp_dx, self.sp_dy = float(sp_dx), float(sp_dy)   # contact mirror offset
         self.x, self.y = x, y
         self.block_name = block_name
@@ -1671,12 +1674,14 @@ class BlockReferenz(Element):
                tuple(sorted(self.ausgeblendet)), tuple(self.refs),
                tuple((a, tuple(p), tuple(o) if isinstance(o, (tuple, list)) else o)
                      for a, p, o in self.kontakte),
-               self.sp_dx, self.sp_dy)
+               self.sp_dx, self.sp_dy, self.gespiegelt)
         if self._cache is not None and self._cache[0] == sig:
             return self._cache[1]
         out = []
         for el in self.elemente:
             k = deepcopy(el)
+            if self.gespiegelt:
+                k.spiegeln(0.0, 0.0, 0.0, 1.0)   # about the local y axis
             self._transformiere(k)
             if isinstance(k, _FestMaske):
                 # Mask/terminal: values come from the attributes of the instance
@@ -1731,7 +1736,7 @@ class BlockReferenz(Element):
             b = el.bbox()
             for (lx, ly) in ((b[0], b[1]), (b[2], b[1]),
                              (b[2], b[3]), (b[0], b[3])):
-                wx, wy = self._welt_pts(lx, ly)
+                wx, wy = self._welt_pts(-lx if self.gespiegelt else lx, ly)
                 xs.append(wx); ys.append(wy)
         if not xs:
             return (self.x, self.y, self.x, self.y)
@@ -2974,3 +2979,230 @@ class Koordinatenfeld(Element):
 
 ZUSAMMENGESETZT = (BlockReferenz, Querverweis, Verbindung, ElektroMaske, Klemme,
                    Kabel, Koordinatenfeld)
+
+
+# ============================================================
+# Scaling and mirroring of all element types
+# ============================================================
+def punkt_spiegeln(px, py, ax, ay, bx, by):
+    """Reflects the point (px, py) about the line through (ax, ay), (bx, by)."""
+    dx, dy = bx - ax, by - ay
+    l2 = dx * dx + dy * dy
+    if l2 < 1e-18:
+        return px, py
+    t = ((px - ax) * dx + (py - ay) * dy) / l2
+    fx, fy = ax + t * dx, ay + t * dy
+    return 2 * fx - px, 2 * fy - py
+
+
+def _phi(ax, ay, bx, by):
+    return math.degrees(math.atan2(by - ay, bx - ax))
+
+
+def _r90(d):
+    return int(round(d / 90.0)) * 90 % 360
+
+
+def _achsparallel(phi):
+    return abs(phi / 90.0 - round(phi / 90.0)) < 1e-6
+
+
+def _skal_pt(x, y, cx, cy, f):
+    return cx + (x - cx) * f, cy + (y - cy) * f
+
+
+def _inst(cls, **methods):
+    for name, fn in methods.items():
+        setattr(cls, name, fn)
+
+
+# ---- scaling --------------------------------------------------
+def _sk_linie(e, cx, cy, f):
+    e.x1, e.y1 = _skal_pt(e.x1, e.y1, cx, cy, f)
+    e.x2, e.y2 = _skal_pt(e.x2, e.y2, cx, cy, f)
+
+
+def _sk_kreis(e, cx, cy, f):
+    e.cx, e.cy = _skal_pt(e.cx, e.cy, cx, cy, f)
+    e.r *= f
+
+
+def _sk_poly(e, cx, cy, f):
+    e.punkte = [_skal_pt(x, y, cx, cy, f) for (x, y) in e.punkte]
+
+
+def _sk_text(e, cx, cy, f):
+    e.x, e.y = _skal_pt(e.x, e.y, cx, cy, f)
+    e.hoehe *= f
+    if isinstance(e, Verbindungspunkt):
+        e.radius *= f
+
+
+def _sk_schraffur(e, cx, cy, f):
+    _sk_poly(e, cx, cy, f)
+    e.abstand *= f
+
+
+def _sk_bem(e, cx, cy, f):
+    e.x1, e.y1 = _skal_pt(e.x1, e.y1, cx, cy, f)
+    e.x2, e.y2 = _skal_pt(e.x2, e.y2, cx, cy, f)
+    e.mx, e.my = _skal_pt(e.mx, e.my, cx, cy, f)
+    if e.tx is not None and e.ty is not None:
+        e.tx, e.ty = _skal_pt(e.tx, e.ty, cx, cy, f)
+    e.hoehe *= f
+    e.pfeil *= f
+
+
+def _sk_block(e, cx, cy, f):
+    e.x, e.y = _skal_pt(e.x, e.y, cx, cy, f)
+    e.skalierung *= f
+    e.sp_dx *= f
+    e.sp_dy *= f
+
+
+def _sk_pos(e, cx, cy, f):
+    """Fixed-size electrical elements: only the position is scaled."""
+    e.x, e.y = _skal_pt(e.x, e.y, cx, cy, f)
+
+
+def _sk_kabel(e, cx, cy, f):
+    _sk_pos(e, cx, cy, f)
+    e.laenge = max(1.0, e.laenge * f)
+
+
+def _sk_kf(e, cx, cy, f):
+    _sk_pos(e, cx, cy, f)
+    e.breite *= f
+    e.hoehe *= f
+
+
+def _sk_rechteck(e, cx, cy, f):
+    e.x1, e.y1 = _skal_pt(e.x1, e.y1, cx, cy, f)
+    e.x2, e.y2 = _skal_pt(e.x2, e.y2, cx, cy, f)
+
+
+# ---- mirroring ------------------------------------------------
+def _sp_linie(e, ax, ay, bx, by):
+    e.x1, e.y1 = punkt_spiegeln(e.x1, e.y1, ax, ay, bx, by)
+    e.x2, e.y2 = punkt_spiegeln(e.x2, e.y2, ax, ay, bx, by)
+
+
+def _sp_kreis(e, ax, ay, bx, by):
+    e.cx, e.cy = punkt_spiegeln(e.cx, e.cy, ax, ay, bx, by)
+
+
+def _sp_bogen(e, ax, ay, bx, by):
+    _sp_kreis(e, ax, ay, bx, by)
+    phi = _phi(ax, ay, bx, by)
+    e.start, e.ende = (2 * phi - e.ende) % 360.0, (2 * phi - e.start) % 360.0
+
+
+def _sp_poly(e, ax, ay, bx, by):
+    e.punkte = [punkt_spiegeln(x, y, ax, ay, bx, by) for (x, y) in e.punkte]
+
+
+def _sp_rechteck(e, ax, ay, bx, by):
+    phi = _phi(ax, ay, bx, by)
+    if _achsparallel(phi):
+        e.x1, e.y1 = punkt_spiegeln(e.x1, e.y1, ax, ay, bx, by)
+        e.x2, e.y2 = punkt_spiegeln(e.x2, e.y2, ax, ay, bx, by)
+        return
+    pts = [punkt_spiegeln(x, y, ax, ay, bx, by) for (x, y) in
+           ((e.x1, e.y1), (e.x2, e.y1), (e.x2, e.y2), (e.x1, e.y2))]
+    neu = Polylinie(pts, geschlossen=True, layer=e.layer, farbe=e.farbe,
+                    linientyp=e.linientyp, eig_farbe=e.eig_farbe,
+                    staerke=e.staerke)
+    e.__class__ = Polylinie
+    e.__dict__.clear()
+    e.__dict__.update(neu.__dict__)
+
+
+_ANKER_TAUSCH = {"links": "rechts", "rechts": "links",
+                 "oben": "unten", "unten": "oben"}
+
+
+def _sp_text(e, ax, ay, bx, by):
+    e.x, e.y = punkt_spiegeln(e.x, e.y, ax, ay, bx, by)
+    phi = _phi(ax, ay, bx, by) % 180.0
+    ep = e.einfuegepunkt
+    if ep and "_" in ep:
+        zeile, spalte = ep.split("_", 1)
+        if abs(phi - 90.0) < 1e-6:            # left <-> right (text stays readable)
+            spalte = _ANKER_TAUSCH.get(spalte, spalte)
+        elif phi < 1e-6 or abs(phi - 180.0) < 1e-6:
+            zeile = _ANKER_TAUSCH.get(zeile, zeile)
+        e.einfuegepunkt = zeile + "_" + spalte
+    if isinstance(e, Verbindungspunkt) and e.richtungen is not None:
+        p2 = _phi(ax, ay, bx, by)
+        e.richtungen = sorted({_r90(2 * p2 - r) for r in e.richtungen})
+
+
+def _sp_schraffur(e, ax, ay, bx, by):
+    _sp_poly(e, ax, ay, bx, by)
+    e.winkel = (2 * _phi(ax, ay, bx, by) - e.winkel) % 360.0
+
+
+def _sp_bem(e, ax, ay, bx, by):
+    e.x1, e.y1 = punkt_spiegeln(e.x1, e.y1, ax, ay, bx, by)
+    e.x2, e.y2 = punkt_spiegeln(e.x2, e.y2, ax, ay, bx, by)
+    e.mx, e.my = punkt_spiegeln(e.mx, e.my, ax, ay, bx, by)
+    if e.tx is not None and e.ty is not None:
+        e.tx, e.ty = punkt_spiegeln(e.tx, e.ty, ax, ay, bx, by)
+    if not _achsparallel(_phi(ax, ay, bx, by)) and e.richtung in ("horizontal", "vertikal"):
+        e.richtung = "ausgerichtet"
+
+
+def _sp_block(e, ax, ay, bx, by):
+    phi = _phi(ax, ay, bx, by)
+    e.x, e.y = punkt_spiegeln(e.x, e.y, ax, ay, bx, by)
+    e.winkel = (2 * phi - e.winkel + 180.0) % 360.0
+    e.gespiegelt = not e.gespiegelt
+    e.sp_dx, e.sp_dy = punkt_spiegeln(e.sp_dx, e.sp_dy, 0.0, 0.0,
+                                      bx - ax, by - ay)
+
+
+def _sp_pos(e, ax, ay, bx, by):
+    e.x, e.y = punkt_spiegeln(e.x, e.y, ax, ay, bx, by)
+
+
+def _sp_qv(e, ax, ay, bx, by):
+    _sp_pos(e, ax, ay, bx, by)
+    e.richtung = _r90(2 * _phi(ax, ay, bx, by) - e.richtung)
+
+
+def _sp_verbindung(e, ax, ay, bx, by):
+    _sp_pos(e, ax, ay, bx, by)
+    phi = _phi(ax, ay, bx, by)
+    s_alt = e.ausrichtung * 90 + 90
+    e.arme = Verbindung.arme_normieren([2 * phi - d for d in e.arme])
+    e.ausrichtung = (_r90(2 * phi - s_alt) - 90) // 90 % 4
+
+
+def _sp_kabel(e, ax, ay, bx, by):
+    x1, y1 = punkt_spiegeln(e.x, e.y, ax, ay, bx, by)
+    x2, _ = punkt_spiegeln(e.x + e.laenge, e.y, ax, ay, bx, by)
+    e.x, e.y = min(x1, x2), y1
+
+
+def _sp_kf(e, ax, ay, bx, by):
+    x1, y1 = punkt_spiegeln(e.x, e.y, ax, ay, bx, by)
+    x2, y2 = punkt_spiegeln(e.x + e.breite, e.y + e.hoehe, ax, ay, bx, by)
+    e.x, e.y = min(x1, x2), min(y1, y2)
+
+
+_inst(Element, skalieren=lambda e, cx, cy, f: None,
+      spiegeln=lambda e, ax, ay, bx, by: None)
+_inst(Linie, skalieren=_sk_linie, spiegeln=_sp_linie)
+_inst(Kreis, skalieren=_sk_kreis, spiegeln=_sp_kreis)
+_inst(Bogen, skalieren=_sk_kreis, spiegeln=_sp_bogen)
+_inst(Rechteck, skalieren=_sk_rechteck, spiegeln=_sp_rechteck)
+_inst(Polylinie, skalieren=_sk_poly, spiegeln=_sp_poly)
+_inst(Text, skalieren=_sk_text, spiegeln=_sp_text)
+_inst(Schraffur, skalieren=_sk_schraffur, spiegeln=_sp_schraffur)
+_inst(Bemassung, skalieren=_sk_bem, spiegeln=_sp_bem)
+_inst(BlockReferenz, skalieren=_sk_block, spiegeln=_sp_block)
+_inst(Querverweis, skalieren=_sk_pos, spiegeln=_sp_qv)
+_inst(Verbindung, skalieren=_sk_pos, spiegeln=_sp_verbindung)
+_inst(_FestMaske, skalieren=_sk_pos, spiegeln=_sp_pos)
+_inst(Kabel, skalieren=_sk_kabel, spiegeln=_sp_kabel)
+_inst(Koordinatenfeld, skalieren=_sk_kf, spiegeln=_sp_kf)
