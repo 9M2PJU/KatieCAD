@@ -6444,18 +6444,57 @@ class CadApp:
         self._menue_zeigen(m, event.x_root, event.y_root)
 
     def _menue_zeigen(self, m, x, y):
-        """Pops up a context menu. On Linux (X11) the menu would close at
-        once if it were opened inside the button-release handler, so it
-        is opened a moment later there."""
-        def zeigen():
+        """Pops up a context menu. Windows/Mac: tk_popup. Linux (X11):
+        tk_popup inside the button-release handler closes the menu at once
+        (the grab is lost again), so it is posted a moment later WITHOUT a
+        grab and closed again on focus loss, Escape or a click elsewhere."""
+        if not sys.platform.startswith("linux"):
             try:
                 m.tk_popup(x, y)
             finally:
                 m.grab_release()
-        if sys.platform.startswith("linux"):
-            self.root.after(60, zeigen)
-        else:
-            zeigen()
+            return
+
+        def schliessen(_e=None):
+            try:
+                m.unpost()
+            except tk.TclError:
+                pass
+            try:
+                self.root.unbind("<Button-1>", self._menue_bind)
+            except (tk.TclError, AttributeError):
+                pass
+
+        def klick(e):
+            if str(e.widget) != str(m):
+                schliessen()
+
+        def zeigen():
+            try:
+                try:
+                    vorher = self.root.focus_get()
+                except (KeyError, tk.TclError):
+                    vorher = None
+                m.post(x, y)
+
+                def fokus_zurueck(_e=None):
+                    # Give the keyboard focus back (otherwise keyboard
+                    # input stays dead on Wayland/XWayland afterwards)
+                    def los():
+                        try:
+                            (vorher or self.canvas).focus_force()
+                        except tk.TclError:
+                            try:
+                                self.canvas.focus_force()
+                            except tk.TclError:
+                                pass
+                    self.root.after(20, los)
+                m.bind("<Unmap>", fokus_zurueck)
+                m.bind("<Escape>", schliessen)
+                self._menue_bind = self.root.bind("<Button-1>", klick, add="+")
+            except tk.TclError as ex:
+                print(f"[KatieCAD] Kontextmenü: {ex}")
+        self.root.after(80, zeigen)
 
     def _zeichnung_anwenden(self, daten, layer_zuruecksetzen=False):
         """Replaces the work area with the contents of `daten`
