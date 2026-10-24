@@ -6441,10 +6441,21 @@ class CadApp:
                       command=self.alle_markieren)
         m.add_command(label=("Zoom Grenzen" if de else "Zoom extents"),
                       command=self.zoom_grenzen)
-        try:
-            m.tk_popup(event.x_root, event.y_root)
-        finally:
-            m.grab_release()
+        self._menue_zeigen(m, event.x_root, event.y_root)
+
+    def _menue_zeigen(self, m, x, y):
+        """Pops up a context menu. On Linux (X11) the menu would close at
+        once if it were opened inside the button-release handler, so it
+        is opened a moment later there."""
+        def zeigen():
+            try:
+                m.tk_popup(x, y)
+            finally:
+                m.grab_release()
+        if sys.platform.startswith("linux"):
+            self.root.after(60, zeigen)
+        else:
+            zeigen()
 
     def _zeichnung_anwenden(self, daten, layer_zuruecksetzen=False):
         """Replaces the work area with the contents of `daten`
