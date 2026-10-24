@@ -1560,6 +1560,141 @@ class PruefungDialog(tk.Toplevel):
         self.clipboard_append(bericht_text(self._befunde))
 
 
+class EigenschaftenPalette(tk.Toplevel):
+    """Non-modal properties window (Ctrl+1) for the current selection.
+    Works with mixed selections (lines, texts, ...): a field shows
+    '*' if the values differ; changes apply to ALL affected elements."""
+
+    def __init__(self, parent, app):
+        super().__init__(parent)
+        self.app = app
+        self.title(tr("dlg.eig.titel"))
+        self.transient(parent)
+        self.configure(bg=FARBEN["bg_mittel"])
+        self.resizable(False, False)
+        self.protocol("WM_DELETE_WINDOW", self._schliessen)
+        f = ttk.Frame(self, padding=10)
+        f.pack(fill=tk.BOTH, expand=True)
+        self.v_info = tk.StringVar()
+        ttk.Label(f, textvariable=self.v_info, style="Title.TLabel").grid(
+            row=0, column=0, columnspan=3, sticky=tk.W, pady=(0, 6))
+        self._vars, self._rows = {}, {}
+
+        def zeile(r, feld, widget_fn):
+            lb = ttk.Label(f, text=tr("dlg.eig." + feld))
+            lb.grid(row=r, column=0, sticky=tk.W, pady=2, padx=(0, 8))
+            w = widget_fn()
+            w.grid(row=r, column=1, sticky=tk.EW, pady=2)
+            self._rows[feld] = (lb, w)
+
+        r = 1
+        for feld in ("layer", "linientyp"):
+            v = tk.StringVar()
+            self._vars[feld] = v
+            vals = (lambda: list(app.layers.keys())) if feld == "layer" \
+                else (lambda: list(LINIENTYPEN.keys()))
+            cb = ttk.Combobox(f, textvariable=v, width=24, values=vals())
+            cb.configure(postcommand=lambda c=cb, fn=vals: c.configure(values=fn()))
+            cb.bind("<<ComboboxSelected>>", lambda e, k=feld: self._anwenden(k))
+            zeile(r, feld, lambda c=cb: c)
+            r += 1
+        # colour: button + "by layer"
+        self._vars["farbe"] = tk.StringVar()
+        fr = ttk.Frame(f)
+        self.btn_farbe = ttk.Button(fr, textvariable=self._vars["farbe"], width=12,
+                                    command=self._farbe_waehlen)
+        self.btn_farbe.pack(side=tk.LEFT)
+        ttk.Button(fr, text=tr("dlg.eig.vonlayer"), width=10,
+                   command=lambda: self._anwenden("farbe", None)).pack(side=tk.LEFT, padx=4)
+        zeile(r, "farbe", lambda: fr)
+        r += 1
+        for feld, br in (("staerke", 10), ("hoehe", 10), ("winkel", 10)):
+            v = tk.StringVar()
+            self._vars[feld] = v
+            e = ttk.Entry(f, textvariable=v, width=br)
+            e.bind("<Return>", lambda ev, k=feld: self._anwenden(k))
+            e.bind("<FocusOut>", lambda ev, k=feld: self._anwenden(k, nur_wenn_geaendert=True))
+            zeile(r, feld, lambda w=e: w)
+            r += 1
+        v = tk.StringVar()
+        self._vars["schriftart"] = v
+        cb = ttk.Combobox(f, textvariable=v, width=24, values=list(SCHRIFTARTEN))
+        cb.bind("<<ComboboxSelected>>", lambda e: self._anwenden("schriftart"))
+        zeile(r, "schriftart", lambda: cb)
+        r += 1
+        ttk.Label(f, text=tr("dlg.eig.hinweis"), style="Hint.TLabel",
+                  wraplength=300, justify=tk.LEFT).grid(
+            row=r, column=0, columnspan=3, sticky=tk.W, pady=(8, 0))
+        self._angezeigt = {}
+        self.update_idletasks()
+        self.geometry(f"+{parent.winfo_rootx() + 40}+{parent.winfo_rooty() + 80}")
+        self.aktualisieren()
+
+    def _schliessen(self):
+        self.app._eig_palette = None
+        self.destroy()
+
+    def aktualisieren(self):
+        from katiecad.model.eigenschaften import gemeinsame, VERSCHIEDEN
+        sel = [e for e in self.app.auswahl]
+        g = gemeinsame(sel)
+        self.v_info.set(tr("dlg.eig.anzahl", n=len(sel)) if g else tr("dlg.eig.keine"))
+        self._angezeigt = {}
+        for feld, (lb, w) in self._rows.items():
+            sicht = feld in g
+            state = "normal" if sicht else "disabled"
+            try:
+                if isinstance(w, ttk.Frame):
+                    for c in w.winfo_children():
+                        c.state(["!disabled"] if sicht else ["disabled"])
+                else:
+                    w.state(["!disabled"] if sicht else ["disabled"])
+            except tk.TclError:
+                pass
+            if not sicht:
+                self._vars[feld].set("")
+                continue
+            val = g[feld]
+            if val == VERSCHIEDEN:
+                txt = tr("dlg.eig.verschieden")
+            elif val is None:
+                txt = tr("dlg.eig.vonlayer") if feld == "farbe" else ""
+            elif isinstance(val, float):
+                txt = ("%g" % val)
+            else:
+                txt = str(val)
+            self._vars[feld].set(txt)
+            self._angezeigt[feld] = txt
+
+    def _farbe_waehlen(self):
+        akt = self._vars["farbe"].get()
+        _, hexc = colorchooser.askcolor(color=akt if akt.startswith("#") else None,
+                                        parent=self)
+        if hexc:
+            self._anwenden("farbe", hexc)
+
+    def _anwenden(self, feld, wert="__lesen__", nur_wenn_geaendert=False):
+        if wert == "__lesen__":
+            wert = self._vars[feld].get().strip()
+            if nur_wenn_geaendert and wert == self._angezeigt.get(feld):
+                return
+            if wert == tr("dlg.eig.verschieden"):
+                return
+            if feld in ("hoehe", "winkel", "staerke"):
+                if wert == "" and feld == "staerke":
+                    wert = None
+                else:
+                    try:
+                        wert = float(wert.replace(",", "."))
+                    except ValueError:
+                        self.aktualisieren()
+                        return
+                    if feld in ("hoehe", "staerke") and wert <= 0:
+                        self.aktualisieren()
+                        return
+        self.app.eigenschaft_anwenden(feld, wert)
+
+
 class VerbindungspunkteDialog(tk.Toplevel):
     """Non-modal window 'Select connection points' for the wire tool.
     Shows the selected points; closing = cancel."""
