@@ -89,9 +89,11 @@ def contact_pole(s, x, top, bot, nc=False):
     """One switching pole: pins at y = +-7.5, blade pivot at the bottom."""
     s.line(x, 7.5, x, 2.5)
     s.line(x, -7.5, x, -2.5)
-    s.line(x, -2.5, x - 2.5, 2.5)            # blade
-    if nc:
-        s.line(x - 2.5, 2.5, x, 2.5)         # hook = closed at rest
+    if nc:                                   # closed at rest: blade touches the tick
+        s.line(x, -2.5, x + 2.0, 3.5)
+        s.line(x, 2.5, x + 3.0, 2.5)
+    else:
+        s.line(x, -2.5, x - 2.5, 2.5)        # blade
     s.pin(x, 7.5, top)
     s.pin(x, -7.5, bot)
 
@@ -167,11 +169,12 @@ poles(s, 1, ["21", "22"], nc=True); s.mask(-4.0, -5.0, "hilfs")
 
 s = sym("Changeover contact", "02 Contacts and switches", "Wechsler")
 s.line(0, -7.5, 0, -2.5)
-s.line(0, -2.5, -2.5, 2.5)
-s.line(-2.5, 7.5, -2.5, 2.5)
-s.line(2.5, 7.5, 2.5, 2.5)
-s.pin(0, -7.5, "11"); s.pin(-2.5, 7.5, "12"); s.pin(2.5, 7.5, "14")
-s.mask(-5.0, -5.0, "hilfs")
+s.line(0, 7.5, 0, 2.5)
+s.line(5, 7.5, 5, 2.5)
+s.line(0, -2.5, 2.0, 3.5)                  # blade (touches the tick = break contact)
+s.line(0, 2.5, 3.0, 2.5)
+s.pin(0, -7.5, "11"); s.pin(0, 7.5, "12"); s.pin(5, 7.5, "14")
+s.mask(-4.0, -5.0, "hilfs")
 
 s = sym("NO contact 3-pole", "02 Contacts and switches", "Schließer 3-polig (Hauptkontakte)")
 poles(s, 3, ["1", "2", "3", "4", "5", "6"]); s.mask(-4.0, -5.0, "hilfs")
@@ -398,3 +401,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
