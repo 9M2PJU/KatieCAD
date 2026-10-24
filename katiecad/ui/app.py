@@ -1033,6 +1033,10 @@ class CadApp:
                             command=lambda: self._op_start("array"))
         m_bearb.add_command(label=tr("menu.bearbeiten.drehen"),
                             command=lambda: self._op_start("rotate"))
+        m_bearb.add_command(label=tr("menu.bearbeiten.skalieren"),
+                            command=lambda: self._op_start("scale"))
+        m_bearb.add_command(label=tr("menu.bearbeiten.spiegeln"),
+                            command=lambda: self._op_start("mirror"))
         m_bearb.add_command(label=tr("menu.bearbeiten.strecken"),
                             command=lambda: self._op_start("stretch"))
         m_bearb.add_separator()
@@ -5887,6 +5891,8 @@ class CadApp:
                 "copybase": "KOPIEREN MIT BASISPUNKT" if de else "COPY WITH BASE POINT",
                 "array": "REIHE" if de else "ARRAY",
                 "rotate": "DREHEN" if de else "ROTATE",
+                "scale": "SKALIEREN" if de else "SCALE",
+                "mirror": "SPIEGELN" if de else "MIRROR",
                 "stretch": "STRECKEN" if de else "STRETCH"}.get(self._op["typ"], "")
 
     def _op_hinweis(self):
@@ -5902,14 +5908,21 @@ class CadApp:
             t = ("Objekte wählen, dann Enter oder Rechtsklick" if de
                  else "Select objects, then Enter or right-click")
         elif op["stufe"] == "basis":
-            t = ("Basispunkt angeben (klicken oder x,y)" if de
-                 else "Specify base point (click or x,y)")
+            if op["typ"] == "mirror":
+                t = ("Ersten Punkt der Spiegelachse angeben" if de
+                     else "Specify the first point of the mirror line")
+            else:
+                t = ("Basispunkt angeben (klicken oder x,y)" if de
+                     else "Specify base point (click or x,y)")
         else:
             if op["typ"] == "copy":
                 t = (("Zielpunkt: klicken, 'x,y', '@dx,dy', 'L<Winkel' - "
                       "Enter/Rechtsklick = fertig") if de else
                      ("Target point: click, 'x,y', '@dx,dy', 'L<angle' - "
                       "Enter/right-click = done"))
+            elif op["typ"] == "mirror":
+                t = ("Zweiten Punkt der Spiegelachse angeben" if de else
+                     "Specify the second point of the mirror line")
             elif op["typ"] == "rotate":
                 t = (("Drehwinkel in Grad eingeben (gegen Uhrzeigersinn) "
                       "oder Maus bewegen + Klick") if de else
@@ -5999,10 +6012,16 @@ class CadApp:
             if op["typ"] == "copybase":
                 self._op_copybase_fertig()
                 return
+            if op["typ"] == "scale":
+                self._op_skalieren_fertig()
+                return
             op["stufe"] = "ziel"
             self._op_hinweis()
             return
         if op["stufe"] == "ziel":
+            if op["typ"] == "mirror":
+                self._op_spiegeln_fertig(pt)
+                return
             if op["typ"] == "rotate":
                 bx, by = op["basis"]
                 dx, dy = pt[0] - bx, pt[1] - by
@@ -6049,6 +6068,59 @@ class CadApp:
                      f"Copied (dx={dx / self._einh_faktor():.3f}, "
                      f"dy={dy / self._einh_faktor():.3f}). Specify another "
                      "target point or Enter/right-click = done."))
+
+    def _op_skalieren_fertig(self):
+        """Scale: factor from a small dialog, applied about the base point."""
+        op = self._op
+        de = SPRACHE["aktuell"] == "de"
+        bx, by = op["basis"]
+        text = simpledialog.askstring(
+            "Skalieren" if de else "Scale",
+            ("Skalierfaktor (z. B. 2 oder 0,5):" if de
+             else "Scale factor (e.g. 2 or 0.5):"),
+            initialvalue="2", parent=self.root)
+        if text is None:
+            self._op_beenden("Abgebrochen." if de else "Cancelled.")
+            return
+        try:
+            f = float(text.strip().replace(",", "."))
+            if not (1e-6 < f < 1e6):
+                raise ValueError
+        except ValueError:
+            self.status.set("Ungültiger Faktor." if de else "Invalid factor.")
+            self._op_beenden("Ungültiger Faktor." if de else "Invalid factor.")
+            return
+        self._snapshot()
+        for el in op["objekte"]:
+            el.skalieren(bx, by, f)
+        self._op_beenden((f"Skaliert um Faktor {f:g}." if de
+                          else f"Scaled by factor {f:g}."))
+
+    def _op_spiegeln_fertig(self, pt):
+        op = self._op
+        de = SPRACHE["aktuell"] == "de"
+        ax, ay = op["basis"]
+        if math.hypot(pt[0] - ax, pt[1] - ay) < 1e-9:
+            return
+        loeschen = messagebox.askyesno(
+            "Spiegeln" if de else "Mirror",
+            ("Originalobjekte löschen?" if de else "Delete the original objects?"),
+            default=messagebox.NO, parent=self.root)
+        self._snapshot()
+        if loeschen:
+            for el in op["objekte"]:
+                el.spiegeln(ax, ay, pt[0], pt[1])
+        else:
+            ziel = self._ziel_liste()
+            kopien = []
+            for el in op["objekte"]:
+                k = self._dict_zu_element(el.to_dict())
+                if k is not None:
+                    k.spiegeln(ax, ay, pt[0], pt[1])
+                    ziel.append(k)
+                    kopien.append(k)
+            self._einrasten(kopien)
+        self._op_beenden("Gespiegelt." if de else "Mirrored.")
 
     def _stretch_anwenden(self, fenster, dx, dy):
         xmin, ymin, xmax, ymax = fenster
@@ -6201,6 +6273,22 @@ class CadApp:
                 text=f"dx {dx / einh:.2f}  dy {dy / einh:.2f}")
             return
 
+        if op["typ"] == "mirror":
+            ax, ay = op["basis"]
+            if math.hypot(pt[0] - ax, pt[1] - ay) > 1e-9:
+                for el in op["objekte"]:
+                    k = self._dict_zu_element(el.to_dict())
+                    if k is None or isinstance(k, Viewport):
+                        continue
+                    k.spiegeln(ax, ay, pt[0], pt[1])
+                    self._zeichne_element(k, tags=("vorschau",), tf=tf, skala=sk,
+                                          stil=stil)
+            bx_px, by_px = tf(ax, ay)
+            px_, py_ = tf(*pt)
+            self.canvas.create_line(bx_px, by_px, px_, py_, fill=FARBEN["gelb"],
+                                    dash=(2, 3), tags="vorschau")
+            return
+
         if op["typ"] == "rotate":
             bx, by = op["basis"]
             dx, dy = pt[0] - bx, pt[1] - by
@@ -6331,7 +6419,8 @@ class CadApp:
             name = (("Objektfang" if cmd == "ofang" else "Ortho") if de
                     else ("Object snap" if cmd == "ofang" else "Ortho"))
             self.status.set(f"{name}: {'EIN' if var.get() else 'AUS'}")
-        elif cmd in ("move", "copy", "copybase", "array", "rotate", "stretch"):
+        elif cmd in ("move", "copy", "copybase", "array", "rotate", "stretch",
+                     "scale", "mirror"):
             self._op_start(cmd)
         elif cmd == "paste":
             self.einfuegen()
@@ -6432,6 +6521,10 @@ class CadApp:
                           command=lambda: self._op_start("array"))
             m.add_command(label=tr("menu.bearbeiten.drehen_basis"),
                           command=lambda: self._op_start("rotate"))
+            m.add_command(label=tr("menu.bearbeiten.skalieren"),
+                          command=lambda: self._op_start("scale"))
+            m.add_command(label=tr("menu.bearbeiten.spiegeln"),
+                          command=lambda: self._op_start("mirror"))
             if any(isinstance(e, BlockReferenz) and e.attribut_definitionen()
                    for e in self.auswahl):
                 m.add_command(label=tr("menu.bloecke.attedit"),
@@ -8706,3 +8799,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
