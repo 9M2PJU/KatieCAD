@@ -6430,6 +6430,9 @@ class CadApp:
                 m.add_command(label=tr("menu.einfuegen.block_aufloesen"),
                               command=self.block_aufloesen)
             m.add_separator()
+            m.add_command(label=tr("menu.bearbeiten.eigenschaften"),
+                          command=self.eigenschaften_fenster)
+            m.add_separator()
             m.add_command(label=("Löschen" if de else "Delete"),
                           command=self.auswahl_loeschen)
             m.add_separator()
