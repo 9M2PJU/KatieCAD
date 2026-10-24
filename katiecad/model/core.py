@@ -2457,6 +2457,8 @@ class _FestMaske(Element):
     def to_dict(self):
         d = super().to_dict()
         d.pop("refs", None)
+        d.pop("kontakte", None)         # computed, never saved
+        d.pop("sym_bbox", None)
         d["werte"] = dict(self.werte)
         d["ausgeblendet"] = sorted(self.ausgeblendet)
         return d
