@@ -47,12 +47,26 @@ Requirements:
 - `tkinter` (included in standard Python on Windows/macOS; on Linux install `python3-tk`)
 
 ```bash
-git clone https://github.com/Merecete/KatieCAD.git
-cd KatieCAD
-python -m venv venv
-# Windows: venv\Scripts\activate      Linux/macOS: source venv/bin/activate
+## Windows:
+
+python -m venv .venv
+
+.venv\Scripts\activate
+
 pip install -r requirements.txt
+
 python main.py
+
+
+## Linux/macOS:
+
+python3 -m venv .venv
+
+source .venv/bin/activate
+
+pip install -r requirements.txt
+
+python3 main.py
 ```
 
 `requirements.txt` installs `ezdxf` (DXF) and `ezdwg` (DWG) and the other dependencies.
