@@ -1551,6 +1551,7 @@ class BlockReferenz(Element):
         self.ausgeblendet = set(ausgeblendet or [])
         self._cache = None          # (signature, resolved children)
         self.refs = []              # Device references (sheet numbers), computed
+        self.kontakte = []          # Contact mirror entries (art, pins, ort), computed
 
     # ---- Attributes --------------------------------------------
     def attribut_definitionen(self):
@@ -1666,7 +1667,9 @@ class BlockReferenz(Element):
         # The list is READ-ONLY (when resolving: copy first).
         sig = (self.x, self.y, self.skalierung, self.winkel,
                tuple(sorted(self.attribute.items())),
-               tuple(sorted(self.ausgeblendet)), tuple(self.refs))
+               tuple(sorted(self.ausgeblendet)), tuple(self.refs),
+               tuple((a, p, tuple(o) if isinstance(o, (tuple, list)) else o)
+                     for a, p, o in self.kontakte))
         if self._cache is not None and self._cache[0] == sig:
             return self._cache[1]
         out = []
@@ -1679,6 +1682,7 @@ class BlockReferenz(Element):
                            for t in k.FELDER}
                 k.ausgeblendet = set(self.ausgeblendet) & set(k.FELDER)
                 k.refs = list(self.refs)
+                k.kontakte = list(self.kontakte)
                 k.platzhalter = False
                 out.append(k)
                 continue
@@ -1733,6 +1737,7 @@ class BlockReferenz(Element):
         d = super().to_dict()
         d.pop("_cache", None)
         d.pop("refs", None)
+        d.pop("kontakte", None)
         d["ausgeblendet"] = sorted(self.ausgeblendet)
         # Store children as dicts (not the objects themselves)
         d["elemente"] = [e.to_dict() for e in self.elemente]
@@ -2163,10 +2168,12 @@ class Querverweis(Element):
     ZIEL_HOEHE = 1.0            # Target specification
     _VEKTOR = {0: (1.0, 0.0), 90: (0.0, 1.0), 180: (-1.0, 0.0), 270: (0.0, -1.0)}
 
-    def __init__(self, x, y, text="", art="abgehend", richtung=0, **kw):
+    def __init__(self, x, y, text="", art="abgehend", richtung=0,
+                 extern=False, **kw):
         kw.setdefault("eig_farbe", True)
         super().__init__("querverweis", **kw)
         self.x, self.y = x, y
+        self.extern = bool(extern)     # handover/external: no counterpart needed
         self.text = str(text or "")
         self.art = art if art in self.ARTEN else "abgehend"
         self.richtung = int(round(float(richtung) / 90.0) * 90) % 360
@@ -2491,14 +2498,60 @@ class ElektroMaske(_FestMaske):
     auxiliary part -> only the main symbol), see katiecad.electrical.logic."""
     FELDER = ("IND", "TYP", "PER")
     ROLLEN = ("haupt", "hilfs")
+    SPIEGEL = ("liste", "rechts", "unten")      # reference list / contact mirror
+    SP_RASTER = 4.0                              # row pitch of the mirror
     HOEHEN = {"IND": 2.5, "TYP": 1.5, "PER": 1.5}
     REF_HOEHE = 1.5
     ABSTAND = {"PER": 1.1, "TYP": 2.0, "IND": 3.0}   # centre to centre upwards
     ZEILEN = ()
 
-    def __init__(self, x, y, werte=None, rolle="haupt", **kw):
+    def __init__(self, x, y, werte=None, rolle="haupt", spiegel="liste", **kw):
         super().__init__("maske", x, y, werte, **kw)
         self.rolle = rolle if rolle in self.ROLLEN else "haupt"
+        self.spiegel = spiegel if spiegel in self.SPIEGEL else "liste"
+        self.kontakte = []        # (art, pins, ort) of the auxiliary parts (computed)
+
+    def to_dict(self):
+        d = super().to_dict()
+        d.pop("kontakte", None)
+        return d
+
+    def _spiegel_aktiv(self):
+        return (self.spiegel != "liste" and self.rolle == "haupt"
+                and bool(self.kontakte))
+
+    def _spiegel_elemente(self, st):
+        """Contact mirror: one row per contact (symbol, pins, location)."""
+        out = []
+        n = len(self.kontakte)
+        p = self.SP_RASTER
+        if self.spiegel == "rechts":
+            x0 = self.x + 3.0              # right of the symbol, same alignment
+            def zy(i):
+                return self.y + 2.0 + (n - 1 - i) * p
+        else:                              # below (relays)
+            x0 = self.x - 14.0
+            def zy(i):
+                return self.y - 3.0 - i * p
+        for i, (art, pins, ort) in enumerate(self.kontakte):
+            cy = zy(i)
+            cx = x0 + 1.0
+            if art in ("schliesser", "oeffner", "wechsler"):
+                out.append(Linie(cx, cy + 1.6, cx, cy + 0.9, staerke=0.25, **st))
+                out.append(Linie(cx, cy - 1.6, cx, cy - 0.9, staerke=0.25, **st))
+                if art == "schliesser":
+                    out.append(Linie(cx, cy - 0.9, cx + 0.9, cy + 0.7, staerke=0.25, **st))
+                elif art == "oeffner":
+                    out.append(Linie(cx, cy - 0.9, cx, cy + 0.9, staerke=0.25, **st))
+                    out.append(Linie(cx - 0.5, cy + 0.2, cx + 0.5, cy + 0.2, staerke=0.25, **st))
+                else:
+                    out.append(Linie(cx, cy - 0.9, cx + 0.9, cy + 0.7, staerke=0.25, **st))
+                    out.append(Linie(cx + 1.6, cy + 1.6, cx + 1.6, cy + 0.9, staerke=0.25, **st))
+            out.append(Text(cx + 2.8, cy, pins, 1.5, 0.0, "Arial",
+                            einfuegepunkt="mitte_links", **st))
+            out.append(Text(cx + 11.0, cy, "(" + ort_text(ort) + ")", 1.5, 0.0,
+                            "Arial", einfuegepunkt="mitte_links", **st))
+        return out
 
     def aufgeloest(self, platzhalter=None):
         """Empty fields stay empty. Only on screen (platzhalter) a small cross
@@ -2510,7 +2563,10 @@ class ElektroMaske(_FestMaske):
         ref = Text(self.x, self.y, "\n".join(refs) if refs else "REF",
                    self.REF_HOEHE, 0.0, "Arial",
                    einfuegepunkt="unten_rechts", **st)
-        out = [ref] if refs else []
+        mirror = self._spiegel_aktiv()
+        out = [ref] if (refs and not mirror) else []
+        if mirror:
+            out.extend(self._spiegel_elemente(st))
         y = ref.bbox()[3]                # Top edge of the (reserved) REF line
         for tag in ("PER", "TYP", "IND"):
             y += self.ABSTAND[tag]       # Centre of the respective line
