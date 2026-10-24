@@ -299,3 +299,9 @@ im Querverweis-Dialog mit **Übergabe / extern** markieren.
 Referenzliste, Kontaktspiegel rechts vom Symbol oder – für Relais – unterhalb. Die Kontakte werden aus den Hilfsteilen mit
 gleichem Kennzeichen ermittelt; Schließer/Öffner/Wechsler aus den Pin-Bezeichnungen (13/14, 21/22, 11/12/14 …).
 
+**Kontaktspiegel verschieben:** Das Gerät markieren – am Kontaktspiegel erscheint ein gelber Griff (oben links). Ziehen verschiebt den Spiegel frei; die Lage bleibt relativ zum Gerät erhalten. Beim Wechsel der Darstellung wird die Position zurückgesetzt.
+
+## Eigenschaften (Strg+1)
+Bearbeiten › Eigenschaften öffnet ein Fenster für die aktuelle Auswahl – auch gemischt (Linien, Texte, Symbole …): Layer, Farbe (oder „Von Layer“), Linientyp, Linienstärke und – sobald Texte dabei sind – Texthöhe, Winkel und Schriftart. Unterschiedliche Werte zeigt das Feld als *VERSCHIEDEN*; eine Änderung gilt sofort für alle gewählten Objekte.
+
+
