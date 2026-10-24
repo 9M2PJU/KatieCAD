@@ -287,3 +287,15 @@ On the Mac, Cmd replaces Ctrl.
 - **Only one dialog at a time:** opening a new dialog closes the previous one.
 - **Safety:** drawing sheets are saved automatically when you switch sheets. Use
   Ctrl+S to save the project at any time.
+
+## Projekt prüfen / Kontaktspiegel
+
+**Projekt › Projekt prüfen…** prüft alle Zeichnungsblätter: doppelte Hauptgeräte und Kabel, Hilfsteile ohne Hauptgerät,
+doppelte Klemmen, Querverweise mit mehr als zwei Vorkommen / ohne Gegenstück / mit gleicher Pfeilart, offene Klemmenanschlüsse.
+Doppelklick auf einen Befund springt zur Stelle. Querverweise, die bewusst ohne Gegenstück bleiben (Einspeisung, Übergabe),
+im Querverweis-Dialog mit **Übergabe / extern** markieren.
+
+**Kontaktspiegel:** Im Geräte-Dialog (Attribute bearbeiten bzw. Betriebsmittelmaske) unter *Darstellung* wählen:
+Referenzliste, Kontaktspiegel rechts vom Symbol oder – für Relais – unterhalb. Die Kontakte werden aus den Hilfsteilen mit
+gleichem Kennzeichen ermittelt; Schließer/Öffner/Wechsler aus den Pin-Bezeichnungen (13/14, 21/22, 11/12/14 …).
+
