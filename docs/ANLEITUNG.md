@@ -127,7 +127,11 @@ Ohne Projekt arbeitest du in einer einzelnen Zeichnung (Menü **Datei**: Neu,
   Vorlage. Eigene Schriftköpfe sind normale Zeichnungen (`*.cadjson`) im Ordner
   `title_blocks/`; ihr Nullpunkt ist die untere rechte Ecke des Blattrandes. Felder
   wie `PAGE`, `PAGES`, `SHEET`, `PROJECT`, `DATE`, `SCALE`, `FORMAT` füllen sich
-  automatisch. Mehr dazu in `title_blocks/README.md`.
+  automatisch. Mit **Projekt > Projekteigenschaften…** trägst du Kunde, Gezeichnet/Geprüft,
+  Zeichnungsnummer und den Änderungsindex (4 Zeilen mit Stand, Änderung, Name, Datum) einmal
+  ein; sie erscheinen in den Schriftköpfen aller Blätter. Der Titel besteht aus Kunde,
+  Projektname und Blattname; das Blattformat folgt dem gewählten Layout-Format. Die
+  Feldnamen (z. B. `KUNDE`, `GEZEICHNET`, `REV1_STAND`) stehen in `title_blocks/README.md`.
 - **Einfügen > Zeichnung als Schriftkopf-Vorlage speichern…** legt aus einer
   Zeichnung eine neue Vorlage an.
 - **Datei > Drucken** (Strg+P) und **Projekt > Blätter drucken / als PDF…**
