@@ -303,5 +303,3 @@ gleichem Kennzeichen ermittelt; Schließer/Öffner/Wechsler aus den Pin-Bezeichn
 
 ## Eigenschaften (Strg+1)
 Bearbeiten › Eigenschaften öffnet ein Fenster für die aktuelle Auswahl – auch gemischt (Linien, Texte, Symbole …): Layer, Farbe (oder „Von Layer“), Linientyp, Linienstärke und – sobald Texte dabei sind – Texthöhe, Winkel und Schriftart. Unterschiedliche Werte zeigt das Feld als *VERSCHIEDEN*; eine Änderung gilt sofort für alle gewählten Objekte.
-
-
