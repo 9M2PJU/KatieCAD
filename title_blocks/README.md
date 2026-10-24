@@ -23,8 +23,8 @@ How to make your own:
    | `FORMAT` | paper format (e.g. A3) |
 
    Also filled in automatically on every sheet, from **Project > Project properties**
-   (use whichever spelling suits your template; empty values never overwrite
-   manual entries):
+   (use whichever spelling suits your template; an empty project value clears the
+   field, without a project nothing is touched):
 
    | Tag (German / English) | Content |
    |---|---|
