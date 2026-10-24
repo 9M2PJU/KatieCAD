@@ -19,7 +19,7 @@ from katiecad.model.core import (
     FARBEN, ZEICHNUNGSFORMATE, LINIENTYPEN, LINIENSTAERKEN,
     SCHRIFTARTEN, MASSSTAEBE, BEM_RICHTUNGEN,
     Layer, Text, Linie, Kreis, Bogen, Rechteck, Polylinie,
-    Bemassung, Viewport, Verbindung,
+    Bemassung, Viewport, Verbindung, ElektroMaske,
     parse_massstab, massstab_text,
 )
 from katiecad.model.project import name_pruefen
@@ -1388,6 +1388,8 @@ class BlockAttributeDialog(tk.Toplevel):
 
         # Device (block with electrical mask): main or auxiliary device
         self.rolle = None
+        self.spiegel = None
+        self._v_spiegel = None
         self._v_rolle = None
         maske = ref.geraet_maske() if hasattr(ref, "geraet_maske") else None
         if maske is not None:
@@ -1400,6 +1402,15 @@ class BlockAttributeDialog(tk.Toplevel):
                             variable=self._v_rolle).pack(side=tk.LEFT, padx=(0, 12))
             ttk.Radiobutton(rf, text=tr("dlg.maske.rolle.hilfs"), value="hilfs",
                             variable=self._v_rolle).pack(side=tk.LEFT)
+            zeile += 1
+            self._v_spiegel = tk.StringVar(value=getattr(maske, "spiegel", "liste"))
+            ttk.Label(f, text=tr("dlg.maske.spiegel")).grid(
+                row=zeile, column=0, sticky=tk.NW, pady=(4, 2))
+            sf = ttk.Frame(f)
+            sf.grid(row=zeile, column=1, columnspan=2, sticky=tk.W, pady=(4, 2))
+            for w in ElektroMaske.SPIEGEL:
+                ttk.Radiobutton(sf, text=tr("dlg.maske.spiegel." + w), value=w,
+                                variable=self._v_spiegel).pack(anchor=tk.W)
             zeile += 1
 
         bf = ttk.Frame(f)
@@ -1419,6 +1430,8 @@ class BlockAttributeDialog(tk.Toplevel):
     def _ok(self):
         if self._v_rolle is not None:
             self.rolle = self._v_rolle.get()
+        if self._v_spiegel is not None:
+            self.spiegel = self._v_spiegel.get()
         self.result = {t: v.get() for t, v in self._vars.items()}
         # Tags whose text is to be hidden in this instance
         self.ausgeblendet = {t for t, v in self._sicht.items() if not v.get()}
@@ -1458,11 +1471,15 @@ class QuerverweisDialog(tk.Toplevel):
         ttk.Label(f, text=tr("dlg.qv.text")).grid(row=2, column=0, sticky=tk.W, pady=3, padx=(0, 10))
         self.e_text = ttk.Entry(f, textvariable=self.v_text, width=24)
         self.e_text.grid(row=2, column=1, sticky=tk.EW, pady=3)
+        self.v_extern = tk.BooleanVar(value=bool(v.get("extern", False)))
+        ttk.Checkbutton(f, text=tr("dlg.qv.extern"),
+                        variable=self.v_extern).grid(
+            row=3, column=0, columnspan=2, sticky=tk.W, pady=(4, 0))
         ttk.Label(f, text=tr("dlg.qv.hinweis"), style="Hint.TLabel",
                   wraplength=330, justify=tk.LEFT).grid(
-            row=3, column=0, columnspan=2, sticky=tk.W, pady=(6, 4))
+            row=4, column=0, columnspan=2, sticky=tk.W, pady=(6, 4))
         bf = ttk.Frame(f)
-        bf.grid(row=4, column=0, columnspan=2, pady=(8, 0))
+        bf.grid(row=5, column=0, columnspan=2, pady=(8, 0))
         ttk.Button(bf, text=tr("dlg.ok"), command=self._ok).pack(side=tk.LEFT, padx=4)
         ttk.Button(bf, text=tr("dlg.abbrechen"), command=self.destroy).pack(side=tk.LEFT, padx=4)
         self.bind("<Return>", lambda e: self._ok())
@@ -1475,8 +1492,72 @@ class QuerverweisDialog(tk.Toplevel):
     def _ok(self):
         art = self._arten[[tr("dlg.qv.art." + a) for a in self._arten].index(self.v_art.get())]
         rt = self._rt[[tr("dlg.qv.rt.%d" % r) for r in self._rt].index(self.v_rt.get())]
-        self.result = {"art": art, "richtung": rt, "text": self.v_text.get().strip()}
+        self.result = {"art": art, "richtung": rt, "text": self.v_text.get().strip(),
+                       "extern": bool(self.v_extern.get())}
         self.destroy()
+
+
+class PruefungDialog(tk.Toplevel):
+    """Non-modal result list of the project check. Double click = jump to
+    the location (callback springen(befund))."""
+
+    def __init__(self, parent, befunde, springen, neu_pruefen=None):
+        super().__init__(parent)
+        self._springen = springen
+        self._neu = neu_pruefen
+        self._befunde = []
+        self.title(tr("dlg.pr.titel"))
+        self.transient(parent)
+        self.configure(bg=FARBEN["bg_mittel"])
+        f = ttk.Frame(self, padding=10)
+        f.pack(fill=tk.BOTH, expand=True)
+        self.v_info = tk.StringVar()
+        ttk.Label(f, textvariable=self.v_info).pack(anchor=tk.W, pady=(0, 6))
+        cols = ("stufe", "blatt", "text")
+        self.tree = ttk.Treeview(f, columns=cols, show="headings", height=14)
+        for c, w in (("stufe", 80), ("blatt", 130), ("text", 460)):
+            self.tree.heading(c, text=tr("dlg.pr.sp." + c))
+            self.tree.column(c, width=w, anchor=tk.W)
+        sb = ttk.Scrollbar(f, orient=tk.VERTICAL, command=self.tree.yview)
+        self.tree.configure(yscrollcommand=sb.set)
+        self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        sb.pack(side=tk.LEFT, fill=tk.Y)
+        self.tree.bind("<Double-1>", lambda e: self._los())
+        self.tree.bind("<Return>", lambda e: self._los())
+        bf = ttk.Frame(self, padding=(10, 0, 10, 10))
+        bf.pack(fill=tk.X)
+        ttk.Button(bf, text=tr("dlg.pr.neu"), command=self._aktualisieren).pack(side=tk.LEFT)
+        ttk.Button(bf, text=tr("dlg.pr.kopieren"), command=self._kopieren).pack(side=tk.LEFT, padx=6)
+        ttk.Button(bf, text=tr("dlg.schliessen"), command=self.destroy).pack(side=tk.RIGHT)
+        self.befunde_setzen(befunde)
+        self.update_idletasks()
+        self.geometry(f"+{parent.winfo_rootx() + 80}+{parent.winfo_rooty() + 80}")
+
+    def befunde_setzen(self, befunde):
+        self._befunde = list(befunde)
+        self.tree.delete(*self.tree.get_children())
+        for i, b in enumerate(self._befunde):
+            self.tree.insert("", tk.END, iid=str(i), values=(
+                tr("pr.stufe." + b.stufe), b.blatt_name, b.text))
+        n = {s: 0 for s in ("fehler", "warnung", "hinweis")}
+        for b in self._befunde:
+            n[b.stufe] += 1
+        self.v_info.set(tr("dlg.pr.summe", f=n["fehler"], w=n["warnung"],
+                           h=n["hinweis"]) if self._befunde else tr("pr.ok"))
+
+    def _los(self):
+        sel = self.tree.selection()
+        if sel:
+            self._springen(self._befunde[int(sel[0])])
+
+    def _aktualisieren(self):
+        if self._neu:
+            self.befunde_setzen(self._neu())
+
+    def _kopieren(self):
+        from katiecad.electrical.pruefung import bericht_text
+        self.clipboard_clear()
+        self.clipboard_append(bericht_text(self._befunde))
 
 
 class VerbindungspunkteDialog(tk.Toplevel):
@@ -2306,7 +2387,7 @@ class FestMaskeDialog(tk.Toplevel):
     result: {'werte': {...}, 'rolle': ...} or None."""
 
     def __init__(self, parent, titel, felder, werte=None, rolle=None, hinweis="",
-                 zusatz=()):
+                 zusatz=(), spiegel=None):
         super().__init__(parent)
         self.result = None
         werte = werte or {}
@@ -2337,6 +2418,16 @@ class FestMaskeDialog(tk.Toplevel):
             ttk.Radiobutton(rf, text=tr("dlg.maske.rolle.hilfs"), value="hilfs",
                             variable=self.v_rolle).pack(anchor=tk.W)
             row += 1
+        self.v_spiegel = tk.StringVar(value=spiegel or "liste")
+        self._spiegel = spiegel is not None and self._rolle
+        if self._spiegel:
+            ttk.Label(f, text=tr("dlg.maske.spiegel")).grid(row=row, column=0, sticky=tk.NW, pady=(4, 2))
+            sf = ttk.Frame(f)
+            sf.grid(row=row, column=1, sticky=tk.W, pady=(4, 2))
+            for w in ElektroMaske.SPIEGEL:
+                ttk.Radiobutton(sf, text=tr("dlg.maske.spiegel." + w), value=w,
+                                variable=self.v_spiegel).pack(anchor=tk.W)
+            row += 1
         self._zvars = {}
         for key, label, wert in zusatz:       # further input fields (e.g. cores)
             ttk.Label(f, text=label).grid(row=row, column=0, sticky=tk.W, pady=2, padx=(0, 10))
@@ -2364,6 +2455,7 @@ class FestMaskeDialog(tk.Toplevel):
     def _ok(self):
         self.result = {"werte": {t: v.get().strip() for t, v in self._vars.items()},
                        "rolle": self.v_rolle.get() if self._rolle else None,
+                       "spiegel": self.v_spiegel.get() if self._spiegel else None,
                        "zusatz": {k: v.get().strip() for k, v in self._zvars.items()}}
         self.destroy()
 
