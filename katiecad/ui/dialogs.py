@@ -1693,6 +1693,82 @@ class DokumentationDialog(tk.Toplevel):
         self.destroy()
 
 
+class ProjektEigenschaftenDialog(tk.Toplevel):
+    """Project properties: data for cover sheet and title blocks (filled in
+    automatically on every sheet) and the revision table (4 rows).
+
+    daten:  project data (dict); projektname: default for 'anlage'
+    result: the new project data dict (all other keys are kept) or None"""
+
+    FELDER = ("anlage", "kunde", "auftrag", "zeichnungsnummer", "firma",
+              "gezeichnet", "geprueft", "revision", "datum")
+    REV_SPALTEN = ("stand", "aenderung", "name", "datum")
+    REV_ZEILEN = 4
+
+    def __init__(self, parent, daten, projektname):
+        super().__init__(parent)
+        self.result = None
+        self._daten = dict(daten or {})
+        self.title(tr("dlg.pe.titel"))
+        self.transient(parent)
+        _modal(self)
+        self.configure(bg=FARBEN["bg_mittel"])
+        f = ttk.Frame(self, padding=14)
+        f.pack(fill=tk.BOTH, expand=True)
+
+        ttk.Label(f, text=tr("dlg.pe.daten"), style="Title.TLabel").pack(anchor=tk.W)
+        g = ttk.Frame(f)
+        g.pack(fill=tk.X)
+        g.columnconfigure(1, weight=1)
+        self.v_f = {}
+        for i, k in enumerate(self.FELDER):
+            ttk.Label(g, text=tr("dlg.doku.f." + k)).grid(
+                row=i, column=0, sticky=tk.W, padx=(10, 8), pady=1)
+            wert = self._daten.get(k, "")
+            if k == "anlage" and not wert:
+                wert = projektname
+            self.v_f[k] = tk.StringVar(value=wert)
+            ttk.Entry(g, textvariable=self.v_f[k], width=40).grid(
+                row=i, column=1, sticky=tk.EW, pady=1)
+
+        ttk.Label(f, text=tr("dlg.pe.rev"), style="Title.TLabel").pack(
+            anchor=tk.W, pady=(12, 2))
+        r = ttk.Frame(f)
+        r.pack(fill=tk.X, padx=(10, 0))
+        breiten = {"stand": 8, "aenderung": 30, "name": 10, "datum": 12}
+        for c, k in enumerate(self.REV_SPALTEN):
+            ttk.Label(r, text=tr("dlg.pe.rev." + k)).grid(row=0, column=c, sticky=tk.W, padx=2)
+        rev = self._daten.get("rev")
+        rev = rev if isinstance(rev, list) else []
+        self.v_rev = []
+        for i in range(self.REV_ZEILEN):
+            alt = rev[i] if i < len(rev) and isinstance(rev[i], dict) else {}
+            zeile = {}
+            for c, k in enumerate(self.REV_SPALTEN):
+                zeile[k] = tk.StringVar(value=str(alt.get(k, "") or ""))
+                ttk.Entry(r, textvariable=zeile[k], width=breiten[k]).grid(
+                    row=i + 1, column=c, sticky=tk.EW, padx=2, pady=1)
+            self.v_rev.append(zeile)
+
+        ttk.Label(f, text=tr("dlg.pe.hinweis"), style="Hint.TLabel",
+                  wraplength=520, justify=tk.LEFT).pack(anchor=tk.W, pady=(12, 4))
+        bf = ttk.Frame(f)
+        bf.pack(pady=(8, 0))
+        ttk.Button(bf, text=tr("dlg.ok"), command=self._ok).pack(side=tk.LEFT, padx=4)
+        ttk.Button(bf, text=tr("dlg.abbrechen"), command=self.destroy).pack(side=tk.LEFT, padx=4)
+        self.bind("<Escape>", lambda e: self.destroy())
+        _zentrieren(self, parent)
+        self.wait_window(self)
+
+    def _ok(self):
+        d = dict(self._daten)
+        d.update({k: v.get().strip() for k, v in self.v_f.items()})
+        d["rev"] = [{k: v.get().strip() for k, v in zeile.items()}
+                    for zeile in self.v_rev]
+        self.result = d
+        self.destroy()
+
+
 class VerbindungspunktDialog(tk.Toplevel):
     """Designation of a connection point + switch 'Show text'.
     result: {'wert': str, 'sichtbar': bool, 'richtungen': [0|90|180|270]}
