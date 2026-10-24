@@ -347,8 +347,8 @@ def geraete_referenzen(eigene, blatt_nr, andere_blaetter):
                 if per == g["per"] and rolle == "hilfs" and oid != id(g["obj"]):
                     art = kontakt_art(pins)
                     if art != "spule":
-                        ptxt = "/".join(str(p).strip() for p in pins if str(p).strip())
-                        kont.append((art, ptxt, blatt))
+                        pt = tuple(str(p).strip() for p in pins if str(p).strip())
+                        kont.append((art, pt, blatt))
             kont.sort(key=lambda k: (k[1], str(k[2])))
         g["obj"].kontakte = kont
         gesucht = ("kabel" if g["rolle"] == "kabel"
@@ -756,4 +756,3 @@ def kabel_kreuzungen(elemente):
             else:
                 gruppen.append([x])
         k.kreuzungen = [g[0] for g in gruppen]
-
