@@ -109,11 +109,13 @@ _REV_WOERTER = {
     "aenderung": {"AENDERUNG", "AENDERUNGEN", "AENDERUNGSTEXT", "AEND",
                   "CHANGE", "CHANGES", "DESCRIPTION", "BESCHREIBUNG",
                   "BEZEICHNUNG", "REVCHANGE", "REVAENDERUNG"},
-    "name": {"NAME", "NAM", "BEARBEITER", "AUTHOR", "BY", "REVNAME"},
+    "name": {"NAME", "NAM", "BEARBEITER", "BEARB", "AUTHOR", "BY", "REVNAME"},
     "datum": {"DATUM", "DATE", "DAT", "REVDATUM", "REVDATE"},
 }
 _REV_VORSILBEN = ("REVISIONSTABELLE", "AENDERUNGSTABELLE", "AENDERUNGSINDEX",
-                  "TABELLE", "ZEILE", "ROW", "REV", "AEND", "Z", "R")
+                  "AENDERUNGS", "AENDERUNG", "REVISION", "CHANGE", "TABELLE",
+                  "ZEILE", "INDEX", "STAND", "ROW", "REV", "AEND", "BEARB",
+                  "Z", "R")
 
 
 def parse_rev_tag(tag):
@@ -129,11 +131,13 @@ def parse_rev_tag(tag):
         if not (1 <= row <= REV_ROWS):
             return None
         kandidaten = [wort]
-        for v in _REV_VORSILBEN:                 # optional prefix / suffix
-            if wort.startswith(v):
-                kandidaten.append(wort[len(v):])
-            if wort.endswith(v):
-                kandidaten.append(wort[:-len(v)])
+        for _runde in range(2):                  # optional prefixes / suffixes
+            for w in list(kandidaten):
+                for v in _REV_VORSILBEN:
+                    if w.startswith(v) and len(w) > len(v):
+                        kandidaten.append(w[len(v):])
+                    if w.endswith(v) and len(w) > len(v):
+                        kandidaten.append(w[:-len(v)])
         for k in kandidaten:
             for key, woerter in _REV_WOERTER.items():
                 if k in woerter and k:
@@ -361,6 +365,22 @@ def make_info(project, sheet_index, lang="en", paper_format="", today=None):
     else:
         nr, total, sheet, proj = 1, 1, "", ""
     return info_values(nr, total, sheet, proj, lang, paper_format, today, daten)
+
+
+def feld_bericht(layout_elements):
+    """Text listing all fields of the title blocks of a layout and whether
+    they are filled in automatically (for the help menu)."""
+    zeilen = []
+    for el in layout_elements:
+        if not is_title_block(el):
+            continue
+        for ad in sorted(el.attribut_definitionen(), key=lambda a: (-a.y, a.x)):
+            pr = parse_rev_tag(ad.tag)
+            hinweis = ""
+            if pr:
+                hinweis = "  (Änderungsindex Zeile %d: %s)" % (pr[0], pr[1])
+            zeilen.append("%s  %s%s" % ("ja  " if is_auto_tag(ad.tag) else "NEIN", ad.tag, hinweis))
+    return "\n".join(zeilen)
 
 
 def refresh_fields(layout_elements, info, fallback_scale=""):
