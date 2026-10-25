@@ -10,6 +10,7 @@
 - Terminal diagram: every terminal strip starts on its own sheet
 - Terminal diagram sheets are named "Klemmenplan <strip>" after the terminal strip (e.g. "Klemmenplan X1")
 - Table of contents: "type" and "description" are now sheet properties (F2); default type stays "Circuit diagram", the customer is no longer used as description
+- Block browser: the symbol library is listed only once ("Symbole" / "symbols"); a second, older "symbols" entry is hidden
 - Info window: Log button opens the log file in the editor (no tabs)
 
 ## 1.0.1
