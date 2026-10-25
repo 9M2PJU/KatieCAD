@@ -73,7 +73,7 @@ Nächstes erwartet. **ESC** bricht den aktuellen Vorgang ab.
 zum Beispiel `L` (Linie), `K` (Kreis), `REC` (Rechteck), `T` (Text),
 `M` (Verschieben), `KO` (Kopieren), `RO` (Drehen), `AR` (Reihe), `STR` (Strecken),
 `TR` (Stutzen), `BR` (Brechen), `ZG` (Zoom Grenzen), `U` (Rückgängig),
-`B` (Block erzeugen), `I` (Block einfügen), `X` (Block auflösen).
+`B` (Block erzeugen), `I` (Block/Gerät einfügen), `X` (Block auflösen).
 Die Befehle gibt es auch auf Englisch.
 
 ## 4. Zeichnen und Bearbeiten
@@ -92,7 +92,7 @@ Die Befehle gibt es auch auf Englisch.
 6. **Rückgängig** (Strg+Z) und **Wiederholen** (Strg+Y) stehen auch in der
    Seitenleiste.
 
-Weitere Zeichenhilfen: **Bemaßung** (auch Radius und Durchmesser),
+Weitere Zeichenhilfen: **Bemaßung** (Menü Einfügen: **Radius-Bemaßung (DR)** und **Durchmesser-Bemaßung (DD)**: Kreis oder Bogen anklicken, dann die Textposition),
 **Schraffur auf Auswahl** (Menü Einfügen), **Layer** (Schaltfläche „Layer…“)
 und Farbe, Linienart und Linienstärke in der Werkzeugleiste.
 
@@ -105,7 +105,7 @@ Menü **Projekt**:
 
 - **Projekt erstellen…**: Name und Speicherort wählen. Das erste Blatt wird angelegt.
 - **Projekt öffnen… / speichern / schließen / umbenennen… / löschen…**
-- **Neues Blatt, Blatt duplizieren, Blatt umbenennen (F2), Blatt löschen**
+- **Neues Blatt, Blatt duplizieren, Blatt-Eigenschaften (F2: Name und Einbauort), Blatt löschen**
 - **Blätter drucken / als PDF…**
 - **Dokumentation erzeugen / aktualisieren…** und **Listen als CSV exportieren…**
   (siehe Abschnitt 9)
@@ -144,7 +144,7 @@ Symbol). Menü **Blöcke**:
 
 - **Block erzeugen (B)**: Objekte markieren, `B` drücken, Basispunkt klicken,
   Namen und Speicherort wählen.
-- **Block einfügen (I)** öffnet den Block-Browser. Doppelklick auf einen Block
+- **Block/Gerät einfügen (I)** öffnet den Block-Browser. Doppelklick auf einen Block
   setzt ihn in die Zeichnung. Die Blöcke sind normale Dateien (`*.katieblock`) in
   den Ordnern, die der Browser anzeigt (auch der Projektordner `Bloecke`).
 - **Blockliste (BL)**, **Block auflösen (X)** zerlegt einen Block wieder.
@@ -172,7 +172,7 @@ Alle Werkzeuge stehen im Menü **Elektro** und in der Werkzeugleiste.
 
 ### Fertige Symbole
 
-Im Block-Browser (**Blöcke > Block einfügen**, Taste `I`) gibt es den Eintrag
+Im Block-Browser (**Blöcke > Block/Gerät einfügen**, Taste `I`) gibt es den Eintrag
 **Symbolbibliothek** mit Grundsymbolen (Kontakte, Taster, Sicherungen,
 Schutzschalter, Spulen, Motoren, Bauteile, Messgeräte …). Doppelklick setzt ein
 Symbol; Maske und Pins sind schon vorbereitet. Die Liste steht in
@@ -188,7 +188,7 @@ Symbol; Maske und Pins sind schon vorbereitet. Die Liste steht in
 4. **Elektro > Gerät aus Auswahl erstellen…**, Basispunkt klicken, Namen vergeben,
    Haupt-/Hilfsgerät bestätigen. Das Gerät liegt danach als Block vor und wird
    beim Speichern als Datei im Block-Ordner abgelegt.
-5. Platzieren kannst du es mit **Block einfügen (I)** oder **Elektro > Gerät aus
+5. Platzieren kannst du es mit **Block/Gerät einfügen (I)** oder **Elektro > Gerät aus
    Datei laden…**. Beim Einfügen fragt das Programm IND, TYP, PER und die Pin-Namen
    ab.
 
@@ -272,7 +272,7 @@ unverändert.
 | Strg+A | Alles markieren |
 | Entf | Auswahl löschen |
 | ESC | Abbrechen / Auswahl aufheben |
-| F2 | Blatt umbenennen |
+| F2 | Blatt-Eigenschaften (Name, Einbauort) |
 | F3 / F7 / F8 / F9 | Objektfang / Raster anzeigen / Ortho / Rasterfang |
 | F4 | Seitenleiste ein-/ausblenden |
 | G | Alles anzeigen (Zoom Grenzen) |
@@ -323,3 +323,7 @@ Bearbeiten › Eigenschaften öffnet ein Fenster für die aktuelle Auswahl – a
 
 ## Info-Fenster und Log
 Hilfe › Info zeigt Logo, Version und Lizenz. Mit **Lizenz** öffnest du den Lizenztext, mit **Log** öffnet sich die Log-Datei (`katiecad-log.txt` im KatieCAD-Einstellungsordner) im Standard-Editor – hilfreich bei Fehlermeldungen. Die Datei der vorherigen Sitzung bleibt als `katiecad-log.txt.old` erhalten.
+
+## Einbauort (Blatt-Eigenschaften)
+Mit **F2**, Doppelklick auf ein Blatt oder Rechtsklick > *Blatt-Eigenschaften…* legst du Blattname und **Einbauort** (z. B. „Verteiler UV1“) fest. Der Einbauort gilt automatisch für alle Objekte auf dem Blatt und wird nicht in die Objekte kopiert: Ändert man ihn, ziehen Schriftfeld und Listen sofort nach. Im Schriftkopf füllt ihn ein Attribut mit dem Tag `EINBAUORT` (englisch `PLACE`). In der Geräte-, Klemmen- und Kabelliste erscheint die Spalte *Einbauort* (nur, wenn mindestens ein Blatt einen hat); gleiche Betriebsmittelkennzeichen an verschiedenen Einbauorten zählen als verschiedene Geräte. Berichtsblätter haben keinen Einbauort.
+
