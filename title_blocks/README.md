@@ -21,6 +21,7 @@ How to make your own:
    | `DATE` | today |
    | `SCALE` | scale of the first viewport |
    | `FORMAT` | paper format (e.g. A3) |
+   | `EINBAUORT` / `PLACE` | installation location of the sheet (Sheet properties, F2) |
 
    Also filled in automatically on every sheet, from **Project > Project properties**
    (use whichever spelling suits your template; an empty project value clears the
