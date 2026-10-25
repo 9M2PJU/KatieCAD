@@ -9,6 +9,7 @@
 - Terminal diagram: on potential rails (PE, N, ...) only the potential name is shown instead of every terminal
 - Terminal diagram: every terminal strip starts on its own sheet
 - Terminal diagram sheets are named "Klemmenplan <strip>" after the terminal strip (e.g. "Klemmenplan X1")
+- Table of contents: "type" and "description" are now sheet properties (F2); default type stays "Circuit diagram", the customer is no longer used as description
 - Info window: Log button opens the log file in the editor (no tabs)
 
 ## 1.0.1
