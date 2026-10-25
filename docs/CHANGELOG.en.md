@@ -1,5 +1,12 @@
 # Changes
 
+## 1.0.2
+- Installation location per sheet (sheet properties, F2): appears in the title block (`EINBAUORT` / `PLACE`) and separates the device, terminal and cable lists
+- Menu: "Insert block/device" now sits above "Create block"
+- Fix: dimension text was offset; it is now centred above the dimension line
+- Radius/diameter dimensions named more clearly (DR / DD)
+- Info window: Log button opens the log file in the editor (no tabs)
+
 ## 1.0.1
 - Contact mirror for main devices (right of the symbol or below the relay), freely movable
 - Project check: duplicate devices, cross references (with "external"), terminals, open connections
