@@ -320,4 +320,4 @@ Column order: terminal strip, location, type, **connection top, terminal (NUM), 
 If a terminal sits on a potential rail (e.g. PE or N), "connection top/bottom" shows only the potential name. Requirement: the net contains a free connection point or cross reference named exactly like the terminal (NUM).
 
 In the terminal diagram every terminal strip (per location) starts on its own sheet; long strips continue on following sheets.
-The terminal diagram sheets are named after their terminal strip, e.g. "Klemmenplan X1" (with a location: "... X1 (UV1)"; several sheets for one strip: "... X1 2/3"). This also applies to the table of contents and the title block.
+The terminal diagram sheets are named after their terminal strip, e.g. "Klemmenplan X1" (with a location, placed first: "Klemmenplan +1 -X1"; several sheets for one strip: "... X1 2/3"). This also applies to the table of contents and the title block.
