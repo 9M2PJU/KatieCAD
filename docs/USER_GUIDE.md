@@ -103,7 +103,7 @@ A **project** is a folder with a project file (`*.katieprj`), one file per sheet
 
 - **Create project…**: choose a name and location. The first sheet is created.
 - **Open / save / close / rename… / delete project…**
-- **New sheet, duplicate sheet, rename sheet (F2), delete sheet**
+- **New sheet, duplicate sheet, sheet properties (F2: name and installation location), delete sheet**
 - **Print sheets / as PDF…**
 - **Create / update documentation…** and **Export lists as CSV…** (see section 9)
 
@@ -139,7 +139,7 @@ A **block** is a reusable group of objects (for example a symbol). **Blocks** me
 
 - **Create block (B)**: select objects, press `B`, click the base point, choose a
   name and a save location.
-- **Insert block (I)** opens the block browser. A double click on a block places it
+- **Insert block/device (I)** opens the block browser. A double click on a block places it
   in the drawing. Blocks are ordinary files (`*.katieblock`) in the folders shown by
   the browser (including the project folder `Bloecke`).
 - **Block list (BL)**; **Explode block (X)** breaks a block apart again.
@@ -167,7 +167,7 @@ All tools are in the **Electrical** menu and in the toolbar.
 
 ### Ready-made symbols
 
-The block browser (**Blocks > Insert block**, key `I`) contains an entry
+The block browser (**Blocks > Insert block/device**, key `I`) contains an entry
 **Symbol library** with basic symbols (contacts, push buttons, fuses, breakers,
 coils, motors, components, meters …). A double click places a symbol; mask and pins
 are already prepared. The list is in `symbols/README.md`.
@@ -183,7 +183,7 @@ are already prepared. The list is in `symbols/README.md`.
 4. **Electrical > Create device from selection…**, click the base point, enter a
    name and confirm main/auxiliary device. The device is now a block and is saved
    as a file in the block folder.
-5. Place it with **Insert block (I)** or **Electrical > Load device from file…**.
+5. Place it with **Insert block/device (I)** or **Electrical > Load device from file…**.
    On insertion the program asks for IND, TYP, PER and the pin names.
 
 Devices with the **same IND** belong together: the main device shows the sheets of
@@ -264,7 +264,7 @@ changes in them are lost; your drawing sheets stay untouched.
 | Ctrl+A | Select all |
 | Del | Delete selection |
 | ESC | Cancel / clear selection |
-| F2 | Rename sheet |
+| F2 | Sheet properties (name, installation location) |
 | F3 / F7 / F8 / F9 | Object snap / show grid / ortho / grid snap |
 | F4 | Show / hide side bar |
 | G | Show everything (zoom extents) |
@@ -308,3 +308,9 @@ Edit › Properties opens a window for the current selection, also mixed (lines,
 
 ## Info window and log
 Help › About shows the logo, version and license. **License** opens the license text; **Log** opens the log file (`katiecad-log.txt` in the KatieCAD settings folder) in your default text editor – useful for error reports. The previous session's log is kept as `katiecad-log.txt.old`.
+
+## Installation location (sheet properties)
+Press **F2**, double-click a sheet or right-click > *Sheet properties…* to set the sheet name and its **installation location** (e.g. "Panel UV1"). It applies to every object on the sheet automatically and is not copied into the objects: change it and the title block and lists follow at once. In the title block an attribute with the tag `PLACE` (German `EINBAUORT`) shows it. The device, terminal and cable lists get a *Location* column (only if at least one sheet has a location); the same equipment identifier at different locations counts as different devices. Report sheets have no location.
+
+Dimensions: **Insert > Radius dimension (DR)** and **Diameter dimension (DD)** - click a circle or arc, then the text position.
+
