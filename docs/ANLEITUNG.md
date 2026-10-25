@@ -333,3 +333,4 @@ Spaltenfolge: Klemmleiste, Einbauort, Typ, **Anschluss oben, Klemme (NUM), Brüc
 Hängt eine Klemme an einer Potentialschiene (z. B. PE oder N), steht in „Anschluss oben/unten“ nur der Potentialname. Voraussetzung: Im Netz gibt es einen freien Anschlusspunkt oder Querverweis, der genauso heißt wie die Klemme (NUM).
 
 Im Klemmenplan beginnt jede Klemmleiste (je Einbauort) auf einem eigenen Blatt; lange Leisten laufen auf Folgeblätter.
+Die Klemmenplan-Blätter heißen nach ihrer Klemmleiste, z. B. „Klemmenplan X1“ (bei Einbauort: „Klemmenplan X1 (UV1)“, bei mehreren Blättern einer Leiste: „… X1 2/3“). Das gilt auch im Inhaltsverzeichnis und im Schriftfeld.
