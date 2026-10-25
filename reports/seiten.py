@@ -39,7 +39,8 @@ DATEN_SCHLUESSEL = ("anlage", "kunde", "auftrag", "zeichnungsnummer", "firma",
 class BlattInfo:
     """A drawing sheet of the project (without report sheets)."""
 
-    def __init__(self, name, elemente, beschreibung=""):
+    def __init__(self, name, elemente, beschreibung="", einbauort=""):
+        self.einbauort = einbauort
         self.name = name
         self.elemente = elemente
         self.beschreibung = beschreibung
@@ -73,13 +74,20 @@ _STANDARD = {
                ("beschreibung", "rep.col.beschreibung", 70, "l"),
                ("typ", "rep.col.art", 24, "l")],
     "geraete": [("pos", "rep.col.pos", 6, "r"), ("ind", "rep.col.ind", 18, "l"),
+                ("einbauort", "rep.col.einbauort", 26, "l"),
                 ("typ", "rep.col.typ", 40, "l"), ("per", "rep.col.per", 40, "l"),
                 ("anzahl", "rep.col.anzahl", 9, "r"),
                 ("ort", "rep.col.fundstellen", 50, "l")],
-    "klemmen": [("leiste", "rep.col.leiste", 16, "l"), ("num", "rep.col.num", 10, "l"),
-                ("typ", "rep.col.typ", 26, "l"), ("oben", "rep.col.oben", 48, "l"),
+    "klemmen": [("leiste", "rep.col.leiste", 16, "l"),
+                ("einbauort", "rep.col.einbauort", 26, "l"),
+                ("typ", "rep.col.typ", 26, "l"),
+                ("oben", "rep.col.oben", 48, "l"),
+                ("num", "rep.col.num", 10, "l"),
+                ("bruecke", "rep.col.bruecke", 16, "c"),
                 ("unten", "rep.col.unten", 48, "l"), ("ort", "rep.col.ort", 20, "l")],
-    "kabel": [("cab", "rep.col.cab", 14, "l"), ("typ", "rep.col.typ", 26, "l"),
+    "kabel": [("cab", "rep.col.cab", 14, "l"),
+              ("einbauort", "rep.col.einbauort", 26, "l"),
+              ("typ", "rep.col.typ", 26, "l"),
               ("ader", "rep.col.ader", 10, "l"), ("von", "rep.col.von", 50, "l"),
               ("nach", "rep.col.nach", 50, "l"), ("ort", "rep.col.ort", 18, "l")],
 }
@@ -170,7 +178,7 @@ def _seite(typ, name, titel1, inhalt, ctx, nr, gesamt):
         ref.setze_attribute(titel_werte(ctx["daten"], titel1, ctx["projekt"],
                                         ctx["heute"], ctx["sprache"]))
         info = TB.info_values(nr, gesamt, name, ctx["projekt"], ctx["sprache"],
-                              FORMAT, ctx["heute"], ctx["daten"])
+                              FORMAT, ctx["heute"], ctx["daten"], "")
         TB.refresh_fields([ref], info, "")
         el.append(ref)
     return BerichtSeite(typ, name, el)
@@ -216,14 +224,17 @@ def deckblatt_inhalt(daten, projektname, flaeche, heute, sprache):
 # ------------------------------------------------------------------
 # Rows per report type (also for the CSV export)
 # ------------------------------------------------------------------
-def listen_zeilen(typ, blaetter, nummer, netz=None, klemmen_in_geraeteliste=True):
-    """Rows of a list report. blaetter: [(idx, elements)]."""
+def listen_zeilen(typ, blaetter, nummer, netz=None, klemmen_in_geraeteliste=True,
+                  einbauorte=None):
+    """Rows of a list report. blaetter: [(idx, elements)];
+    einbauorte: {idx: installation location of the sheet}."""
     if typ == "geraete":
-        return D.geraeteliste(blaetter, nummer, netz, klemmen_in_geraeteliste)
+        return D.geraeteliste(blaetter, nummer, netz, klemmen_in_geraeteliste,
+                              einbauorte)
     if typ == "klemmen":
-        return D.klemmenplan(netz, blaetter, nummer)
+        return D.klemmenplan(netz, blaetter, nummer, einbauorte)
     if typ == "kabel":
-        return D.kabelplan(netz, blaetter, nummer)
+        return D.kabelplan(netz, blaetter, nummer, einbauorte)
     raise ValueError(typ)
 
 
@@ -231,22 +242,34 @@ def netz_aufbauen(blaetter):
     return Netz.aufbauen(blaetter)
 
 
-def tabellen_fuer_export(blaetter, nummer, ordner=(), klemmen_in_geraeteliste=True):
+def _ohne_leere_einbauorte(spalten, zeilen):
+    """Columns without content disappear: 'einbauort' without any location,
+    'bruecke' without any bridge."""
+    return [sp for sp in spalten
+            if not (sp.key == "einbauort" and not any(z.get("einbauort") for z in zeilen))
+            and not (sp.key == "bruecke" and not any(z.get("_bruecke") for z in zeilen))]
+
+
+def tabellen_fuer_export(blaetter, nummer, ordner=(), klemmen_in_geraeteliste=True,
+                         einbauorte=None):
     """{type: (columns, rows)} for device list, terminal diagram, cable plan."""
     netz = netz_aufbauen(blaetter)
     out = {}
     for typ in LISTEN:
         spalten, _opt = lade_spalten(typ, ordner)
-        out[typ] = (spalten, listen_zeilen(typ, blaetter, nummer, netz,
-                                           klemmen_in_geraeteliste))
+        zeilen = listen_zeilen(typ, blaetter, nummer, netz,
+                               klemmen_in_geraeteliste, einbauorte)
+        out[typ] = (_ohne_leere_einbauorte(spalten, zeilen), zeilen)
     return out
 
 
-_GRUPPE = {"klemmen": ("leiste", ("leiste",)), "kabel": ("cab", ("cab", "typ"))}
+_GRUPPE = {"klemmen": ("_gk", ("leiste", "einbauort")),
+           "kabel": ("_gk", ("cab", "einbauort", "typ"))}
 
 
 def _liste_tabelle(typ, zeilen, ordner, flaeche, titel):
     spalten, opt = lade_spalten(typ, ordner)
+    spalten = _ohne_leere_einbauorte(spalten, zeilen)
     gruppe, leer = _GRUPPE.get(typ, (None, ()))
     if gruppe:
         zeilen = zeilen_vorbereiten(zeilen, gruppe, leer)
@@ -276,6 +299,7 @@ def berichte_erzeugen(blaetter, projektname, daten, aktiv, vorlage, sprache,
            "heute": heute, "sprache": sprache}
     flaeche = inhaltsflaeche(vorlage)
     basis = [(i, b.elemente) for i, b in enumerate(blaetter)]
+    einbauorte = {i: getattr(b, "einbauort", "") for i, b in enumerate(blaetter)}
     brauchen_netz = bool(aktiv & {"klemmen", "kabel"}) or (
         "geraete" in aktiv and klemmen_in_geraeteliste)
     netz = netz_aufbauen(basis) if brauchen_netz else None
@@ -293,7 +317,7 @@ def berichte_erzeugen(blaetter, projektname, daten, aktiv, vorlage, sprache,
         for typ in LISTEN:
             if typ in aktiv:
                 zeilen = listen_zeilen(typ, basis, nummer, netz,
-                                       klemmen_in_geraeteliste)
+                                       klemmen_in_geraeteliste, einbauorte)
                 listen[typ] = _liste_tabelle(typ, zeilen, ordner, flaeche,
                                              namen[typ])
         hinten_n = sum(len(p) for p in listen.values())
@@ -360,3 +384,4 @@ def beschreibung_aus_layouts(layouts):
                 if teile:
                     return " - ".join(teile[:2])
     return ""
+
