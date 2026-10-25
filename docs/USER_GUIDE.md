@@ -314,3 +314,5 @@ Press **F2**, double-click a sheet or right-click > *Sheet properties…* to set
 
 Dimensions: **Insert > Radius dimension (DR)** and **Diameter dimension (DD)** - click a circle or arc, then the text position.
 
+## Terminal diagram: bridges
+Column order: terminal strip, location, type, **connection top, terminal (NUM), bridge, connection bottom**, sheet/column/row. Terminals of the same strip that you wire together on the top or bottom side count as a bridge: the *Bridge* column shows a line with dots at the connected terminals (overlapping bridges use separate lanes). The target then appears only on the first terminal of the bridge; the other cells stay empty. The column only appears if at least one bridge exists.
