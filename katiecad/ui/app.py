@@ -7279,21 +7279,31 @@ class CadApp:
             index = p.aktiv
         b = p.blaetter[index]
         orte = sorted({x.einbauort for x in p.blaetter if x.einbauort})
+        standard_art = tr("rep.art.zeichnung")
+        arten = [standard_art, tr("blatt.art.gestell"), tr("blatt.art.uebersicht"),
+                 tr("blatt.art.layout")]
+        arten += sorted({x.art for x in p.blaetter if x.art and x.art not in arten})
         res = BlattEigenschaftenDialog(
             self.root, tr("msg.blatt.umbenennen"), b.name, b.einbauort, orte,
-            mit_ort=not b.bericht).result
+            mit_ort=not b.bericht, art=b.art or standard_art,
+            beschreibung=b.beschreibung, art_vorschlaege=arten).result
         if res is None:
             return
-        name, ort = res
+        name, ort, art, beschr = res
+        if art in (tr("rep.art.zeichnung"), "Schaltplan", "Circuit diagram"):
+            art = ""                      # default kind
         if not name:
             messagebox.showinfo(tr("msg.projekt.titel"),
                                 tr("msg.blatt.name_leer"), parent=self.root)
             return
-        if name == b.name and (ort == b.einbauort or b.bericht):
+        if b.bericht:
+            ort, art, beschr = b.einbauort, b.art, b.beschreibung
+        if (name == b.name and ort == b.einbauort and art == b.art
+                and beschr == b.beschreibung):
             return
         b.name = name
         if not b.bericht:
-            b.einbauort = ort
+            b.einbauort, b.art, b.beschreibung = ort, art, beschr
         try:
             p.speichern()
         except OSError as e:
@@ -8309,8 +8319,9 @@ class CadApp:
             leitungen_automatisch(ctx.elemente)
             kabel_kreuzungen(ctx.elemente)
             infos.append(SEI.BlattInfo(p.blaetter[i].name, ctx.elemente,
-                                       SEI.beschreibung_aus_layouts(ctx.layouts),
-                                       p.blaetter[i].einbauort))
+                                       p.blaetter[i].beschreibung,
+                                       p.blaetter[i].einbauort,
+                                       p.blaetter[i].art))
             indizes.append(i)
         return infos, indizes
 
@@ -8891,3 +8902,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
