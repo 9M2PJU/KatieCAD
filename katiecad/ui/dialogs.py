@@ -210,14 +210,14 @@ class _LayoutNameDialog(tk.Toplevel):
 # ============================================================
 class BlattEigenschaftenDialog(tk.Toplevel):
     """Name and installation location of a sheet.
-    result = (name, einbauort) or None."""
+    result = (name, einbauort, art, beschreibung) or None."""
 
     def __init__(self, parent, titel, name, einbauort="", vorschlaege=(),
-                 mit_ort=True):
+                 mit_ort=True, art="", beschreibung="", art_vorschlaege=()):
         super().__init__(parent)
         self.result = None
         self.title(titel)
-        self.geometry("440x230")
+        self.geometry("440x370")
         self.transient(parent)
         _modal(self)
         self.configure(bg=FARBEN["bg_mittel"])
@@ -238,6 +238,17 @@ class BlattEigenschaftenDialog(tk.Toplevel):
         ttk.Label(f, text=tr("dlg.blatt.einbauort_hinweis" if mit_ort
                              else "dlg.blatt.nur_zeichnung"),
                   wraplength=400, justify=tk.LEFT).pack(anchor=tk.W, pady=(2, 0))
+        ttk.Label(f, text=tr("dlg.blatt.art")).pack(anchor=tk.W, pady=(8, 0))
+        self.art_var = tk.StringVar(value=art)
+        ttk.Combobox(f, textvariable=self.art_var, width=38,
+                     values=list(art_vorschlaege),
+                     state="normal" if mit_ort else "disabled").pack(
+            fill=tk.X, pady=(2, 2))
+        ttk.Label(f, text=tr("dlg.blatt.beschreibung")).pack(anchor=tk.W, pady=(8, 0))
+        self.beschr_var = tk.StringVar(value=beschreibung)
+        ttk.Entry(f, textvariable=self.beschr_var, width=40,
+                  state="normal" if mit_ort else "disabled").pack(
+            fill=tk.X, pady=(2, 2))
         bf = ttk.Frame(f)
         bf.pack(pady=10)
         ttk.Button(bf, text=tr("dlg.ok"), command=self._ok).pack(side=tk.LEFT, padx=4)
@@ -248,7 +259,8 @@ class BlattEigenschaftenDialog(tk.Toplevel):
         self.wait_window(self)
 
     def _ok(self):
-        self.result = (self.name_var.get().strip(), self.ort_var.get().strip())
+        self.result = (self.name_var.get().strip(), self.ort_var.get().strip(),
+                       self.art_var.get().strip(), self.beschr_var.get().strip())
         self.destroy()
 
 
