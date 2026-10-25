@@ -288,30 +288,23 @@ On the Mac, Cmd replaces Ctrl.
 - **Safety:** drawing sheets are saved automatically when you switch sheets. Use
   Ctrl+S to save the project at any time.
 
-## Projekt prüfen / Kontaktspiegel
+## Project check / contact mirror
+**Project › Check project…** checks all drawing sheets: duplicate main devices and cables, auxiliary parts without a main device, duplicate terminals, cross references that occur more than twice / have no counterpart / use the same arrow type twice, and open terminal connections. Double-click a finding to jump to it. Mark cross references that intentionally have no counterpart (supply, handover) with **Handover / external** in the cross-reference dialog.
 
-**Projekt › Projekt prüfen…** prüft alle Zeichnungsblätter: doppelte Hauptgeräte und Kabel, Hilfsteile ohne Hauptgerät,
-doppelte Klemmen, Querverweise mit mehr als zwei Vorkommen / ohne Gegenstück / mit gleicher Pfeilart, offene Klemmenanschlüsse.
-Doppelklick auf einen Befund springt zur Stelle. Querverweise, die bewusst ohne Gegenstück bleiben (Einspeisung, Übergabe),
-im Querverweis-Dialog mit **Übergabe / extern** markieren.
+**Contact mirror:** In the device dialog (edit attributes or device mask) choose *Display*: reference list, contact mirror right of the symbol, or - for relays - below. The contacts are taken from the auxiliary parts with the same identifier; make/break/changeover is derived from the pin labels (13/14, 21/22, 11/12/14 ...).
 
-**Kontaktspiegel:** Im Geräte-Dialog (Attribute bearbeiten bzw. Betriebsmittelmaske) unter *Darstellung* wählen:
-Referenzliste, Kontaktspiegel rechts vom Symbol oder – für Relais – unterhalb. Die Kontakte werden aus den Hilfsteilen mit
-gleichem Kennzeichen ermittelt; Schließer/Öffner/Wechsler aus den Pin-Bezeichnungen (13/14, 21/22, 11/12/14 …).
+**Moving the contact mirror:** Select the device - a yellow grip appears at the upper left of the mirror. Drag it to move the mirror freely; the position stays relative to the device. It is reset when the display mode is changed.
 
-**Kontaktspiegel verschieben:** Das Gerät markieren – am Kontaktspiegel erscheint ein gelber Griff (oben links). Ziehen verschiebt den Spiegel frei; die Lage bleibt relativ zum Gerät erhalten. Beim Wechsel der Darstellung wird die Position zurückgesetzt.
+## Properties (Ctrl+1)
+Edit › Properties opens a window for the current selection, also mixed (lines, texts, symbols ...): layer, colour (or "By layer"), linetype, line weight and - as soon as texts are included - text height, angle and font. Differing values show as *VARIES*; a change applies at once to all selected objects.
 
-## Eigenschaften (Strg+1)
-Bearbeiten › Eigenschaften öffnet ein Fenster für die aktuelle Auswahl – auch gemischt (Linien, Texte, Symbole …): Layer, Farbe (oder „Von Layer“), Linientyp, Linienstärke und – sobald Texte dabei sind – Texthöhe, Winkel und Schriftart. Unterschiedliche Werte zeigt das Feld als *VERSCHIEDEN*; eine Änderung gilt sofort für alle gewählten Objekte.
+## Scale and mirror
+**Edit › Scale** (command `SCALE`/`SC`, also in the right-click menu): select objects, Enter, pick the base point, enter the factor (e.g. `2` or `0.5`). Blocks are scaled with their size; fixed-size electrical elements (junctions, cross references, masks, terminals) keep their size and only move to the new position.
 
-## Skalieren und Spiegeln
-**Bearbeiten › Skalieren** (Befehl `SKALIEREN`/`SC`, auch im Rechtsklickmenü): Objekte wählen, Enter, Basispunkt klicken, Faktor eingeben (z. B. `2` oder `0,5`). Blöcke werden mit ihrer Größe skaliert; fest dimensionierte Elektro-Elemente (Verbindungen, Querverweise, Masken, Klemmen) behalten ihre Größe und wandern nur an die neue Position.
+**Edit › Mirror** (command `MIRROR`/`MI`, also in the right-click menu): select objects, Enter, pick two points of the mirror line (live preview), then decide whether the originals are deleted. Texts stay readable (not mirrored); blocks including pins and labels are mirrored correctly and remain devices.
 
-**Bearbeiten › Spiegeln** (Befehl `SPIEGELN`/`MI`, auch im Rechtsklickmenü): Objekte wählen, Enter, zwei Punkte der Spiegelachse klicken (Vorschau live), dann entscheiden, ob die Originale gelöscht werden. Texte bleiben lesbar (nicht gespiegelt), Blöcke inklusive Pins und Beschriftung werden korrekt gespiegelt und bleiben Geräte.
+## Whole project as one DXF file
+**File › Export project as one DXF…** evaluates all sheets like printing (layout with frame, title block and viewports) and places them side by side in one DXF file: 4 sheets per row, then a new row. Every sheet is on its own layer (`Blatt_01` ...), plus `Blattgrenze` and `Blattnamen`.
 
-## Projekt als eine DXF-Datei
-**Datei › Projekt als eine DXF exportieren…** wertet alle Blätter wie beim Drucken aus (Layout mit Rahmen, Schriftfeld und Viewports) und legt sie in einer DXF-Datei nebeneinander ab: 4 Blätter pro Zeile, dann eine neue Zeile. Jedes Blatt liegt auf einem eigenen Layer (`Blatt_01` …), dazu `Blattgrenze` und `Blattnamen`.
-
-## Info-Fenster: Änderungen und Protokoll
-Hilfe › Info hat drei Reiter: *Info*, *Änderungen* (Versionsverlauf) und *Protokoll* (alles, was das Programm intern meldet – auch Ladefehler). Das Protokoll lässt sich kopieren oder als Textdatei speichern, praktisch für Fehlermeldungen.
-
+## Info window: changes and log
+Help › About has three tabs: *Info*, *Changes* (version history) and *Log* (everything the program reports internally, including load errors). The log can be copied or saved as a text file - handy for bug reports.
