@@ -245,15 +245,6 @@ TEXTE = {
         "msg.eig.angewendet": "Eigenschaft auf {n} Objekt(e) angewendet.",
         "menu.datei.export_projekt_dxf": "Projekt als eine DXF exportieren…",
         "msg.dxfp.fertig": "{n} Blatt/Blätter als DXF exportiert: {pfad}",
-        "info.tab.info": "Info",
-        "info.tab.aenderungen": "Änderungen",
-        "info.tab.log": "Protokoll",
-        "info.changelog.fehlt": "Änderungsprotokoll nicht gefunden (docs/CHANGELOG.md).",
-        "info.log.leer": "Noch keine Einträge.",
-        "info.log.aktualisieren": "Aktualisieren",
-        "info.log.kopieren": "Kopieren",
-        "info.log.speichern": "Als Datei speichern…",
-        "info.log.leeren": "Leeren",
         "dlg.qv.extern": "Übergabe / extern (Gegenstück nicht erforderlich)",
         "menu.projekt.pruefen": "Projekt prüfen…",
         "dlg.pr.titel": "Projektprüfung",
@@ -721,6 +712,7 @@ TEXTE = {
         "info.copyright": "(c) 2026 Merecete",
         "info.version": "Version 1.0.1",
         "info.lizenz": "Veröffentlicht unter der MIT-Lizenz.",
+        "info.btn_log": "Log",
         "info.btn_lizenz": "Lizenz",
     },
     "en": {
@@ -956,15 +948,6 @@ TEXTE = {
         "msg.eig.angewendet": "Property applied to {n} object(s).",
         "menu.datei.export_projekt_dxf": "Export project as one DXF…",
         "msg.dxfp.fertig": "{n} sheet(s) exported as DXF: {pfad}",
-        "info.tab.info": "Info",
-        "info.tab.aenderungen": "Changes",
-        "info.tab.log": "Log",
-        "info.changelog.fehlt": "Change log not found (docs/CHANGELOG.md).",
-        "info.log.leer": "No entries yet.",
-        "info.log.aktualisieren": "Refresh",
-        "info.log.kopieren": "Copy",
-        "info.log.speichern": "Save as file…",
-        "info.log.leeren": "Clear",
         "dlg.qv.extern": "Handover / external (no counterpart required)",
         "menu.projekt.pruefen": "Check project…",
         "dlg.pr.titel": "Project check",
@@ -1432,6 +1415,7 @@ TEXTE = {
         "info.copyright": "(c) 2026 Merecete",
         "info.version": "Version 1.0.1",
         "info.lizenz": "Released under the MIT License.",
+        "info.btn_log": "Log",
         "info.btn_lizenz": "License",
     },
 }
@@ -1452,4 +1436,3 @@ def tr(schluessel, **kwargs):
 def setze_sprache(code):
     if code in TEXTE:
         SPRACHE["aktuell"] = code
-
