@@ -1,0 +1,1565 @@
+{
+  "format": "katiecad-block",
+  "version": 1,
+  "block": {
+    "name": "Block2",
+    "basispunkt": [
+      0.0,
+      0.0
+    ],
+    "elemente": [
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": 0.0,
+        "y1": 0.0,
+        "x2": 0.0,
+        "y2": -5.0
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": 0.0,
+        "y1": -10.0,
+        "x2": -2.5,
+        "y2": -5.0
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": 0.0,
+        "y1": -14.0,
+        "x2": 0.0,
+        "y2": -10.0
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": 5.0,
+        "y1": 0.0,
+        "x2": 5.0,
+        "y2": -5.0
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": 5.0,
+        "y1": -11.5,
+        "x2": 5.0,
+        "y2": -10.0
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": 5.0,
+        "y1": -10.0,
+        "x2": 2.5,
+        "y2": -5.0
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": 10.0,
+        "y1": 0.0,
+        "x2": 10.0,
+        "y2": -5.0
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": 10.0,
+        "y1": -12.0,
+        "x2": 10.0,
+        "y2": -10.0
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": 10.0,
+        "y1": -10.0,
+        "x2": 7.5,
+        "y2": -5.0
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": 10.0,
+        "y1": -12.0,
+        "x2": 5.5,
+        "y2": -12.0
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": 5.0,
+        "y1": -12.5,
+        "x2": 5.0,
+        "y2": -14.0
+      },
+      {
+        "typ": "polylinie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "punkte": [
+          [
+            -8.0,
+            -14.0
+          ],
+          [
+            10.0,
+            -14.0
+          ],
+          [
+            10.0,
+            -17.0
+          ],
+          [
+            -8.0,
+            -17.0
+          ]
+        ],
+        "geschlossen": true
+      },
+      {
+        "typ": "polylinie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "punkte": [
+          [
+            0.0,
+            -14.0
+          ],
+          [
+            -1.0,
+            -15.0
+          ],
+          [
+            1.0,
+            -16.0
+          ],
+          [
+            0.0,
+            -17.0
+          ]
+        ],
+        "geschlossen": false
+      },
+      {
+        "typ": "polylinie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "punkte": [
+          [
+            5.0,
+            -14.0
+          ],
+          [
+            4.0,
+            -15.0
+          ],
+          [
+            6.0,
+            -16.0
+          ],
+          [
+            5.0,
+            -17.0
+          ]
+        ],
+        "geschlossen": false
+      },
+      {
+        "typ": "schraffur",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": null,
+        "punkte": [
+          [
+            5.5,
+            -12.0
+          ],
+          [
+            5.495722430686897,
+            -11.93473690388997
+          ],
+          [
+            5.482962913144547,
+            -11.870590477448744
+          ],
+          [
+            5.461939766255654,
+            -11.80865828381745
+          ],
+          [
+            5.43301270189221,
+            -11.75
+          ],
+          [
+            5.3966766701456095,
+            -11.695619285495638
+          ],
+          [
+            5.353553390593277,
+            -11.646446609406723
+          ],
+          [
+            5.3043807145043615,
+            -11.603323329854376
+          ],
+          [
+            5.25,
+            -11.566987298107776
+          ],
+          [
+            5.191341716182535,
+            -11.53806023374436
+          ],
+          [
+            5.129409522551271,
+            -11.517037086855467
+          ],
+          [
+            5.065263096110016,
+            -11.50427756931309
+          ],
+          [
+            5.0,
+            -11.5
+          ],
+          [
+            4.934736903889984,
+            -11.50427756931309
+          ],
+          [
+            4.870590477448729,
+            -11.517037086855467
+          ],
+          [
+            4.808658283817465,
+            -11.53806023374436
+          ],
+          [
+            4.75,
+            -11.566987298107776
+          ],
+          [
+            4.6956192854956385,
+            -11.603323329854376
+          ],
+          [
+            4.646446609406723,
+            -11.646446609406723
+          ],
+          [
+            4.6033233298543905,
+            -11.695619285495638
+          ],
+          [
+            4.56698729810779,
+            -11.75
+          ],
+          [
+            4.538060233744346,
+            -11.80865828381745
+          ],
+          [
+            4.517037086855453,
+            -11.870590477448744
+          ],
+          [
+            4.504277569313103,
+            -11.93473690388997
+          ],
+          [
+            4.5,
+            -12.0
+          ],
+          [
+            4.504277569313103,
+            -12.06526309611003
+          ],
+          [
+            4.517037086855453,
+            -12.129409522551256
+          ],
+          [
+            4.538060233744346,
+            -12.19134171618255
+          ],
+          [
+            4.56698729810779,
+            -12.25
+          ],
+          [
+            4.6033233298543905,
+            -12.304380714504362
+          ],
+          [
+            4.646446609406723,
+            -12.353553390593277
+          ],
+          [
+            4.6956192854956385,
+            -12.396676670145624
+          ],
+          [
+            4.75,
+            -12.433012701892224
+          ],
+          [
+            4.808658283817465,
+            -12.46193976625564
+          ],
+          [
+            4.870590477448729,
+            -12.482962913144533
+          ],
+          [
+            4.934736903889984,
+            -12.49572243068691
+          ],
+          [
+            5.0,
+            -12.5
+          ],
+          [
+            5.065263096110016,
+            -12.49572243068691
+          ],
+          [
+            5.129409522551271,
+            -12.482962913144533
+          ],
+          [
+            5.191341716182535,
+            -12.46193976625564
+          ],
+          [
+            5.25,
+            -12.433012701892224
+          ],
+          [
+            5.3043807145043615,
+            -12.396676670145624
+          ],
+          [
+            5.353553390593277,
+            -12.353553390593277
+          ],
+          [
+            5.3966766701456095,
+            -12.304380714504362
+          ],
+          [
+            5.43301270189221,
+            -12.25
+          ],
+          [
+            5.461939766255654,
+            -12.19134171618255
+          ],
+          [
+            5.482962913144547,
+            -12.129409522551256
+          ],
+          [
+            5.495722430686897,
+            -12.06526309611003
+          ]
+        ],
+        "muster": "solid",
+        "winkel": 45.0,
+        "abstand": 5.0
+      },
+      {
+        "typ": "kreis",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "cx": 5.0,
+        "cy": -12.0,
+        "r": 0.5
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": 9.5,
+        "y1": -17.0,
+        "x2": 9.5,
+        "y2": -14.0
+      },
+      {
+        "typ": "schraffur",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": null,
+        "punkte": [
+          [
+            9.5,
+            -14.0
+          ],
+          [
+            10.0,
+            -14.0
+          ],
+          [
+            10.0,
+            -17.0
+          ],
+          [
+            9.5,
+            -17.0
+          ]
+        ],
+        "muster": "solid",
+        "winkel": 45.0,
+        "abstand": 5.0
+      },
+      {
+        "typ": "polylinie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "punkte": [
+          [
+            9.5,
+            -14.0
+          ],
+          [
+            10.0,
+            -14.0
+          ],
+          [
+            10.0,
+            -17.0
+          ],
+          [
+            9.5,
+            -17.0
+          ]
+        ],
+        "geschlossen": true
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": 8.0,
+        "y1": -14.0,
+        "x2": 8.0,
+        "y2": -17.0
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": 8.5,
+        "y1": -17.0,
+        "x2": 8.5,
+        "y2": -14.0
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": 5.0,
+        "y1": -17.0,
+        "x2": 5.0,
+        "y2": -24.0
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": 0.0,
+        "y1": -17.0,
+        "x2": 0.0,
+        "y2": -24.0
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": -13.0,
+        "y1": -7.5,
+        "x2": -21.25,
+        "y2": -7.5
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": 15.0,
+        "y1": -14.0,
+        "x2": 13.0,
+        "y2": -14.0
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": 13.0,
+        "y1": -14.0,
+        "x2": 13.0,
+        "y2": -9.0
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": 13.0,
+        "y1": -9.0,
+        "x2": 15.0,
+        "y2": -9.0
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": 15.0,
+        "y1": -14.0,
+        "x2": 15.0,
+        "y2": -9.0
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": 10.0,
+        "y1": 0.0,
+        "x2": 14.0,
+        "y2": 0.0
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": 14.0,
+        "y1": -9.0,
+        "x2": 14.0,
+        "y2": 0.0
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": 0.0,
+        "y1": -20.5,
+        "x2": 8.0,
+        "y2": -20.5
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": 8.0,
+        "y1": -20.5,
+        "x2": 13.0,
+        "y2": -22.0
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": 14.0,
+        "y1": -14.0,
+        "x2": 14.0,
+        "y2": -20.5
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": 12.5,
+        "y1": -20.5,
+        "x2": 14.0,
+        "y2": -20.5
+      },
+      {
+        "typ": "schraffur",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": null,
+        "punkte": [
+          [
+            0.5,
+            -20.5
+          ],
+          [
+            0.4957224306868966,
+            -20.43473690388997
+          ],
+          [
+            0.4829629131445472,
+            -20.370590477448744
+          ],
+          [
+            0.4619397662556537,
+            -20.30865828381745
+          ],
+          [
+            0.43301270189220986,
+            -20.25
+          ],
+          [
+            0.3966766701456095,
+            -20.19561928549564
+          ],
+          [
+            0.3535533905932766,
+            -20.146446609406723
+          ],
+          [
+            0.30438071450436155,
+            -20.103323329854376
+          ],
+          [
+            0.25,
+            -20.066987298107776
+          ],
+          [
+            0.19134171618253504,
+            -20.03806023374436
+          ],
+          [
+            0.12940952255127058,
+            -20.017037086855467
+          ],
+          [
+            0.0652630961100158,
+            -20.00427756931309
+          ],
+          [
+            0.0,
+            -20.0
+          ],
+          [
+            -0.0652630961100158,
+            -20.00427756931309
+          ],
+          [
+            -0.12940952255127058,
+            -20.017037086855467
+          ],
+          [
+            -0.19134171618253504,
+            -20.03806023374436
+          ],
+          [
+            -0.25,
+            -20.066987298107776
+          ],
+          [
+            -0.30438071450436155,
+            -20.103323329854376
+          ],
+          [
+            -0.3535533905932766,
+            -20.146446609406723
+          ],
+          [
+            -0.3966766701456095,
+            -20.19561928549564
+          ],
+          [
+            -0.43301270189220986,
+            -20.25
+          ],
+          [
+            -0.4619397662556537,
+            -20.30865828381745
+          ],
+          [
+            -0.4829629131445472,
+            -20.370590477448744
+          ],
+          [
+            -0.4957224306868966,
+            -20.43473690388997
+          ],
+          [
+            -0.5,
+            -20.5
+          ],
+          [
+            -0.4957224306868966,
+            -20.56526309611003
+          ],
+          [
+            -0.4829629131445472,
+            -20.629409522551256
+          ],
+          [
+            -0.4619397662556537,
+            -20.69134171618255
+          ],
+          [
+            -0.43301270189220986,
+            -20.75
+          ],
+          [
+            -0.3966766701456095,
+            -20.80438071450436
+          ],
+          [
+            -0.3535533905932766,
+            -20.853553390593277
+          ],
+          [
+            -0.30438071450436155,
+            -20.896676670145624
+          ],
+          [
+            -0.25,
+            -20.933012701892224
+          ],
+          [
+            -0.19134171618253504,
+            -20.96193976625564
+          ],
+          [
+            -0.12940952255127058,
+            -20.982962913144533
+          ],
+          [
+            -0.0652630961100158,
+            -20.99572243068691
+          ],
+          [
+            0.0,
+            -21.0
+          ],
+          [
+            0.0652630961100158,
+            -20.99572243068691
+          ],
+          [
+            0.12940952255127058,
+            -20.982962913144533
+          ],
+          [
+            0.19134171618253504,
+            -20.96193976625564
+          ],
+          [
+            0.25,
+            -20.933012701892224
+          ],
+          [
+            0.30438071450436155,
+            -20.896676670145624
+          ],
+          [
+            0.3535533905932766,
+            -20.853553390593277
+          ],
+          [
+            0.3966766701456095,
+            -20.80438071450436
+          ],
+          [
+            0.43301270189220986,
+            -20.75
+          ],
+          [
+            0.4619397662556537,
+            -20.69134171618255
+          ],
+          [
+            0.4829629131445472,
+            -20.629409522551256
+          ],
+          [
+            0.4957224306868966,
+            -20.56526309611003
+          ]
+        ],
+        "muster": "solid",
+        "winkel": 45.0,
+        "abstand": 5.0
+      },
+      {
+        "typ": "kreis",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "cx": 0.0,
+        "cy": -20.5,
+        "r": 0.5
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": -3.0,
+        "y1": -17.0,
+        "x2": -3.0,
+        "y2": -16.625
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": -3.0,
+        "y1": -14.0,
+        "x2": -3.0,
+        "y2": -14.5
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": -2.0,
+        "y1": -15.0,
+        "x2": -4.0,
+        "y2": -15.5
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": -2.0,
+        "y1": -15.0,
+        "x2": -4.0,
+        "y2": -16.0
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": -3.0,
+        "y1": -15.5,
+        "x2": -4.0,
+        "y2": -16.0
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": -2.0,
+        "y1": -15.5,
+        "x2": -4.0,
+        "y2": -16.0
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": -2.0,
+        "y1": -14.5,
+        "x2": -4.0,
+        "y2": -15.5
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": -2.0,
+        "y1": -14.5,
+        "x2": -4.0,
+        "y2": -15.0
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": -2.0,
+        "y1": -15.5,
+        "x2": -4.0,
+        "y2": -16.5
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": -2.0,
+        "y1": -16.0,
+        "x2": -4.0,
+        "y2": -16.5
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": -2.0,
+        "y1": -16.0,
+        "x2": -3.0,
+        "y2": -16.625
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": -4.0,
+        "y1": -15.0,
+        "x2": -3.0,
+        "y2": -14.5
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": -3.0,
+        "y1": -14.0,
+        "x2": -3.0,
+        "y2": -12.0
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": -3.0,
+        "y1": -12.0,
+        "x2": -13.0,
+        "y2": -12.0
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": -13.0,
+        "y1": -12.0,
+        "x2": -13.0,
+        "y2": -14.0
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": -7.0,
+        "y1": -17.0,
+        "x2": -7.0,
+        "y2": -14.0
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": -6.5,
+        "y1": -17.0,
+        "x2": -6.5,
+        "y2": -14.0
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": -5.800000000000011,
+        "y1": -17.0,
+        "x2": -5.800000000000011,
+        "y2": -14.0
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": -3.0,
+        "y1": -19.0,
+        "x2": -3.0,
+        "y2": -17.0
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": -3.0,
+        "y1": -21.0,
+        "x2": -17.0,
+        "y2": -21.0
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": -14.0,
+        "y1": -18.0,
+        "x2": -16.0,
+        "y2": -18.0
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": -16.0,
+        "y1": -18.0,
+        "x2": -16.0,
+        "y2": -13.0
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": -16.0,
+        "y1": -13.0,
+        "x2": -14.0,
+        "y2": -13.0
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": -14.0,
+        "y1": -18.0,
+        "x2": -14.0,
+        "y2": -13.0
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": -3.0,
+        "y1": -21.0,
+        "x2": -3.0,
+        "y2": -19.0
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": -17.0,
+        "y1": -21.0,
+        "x2": -17.0,
+        "y2": -17.0
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": -17.0,
+        "y1": -17.0,
+        "x2": -13.0,
+        "y2": -15.0
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": -15.0,
+        "y1": -13.0,
+        "x2": -15.0,
+        "y2": -7.5
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": -15.0,
+        "y1": -7.5,
+        "x2": -15.0,
+        "y2": -5.5
+      },
+      {
+        "typ": "polylinie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "punkte": [
+          [
+            -15.0,
+            -5.5
+          ],
+          [
+            -13.0,
+            -5.5
+          ],
+          [
+            -13.0,
+            -8.0
+          ],
+          [
+            -13.0,
+            -9.5
+          ],
+          [
+            -15.0,
+            -9.5
+          ],
+          [
+            -17.0,
+            -9.5
+          ],
+          [
+            -17.0,
+            -5.5
+          ]
+        ],
+        "geschlossen": true
+      },
+      {
+        "typ": "polylinie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "punkte": [
+          [
+            -23.25,
+            -5.5
+          ],
+          [
+            -21.25,
+            -5.5
+          ],
+          [
+            -21.25,
+            -8.0
+          ],
+          [
+            -21.25,
+            -9.5
+          ],
+          [
+            -23.25,
+            -9.5
+          ],
+          [
+            -25.25,
+            -9.5
+          ],
+          [
+            -25.25,
+            -5.5
+          ]
+        ],
+        "geschlossen": true
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": 10.5,
+        "y1": -21.25,
+        "x2": 10.5,
+        "y2": -23.125
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": 9.9375,
+        "y1": -23.125,
+        "x2": 11.0625,
+        "y2": -23.125
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": 9.75,
+        "y1": -24.0,
+        "x2": 11.25,
+        "y2": -24.0
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": 10.5,
+        "y1": -24.0,
+        "x2": 10.5,
+        "y2": -24.9375
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": -23.25,
+        "y1": -7.5,
+        "x2": -24.25,
+        "y2": -7.5
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": -24.25,
+        "y1": -8.5,
+        "x2": -24.25,
+        "y2": -6.5
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": -24.25,
+        "y1": -6.0,
+        "x2": -24.25,
+        "y2": -9.0
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": -22.25,
+        "y1": -7.5,
+        "x2": -23.25,
+        "y2": -7.5
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": -22.25,
+        "y1": -6.0,
+        "x2": -22.25,
+        "y2": -9.0
+      },
+      {
+        "typ": "vpunkt",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.25,
+        "x": 0.0,
+        "y": 0.0,
+        "inhalt": "1",
+        "hoehe": 2.0,
+        "winkel": 0.0,
+        "schriftart": "Arial",
+        "einfuegepunkt": "mitte_links",
+        "tag": "VP1",
+        "prompt": "Pin 1",
+        "wert": "1",
+        "sichtbar": true,
+        "richtungen": [
+          90
+        ],
+        "radius": 0.5
+      },
+      {
+        "typ": "vpunkt",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.25,
+        "x": 5.0,
+        "y": 0.0,
+        "inhalt": "N",
+        "hoehe": 2.0,
+        "winkel": 0.0,
+        "schriftart": "Arial",
+        "einfuegepunkt": "mitte_links",
+        "tag": "VP2",
+        "prompt": "Pin 2",
+        "wert": "N",
+        "sichtbar": true,
+        "richtungen": [
+          90
+        ],
+        "radius": 0.5
+      },
+      {
+        "typ": "vpunkt",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.25,
+        "x": 0.0,
+        "y": -24.0,
+        "inhalt": "2",
+        "hoehe": 2.0,
+        "winkel": 0.0,
+        "schriftart": "Arial",
+        "einfuegepunkt": "mitte_links",
+        "tag": "VP3",
+        "prompt": "Pin 3",
+        "wert": "2",
+        "sichtbar": true,
+        "richtungen": [
+          270
+        ],
+        "radius": 0.5
+      },
+      {
+        "typ": "vpunkt",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.25,
+        "x": 5.0,
+        "y": -24.0,
+        "inhalt": "N",
+        "hoehe": 2.0,
+        "winkel": 0.0,
+        "schriftart": "Arial",
+        "einfuegepunkt": "mitte_links",
+        "tag": "VP4",
+        "prompt": "Pin 4",
+        "wert": "N",
+        "sichtbar": true,
+        "richtungen": [
+          270
+        ],
+        "radius": 0.5
+      },
+      {
+        "typ": "maske",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": null,
+        "x": -27.0,
+        "y": -16.0,
+        "werte": {
+          "IND": "IND",
+          "TYP": "TYP",
+          "PER": "PER"
+        },
+        "ausgeblendet": [],
+        "platzhalter": false,
+        "rolle": "haupt",
+        "spiegel": "rechts",
+        "sp_dx": 0.0,
+        "sp_dy": 0.0
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Strichlinie (verdeckt)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": -13.0,
+        "y1": -7.5,
+        "x2": 8.75,
+        "y2": -7.5
+      }
+    ]
+  }
+}
