@@ -32,6 +32,11 @@ def _konfig_verzeichnis():
     return os.path.join(basis, "KatieCAD")
 
 
+def konfig_ordner():
+    """Directory for settings and the log file."""
+    return _konfig_verzeichnis()
+
+
 def konfig_pfad():
     """Full path to the configuration file."""
     return os.path.join(_konfig_verzeichnis(), KONFIG_DATEI)
