@@ -1,0 +1,16 @@
+# Änderungen
+
+## 1.0.1
+- Kontaktspiegel für Hauptgeräte (rechts neben dem Symbol oder unter dem Relais), frei verschiebbar
+- Projektprüfung: doppelte Geräte, Querverweise (mit „extern“), Klemmen, offene Anschlüsse
+- Eigenschaftenfenster (Strg+1) für gemischte Auswahlen, auch im Rechtsklickmenü
+- Skalieren und Spiegeln von Objekten, Blöcken und Geräten
+- Ganzes Projekt als eine DXF-Datei exportieren (4 Blätter pro Zeile)
+- Infofenster mit Änderungsprotokoll und Programmprotokoll
+- Fix: Kabel gingen beim Blattwechsel verloren
+- Fix: Rechtsklickmenü unter Linux/Wayland, Logo im Infofenster unter Linux
+- Fix: macOS-Info zeigt die richtige Version
+
+## 1.0.0
+- Erstes Release: 2D-CAD, Blöcke, Projekte mit Blättern, Schaltpläne, Querverweise, Klemmen, Kabel,
+  Reports, Schriftfeld-Automatik, DXF/DWG-Import und -Export, Installer für Windows, Linux und macOS
