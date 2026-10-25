@@ -959,8 +959,6 @@ class CadApp:
         m_datei.add_command(label=tr("menu.datei.import_dwg"), command=self.import_dwg)
         m_datei.add_command(label=tr("menu.datei.export_dxf"), command=self.export_dxf)
         m_datei.add_command(label=tr("menu.datei.export_dwg"), command=self.export_dwg)
-        m_datei.add_command(label=tr("menu.datei.export_projekt_dxf"),
-                            command=self.projekt_dxf_exportieren)
         m_datei.add_separator()
         m_datei.add_command(label=tr("menu.datei.drucken"), command=self.drucken)
         m_datei.add_separator()
@@ -1000,6 +998,8 @@ class CadApp:
         m_projekt.add_separator()
         m_projekt.add_command(label=tr("menu.projekt.drucken"),
                               command=self.projekt_drucken)
+        m_projekt.add_command(label=tr("menu.datei.export_projekt_dxf"),
+                              command=self.projekt_dxf_exportieren)
         m_projekt.add_separator()
         m_projekt.add_command(label=tr("menu.projekt.doku"),
                               command=self.dokumentation_erzeugen)
@@ -8926,4 +8926,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
