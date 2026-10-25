@@ -53,6 +53,11 @@ class Spalte:
         self.ausr = ausr if ausr in ("l", "r", "c") else "l"
 
 
+class Seite(list):
+    """Elements of one table page; `kopf` = group key (`_gk`) of its first row."""
+    kopf = None
+
+
 def spaltenbreiten(spalten, gesamt):
     summe = sum(s.gewicht for s in spalten) or 1.0
     return [gesamt * s.gewicht / summe for s in spalten]
@@ -230,7 +235,7 @@ def tabellen_seiten(spalten, zeilen, flaeche, titel="", textgroesse=2.5,
             el.append(Linie(xa, oben, xa, unten, staerke=0.25, **LINIE))
         el.append(Linie(x1, oben - kopf_h, x2, oben - kopf_h, staerke=0.5, **LINIE))
         el.append(Rechteck(x1, unten, x2, oben, staerke=0.5, **LINIE))
-        ergebnis.append(el)
+        sp_ = Seite(el)
+        sp_.kopf = seite[0][0].get("_gk") if seite else None
+        ergebnis.append(sp_)
     return ergebnis
-
-
