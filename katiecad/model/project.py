@@ -56,8 +56,13 @@ def _json_schreiben(pfad, daten):
 
 
 class Blatt:
-    def __init__(self, name, datei, bericht=None, einbauort=""):
+    def __init__(self, name, datei, bericht=None, einbauort="", art="",
+                 beschreibung=""):
         self.name = name
+        # Kind of sheet for the table of contents ("" = circuit diagram) and
+        # a free description of the sheet.
+        self.art = str(art or "").strip()
+        self.beschreibung = str(beschreibung or "").strip()
         # Installation location (e.g. "Verteiler UV1"): applies to every object
         # on this sheet; derived when needed (title block, lists), not copied.
         self.einbauort = str(einbauort or "").strip()
@@ -72,6 +77,10 @@ class Blatt:
             d["bericht"] = self.bericht
         if self.einbauort:
             d["einbauort"] = self.einbauort
+        if self.art:
+            d["art"] = self.art
+        if self.beschreibung:
+            d["beschreibung"] = self.beschreibung
         return d
 
 
@@ -145,7 +154,9 @@ class Projekt:
             if isinstance(bd, dict) and bd.get("datei"):
                 blaetter.append(Blatt(bd.get("name") or bd["datei"],
                                       bd["datei"], bd.get("bericht") or None,
-                                      bd.get("einbauort") or ""))
+                                      bd.get("einbauort") or "",
+                                      bd.get("art") or "",
+                                      bd.get("beschreibung") or ""))
         p = cls(name, ordner, blaetter,
                 aktiv=int(d.get("aktiv", 0) or 0),
                 naechste_id=int(d.get("naechste_id", len(blaetter) + 1)),
@@ -283,6 +294,8 @@ class Projekt:
         name = (name or "").strip() or self.kopie_name(self.blaetter[index].name)
         b = self.blatt_hinzufuegen(name, nach_index=index)
         b.einbauort = self.blaetter[index].einbauort
+        b.art = self.blaetter[index].art
+        b.beschreibung = self.blaetter[index].beschreibung
         try:
             shutil.copy2(quelle, self.blatt_pfad(b))
         except OSError:
