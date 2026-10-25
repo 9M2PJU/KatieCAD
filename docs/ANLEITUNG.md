@@ -334,3 +334,5 @@ Hängt eine Klemme an einer Potentialschiene (z. B. PE oder N), steht in „Ansc
 
 Im Klemmenplan beginnt jede Klemmleiste (je Einbauort) auf einem eigenen Blatt; lange Leisten laufen auf Folgeblätter.
 Die Klemmenplan-Blätter heißen nach ihrer Klemmleiste, z. B. „Klemmenplan X1“ (bei Einbauort zuerst: „Klemmenplan +1 -X1“, bei mehreren Blättern einer Leiste: „… X1 2/3“). Das gilt auch im Inhaltsverzeichnis und im Schriftfeld.
+
+Im Dialog **Blatt-Eigenschaften (F2)** legst du außerdem die **Art des Blatts** (Schaltplan, Gestellansicht, Übersicht, Layout oder eigener Text) und eine **Beschreibung** fest. Beides erscheint im Inhaltsverzeichnis; ohne Eintrag gilt „Schaltplan“ bzw. bleibt die Beschreibung leer.
