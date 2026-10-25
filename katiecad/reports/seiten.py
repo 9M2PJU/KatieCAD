@@ -275,7 +275,8 @@ def _liste_tabelle(typ, zeilen, ordner, flaeche, titel):
         zeilen = zeilen_vorbereiten(zeilen, gruppe, leer)
     return tabellen_seiten(spalten, zeilen, flaeche, titel,
                            opt["textgroesse"], opt["zeilenhoehe"],
-                           tr("rep.leer"))
+                           tr("rep.leer"),
+                           seite_pro_gruppe=(typ == "klemmen"))
 
 
 def _name(basis, k, n):
