@@ -18,6 +18,7 @@ Rules for a template drawing
         FORMAT paper format (e.g. A3)
     Aliases (German / other templates): SEITE = PAGE, SEITEN = PAGES,
     SIZE / BLATTFORMAT / PAPIERFORMAT = FORMAT.
+    EINBAUORT / PLACE   installation location of the sheet (Sheet properties)
     From Project > Project properties (on every sheet):
         GEZEICHNET / DRAWN (+ _DATUM / _DATE), GEPRUEFT / VERIFIED (+ _DATUM),
         ZEICHNUNGSNUMMER / DRAWINGNUMBER, FIRMA / COMPANY, KUNDE / CUSTOMER,
@@ -85,8 +86,9 @@ def _alle_data_tags():
     return out
 
 
+PLACE_TAGS = ("EINBAUORT", "PLACE")
 _BASIS = {"PAGE", "PAGES", "SHEET", "PROJECT", "DATE", "SCALE", "SEITE",
-          "SEITEN"} | set(FORMAT_TAGS)
+          "SEITEN"} | set(PLACE_TAGS) | set(FORMAT_TAGS)
 _TITEL = set(TITLE_TAGS) | {t for pair in TITLE_PARTS for t in pair}
 DATA_ONLY = frozenset(_alle_data_tags())        # empty value = keep as is
 RESERVED = tuple(sorted(_BASIS | _TITEL | DATA_ONLY))
@@ -339,7 +341,7 @@ def daten_werte(daten, projekt, sheet, lang="en", today=None):
 
 
 def info_values(nr, total, sheet, project, lang="en", paper_format="", today=None,
-                daten=None):
+                daten=None, einbauort=None):
     """Values for the reserved tags from plain numbers / names."""
     today = today or datetime.date.today()
     date = today.strftime("%d.%m.%Y") if lang == "de" else today.strftime("%Y-%m-%d")
@@ -350,21 +352,27 @@ def info_values(nr, total, sheet, project, lang="en", paper_format="", today=Non
                 "SEITE": str(nr), "SEITEN": str(total)})
     for t in FORMAT_TAGS:
         out[t] = short
+    if einbauort is not None:           # None = no project: leave fields alone
+        for t in PLACE_TAGS:
+            out[t] = str(einbauort)
     return out
 
 
 def make_info(project, sheet_index, lang="en", paper_format="", today=None):
     """Values for the reserved tags (SCALE is determined per layout)."""
     daten = None
+    ort = None
     if project is not None:
         nr = sheet_index + 1
         total = len(project.blaetter)
         sheet = project.blaetter[sheet_index].name if 0 <= sheet_index < total else ""
         proj = project.name
         daten = project.daten
+        ort = (getattr(project.blaetter[sheet_index], "einbauort", "")
+               if 0 <= sheet_index < total else "")
     else:
         nr, total, sheet, proj = 1, 1, "", ""
-    return info_values(nr, total, sheet, proj, lang, paper_format, today, daten)
+    return info_values(nr, total, sheet, proj, lang, paper_format, today, daten, ort)
 
 
 def feld_bericht(layout_elements):
