@@ -8605,9 +8605,19 @@ class CadApp:
         if os.path.normpath(eigene) != os.path.normpath(standard_ordner()):
             wurzeln.append((os.path.basename(eigene) or eigene, eigene))
         for pf in cfg.get("block_wurzeln", []) or []:
+            if self._ist_symbolordner(pf):      # the library is listed only once
+                continue
             if all(os.path.normpath(pf) != os.path.normpath(w[1]) for w in wurzeln):
                 wurzeln.append((os.path.basename(pf) or pf, pf))
         return wurzeln
+
+    @staticmethod
+    def _ist_symbolordner(pfad):
+        """True for the program's symbol library - also for a stale or second
+        copy that was saved as an extra folder earlier (named 'symbols')."""
+        n = os.path.normpath(pfad)
+        return (n == os.path.normpath(symbol_ordner())
+                or os.path.basename(n).lower() in ("symbols", "symbolbibliothek"))
 
     def _block_bibliothek_migrieren(self):
         """One-time: store the blocks of the old internal library as files."""
@@ -8664,6 +8674,7 @@ class CadApp:
             cfg = lade_konfiguration()
             cfg["block_wurzeln"] = [pf for pf in neu if os.path.normpath(pf) not in
                                     {os.path.normpath(standard_ordner())}
+                                    and not self._ist_symbolordner(pf)
                                     and (self.projekt is None or os.path.normpath(pf)
                                          != os.path.normpath(self.projekt.bloecke_ordner))]
             speichere_konfiguration(cfg)
