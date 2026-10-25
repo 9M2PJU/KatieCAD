@@ -6,6 +6,7 @@
 - Fix: dimension text was offset; it is now centred above the dimension line
 - Radius/diameter dimensions named more clearly (DR / DD)
 - Terminal diagram: column "Terminal (NUM)" now sits between "Connection top" and "Connection bottom"; new column "Bridge" with a graphic for terminals wired together (only the first terminal of a bridge shows the target)
+- Terminal diagram: on potential rails (PE, N, ...) only the potential name is shown instead of every terminal
 - Info window: Log button opens the log file in the editor (no tabs)
 
 ## 1.0.1
@@ -22,3 +23,4 @@
 ## 1.0.0
 - First release: 2D CAD, blocks, projects with sheets, schematics, cross references, terminals, cables,
   reports, title block automation, DXF/DWG import and export, installers for Windows, Linux and macOS
+
