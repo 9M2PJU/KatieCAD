@@ -8103,7 +8103,8 @@ class CadApp:
         if infos is None:
             return []
         return pruefe([(i, inf.name, inf.elemente)
-                       for i, inf in zip(indizes, infos)])
+                       for i, inf in zip(indizes, infos)],
+                      {i: inf.einbauort for i, inf in zip(indizes, infos)})
 
     def projekt_pruefen(self):
         if self.projekt is None:
@@ -8913,4 +8914,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
