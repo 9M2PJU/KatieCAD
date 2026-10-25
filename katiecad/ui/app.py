@@ -959,6 +959,8 @@ class CadApp:
         m_datei.add_command(label=tr("menu.datei.import_dwg"), command=self.import_dwg)
         m_datei.add_command(label=tr("menu.datei.export_dxf"), command=self.export_dxf)
         m_datei.add_command(label=tr("menu.datei.export_dwg"), command=self.export_dwg)
+        m_datei.add_command(label=tr("menu.datei.export_projekt_dxf"),
+                            command=self.projekt_dxf_exportieren)
         m_datei.add_separator()
         m_datei.add_command(label=tr("menu.datei.drucken"), command=self.drucken)
         m_datei.add_separator()
@@ -4411,13 +4413,19 @@ class CadApp:
     def zeige_info_fenster(self):
         info_win = tk.Toplevel(self.root)
         info_win.title(tr("info.titel") + " - KatieCAD")
-        info_win.geometry("560x460")
+        info_win.geometry("640x540")
         info_win.transient(self.root)
         info_win.configure(bg=FARBEN["bg_mittel"])
-        info_win.resizable(False, False)
+        info_win.resizable(True, True)
 
-        frame = tk.Frame(info_win, bg=FARBEN["bg_mittel"], padx=26, pady=22)
-        frame.pack(fill=tk.BOTH, expand=True)
+        # Tabs: Info / Changes / Program log
+        nb = ttk.Notebook(info_win)
+        btn_row = tk.Frame(info_win, bg=FARBEN["bg_mittel"])
+        btn_row.pack(fill="x", side="bottom", padx=12, pady=(0, 10))
+        nb.pack(fill=tk.BOTH, expand=True, padx=8, pady=8)
+        frame = tk.Frame(nb, bg=FARBEN["bg_mittel"], padx=26, pady=22)
+        nb.add(frame, text=tr("info.tab.info"))
+        self._info_tabs_bauen(nb, info_win)
 
         title_row = tk.Frame(frame, bg=FARBEN["bg_mittel"])
         title_row.pack(anchor="w", fill="x")
@@ -4478,9 +4486,6 @@ class CadApp:
                  font=("Helvetica", 9),
                  bg=FARBEN["bg_mittel"], fg=FARBEN["text_dim"]).pack(anchor="w", pady=(0, 6))
 
-        btn_row = tk.Frame(frame, bg=FARBEN["bg_mittel"])
-        btn_row.pack(fill="x", side="bottom", pady=(10, 0))
-
         def make_btn(text, cmd):
             b = ttk.Button(btn_row, text=text, command=cmd)
             return b
@@ -4494,6 +4499,80 @@ class CadApp:
         w = info_win.winfo_width()
         h = info_win.winfo_height()
         info_win.geometry(f"+{mx - w // 2}+{my - h // 2}")
+
+    def _info_tabs_bauen(self, nb, info_win):
+        """Tabs 'Changes' (docs/CHANGELOG*.md) and 'Program log'."""
+        from katiecad.common import logbuch
+
+        def textfeld(parent):
+            f = tk.Frame(parent, bg=FARBEN["bg_mittel"])
+            t = tk.Text(f, wrap="word", bg=FARBEN["bg_dunkel"], fg=FARBEN["text"],
+                        insertbackground=FARBEN["text"], relief="flat",
+                        font=(UI_SCHRIFT, 9), padx=8, pady=6)
+            sb = ttk.Scrollbar(f, orient=tk.VERTICAL, command=t.yview)
+            t.configure(yscrollcommand=sb.set)
+            sb.pack(side=tk.RIGHT, fill=tk.Y)
+            t.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+            return f, t
+
+        # --- Changes ---
+        f1, t1 = textfeld(nb)
+        name = "docs/CHANGELOG.md" if SPRACHE["aktuell"] == "de" else "docs/CHANGELOG.en.md"
+        pfad = _symbol_datei(name) or _symbol_datei("docs/CHANGELOG.md")
+        try:
+            with open(pfad, "r", encoding="utf-8") as fh:
+                inhalt = fh.read()
+        except (OSError, TypeError):
+            inhalt = tr("info.changelog.fehlt")
+        t1.insert("1.0", inhalt)
+        t1.configure(state="disabled")
+        nb.add(f1, text=tr("info.tab.aenderungen"))
+
+        # --- Program log ---
+        f2 = tk.Frame(nb, bg=FARBEN["bg_mittel"])
+        kopf = tk.Frame(f2, bg=FARBEN["bg_mittel"])
+        kopf.pack(fill="x", padx=6, pady=(6, 2))
+        ft, t2 = textfeld(f2)
+        ft.pack(fill=tk.BOTH, expand=True, padx=6, pady=(0, 6))
+        t2.tag_configure("fehler", foreground=FARBEN["magenta"])
+
+        def laden(_e=None):
+            t2.configure(state="normal")
+            t2.delete("1.0", tk.END)
+            txt = logbuch.text()
+            if not txt:
+                txt = tr("info.log.leer")
+            for zeile in txt.split("\n"):
+                t2.insert(tk.END, zeile + "\n",
+                          ("fehler",) if "  !  " in zeile else ())
+            t2.configure(state="disabled")
+            t2.see(tk.END)
+
+        def kopieren():
+            info_win.clipboard_clear()
+            info_win.clipboard_append(logbuch.text())
+
+        def speichern():
+            pf = filedialog.asksaveasfilename(
+                parent=info_win, defaultextension=".txt",
+                initialfile="katiecad-log.txt", filetypes=[("Text", "*.txt")])
+            if pf:
+                with open(pf, "w", encoding="utf-8") as fh:
+                    fh.write(logbuch.text() + "\n")
+
+        def leeren():
+            logbuch.leeren()
+            laden()
+
+        for txt, cmd in ((tr("info.log.aktualisieren"), laden),
+                         (tr("info.log.kopieren"), kopieren),
+                         (tr("info.log.speichern"), speichern),
+                         (tr("info.log.leeren"), leeren)):
+            ttk.Button(kopf, text=txt, command=cmd).pack(side="left", padx=(0, 4))
+        nb.add(f2, text=tr("info.tab.log"))
+        nb.bind("<<NotebookTabChanged>>",
+                lambda e: laden() if nb.index(nb.select()) == 2 else None)
+        laden()
 
     def neu(self):
         de = SPRACHE["aktuell"] == "de"
@@ -8139,15 +8218,10 @@ class CadApp:
             print(f"[KatieCAD] Blatt {index + 1} nicht lesbar: {ex}")
             return None
 
-    def projekt_drucken(self):
+    def _kontexte_vorbereiten(self, indizes):
+        """Print contexts of the sheets `indizes` with all computed values
+        (wires, cross references, device references, title blocks)."""
         p = self.projekt
-        if p is None:
-            self.status.set(tr("msg.projekt.kein_projekt"))
-            return
-        dlg = ProjektDruckDialog(self.root, p)
-        if not dlg.result:
-            return
-        aktion, indizes, quelle, farbig, rahmen = dlg.result
         kontexte, nicht_lesbar = [], []
         for i in indizes:
             name = f"{p.nummer(i)} {p.blaetter[i].name}"
@@ -8175,6 +8249,57 @@ class CadApp:
             for lay in getattr(ctx, "layouts", []):
                 TB.refresh_fields(lay.elemente,
                                   TB.make_info(p, i, SPRACHE["aktuell"], lay.format))
+        return kontexte, nicht_lesbar
+
+    def projekt_dxf_exportieren(self):
+        """The whole project as ONE DXF file (sheets side by side, 4 per row)."""
+        de = SPRACHE["aktuell"] == "de"
+        p = self.projekt
+        if p is None:
+            self.status.set(tr("msg.projekt.kein_projekt"))
+            return
+        if not EZDXF_VERFUEGBAR:
+            messagebox.showwarning("DXF", ("ezdxf nicht installiert." if de
+                                           else "ezdxf is not installed."))
+            return
+        pfad = filedialog.asksaveasfilename(
+            parent=self.root, defaultextension=".dxf", initialdir=p.ordner,
+            initialfile=p.name + ".dxf",
+            filetypes=[("DXF", "*.dxf")])
+        if not pfad:
+            return
+        try:
+            from katiecad.fileio.dxf_projekt import (seiten_sammeln,
+                                                     dxf_projekt_schreiben)
+            kontexte, nicht_lesbar = self._kontexte_vorbereiten(
+                list(range(len(p.blaetter))))
+            seiten, uebersprungen = seiten_sammeln(
+                [(n, c) for _, n, c in kontexte], False)
+            if not seiten:
+                raise ValueError(tr("msg.druckp.keine_seiten"))
+            doc = ezdxf.new(dxfversion="R2010")
+            dxf_projekt_schreiben(doc, seiten, spalten=4)
+            doc.saveas(pfad)
+        except Exception as ex:
+            messagebox.showerror("DXF", (f"Fehler:\n{ex}" if de
+                                         else f"Error:\n{ex}"), parent=self.root)
+            return
+        self.status.set(tr("msg.dxfp.fertig", n=len(seiten), pfad=pfad))
+        rest = uebersprungen + nicht_lesbar
+        if rest:
+            messagebox.showinfo("DXF", tr("msg.druckp.uebersprungen",
+                                          liste="\n".join(rest)), parent=self.root)
+
+    def projekt_drucken(self):
+        p = self.projekt
+        if p is None:
+            self.status.set(tr("msg.projekt.kein_projekt"))
+            return
+        dlg = ProjektDruckDialog(self.root, p)
+        if not dlg.result:
+            return
+        aktion, indizes, quelle, farbig, rahmen = dlg.result
+        kontexte, nicht_lesbar = self._kontexte_vorbereiten(indizes)
         try:
             pdf, uebersprungen = pdf_mehrseitig_erzeugen(
                 [(n, c) for _, n, c in kontexte], quelle, farbig, rahmen)
@@ -8791,6 +8916,8 @@ def fenstersymbol_setzen(root):
 
 
 def main():
+    from katiecad.common import logbuch
+    logbuch.installieren()
     root = tk.Tk()
     fenstersymbol_setzen(root)
     app = CadApp(root)
