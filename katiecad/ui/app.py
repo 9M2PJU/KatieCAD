@@ -75,7 +75,7 @@ from katiecad.model.core import (
 )
 from katiecad.ui.dialogs import (
     MIT_LICENSE_TEXT, zeige_lizenz_fenster,
-    _LayoutNameDialog, PropertiesDialog, ViewportDialog,
+    _LayoutNameDialog, BlattEigenschaftenDialog, PropertiesDialog, ViewportDialog,
     LayerDialog, LayerEditDialog, TextDialog, ArrayDialog, DruckDialog,
     _BlockNameDialog, _BlockAuswahlDialog, BlockBrowserDialog,
     BlockSpeichernDialog,
@@ -1128,10 +1128,10 @@ class CadApp:
                             bg=FARBEN["bg_mittel"], fg=FARBEN["cyan"],
                             activebackground=FARBEN["cyan"],
                             activeforeground=FARBEN["bg_dunkel"])
-        m_bloecke.add_command(label=tr("menu.einfuegen.block_erzeugen"),
-                              command=self.block_erzeugen)
         m_bloecke.add_command(label=tr("menu.einfuegen.block_einfuegen"),
                               command=self.block_einfuegen)
+        m_bloecke.add_command(label=tr("menu.einfuegen.block_erzeugen"),
+                              command=self.block_erzeugen)
         m_bloecke.add_command(label=tr("menu.einfuegen.block_liste"),
                               command=self.block_liste)
         m_bloecke.add_separator()
@@ -4253,11 +4253,12 @@ class CadApp:
 
     def _titelfelder_aktualisieren(self):
         """Automatic title block fields (page, date, ...) of all layouts."""
-        if not any(TB.is_title_block(e) for lay in self.layouts for e in lay.elemente):
+        layouts = getattr(self, "layouts", None) or []
+        if not any(TB.is_title_block(e) for lay in layouts for e in lay.elemente):
             return
         p = self.projekt
         idx = p.aktiv if p is not None else 0
-        for lay in self.layouts:
+        for lay in layouts:
             info = TB.make_info(p, idx, SPRACHE["aktuell"], lay.format)
             TB.refresh_fields(lay.elemente, info, self.massstab.get())
 
@@ -5291,7 +5292,7 @@ class CadApp:
             out += [("p", p[0], p[1], p[2], p[3]) for p in g["pfeile"]]
             if g["text"]:
                 s, cx, cy, ang, w, h = g["text"]
-                out.append(("tc", cx, cy, s, h, ang, "Arial"))
+                out.append(("t", cx, cy, s, h, ang, "Arial", "mitte_zentriert"))
             return out
         return []
 
@@ -7277,21 +7278,31 @@ class CadApp:
         if index is None or not (0 <= index < len(p.blaetter)):
             index = p.aktiv
         b = p.blaetter[index]
-        name = _LayoutNameDialog(self.root, tr("msg.blatt.umbenennen"),
-                                 b.name, label=tr("dlg.blatt.name")).result
-        if name is None or name == b.name:
+        orte = sorted({x.einbauort for x in p.blaetter if x.einbauort})
+        res = BlattEigenschaftenDialog(
+            self.root, tr("msg.blatt.umbenennen"), b.name, b.einbauort, orte,
+            mit_ort=not b.bericht).result
+        if res is None:
             return
+        name, ort = res
         if not name:
             messagebox.showinfo(tr("msg.projekt.titel"),
                                 tr("msg.blatt.name_leer"), parent=self.root)
             return
+        if name == b.name and (ort == b.einbauort or b.bericht):
+            return
         b.name = name
+        if not b.bericht:
+            b.einbauort = ort
         try:
             p.speichern()
         except OSError as e:
             messagebox.showerror(tr("msg.projekt.titel"),
                                  tr("msg.projekt.fehler", fehler=e),
                                  parent=self.root)
+        self._titelfelder_aktualisieren()
+        if getattr(self, "layouts", None):
+            self.redraw()
         self.seitenleiste.aktualisieren()
         self._update_titel()
 
@@ -8298,7 +8309,8 @@ class CadApp:
             leitungen_automatisch(ctx.elemente)
             kabel_kreuzungen(ctx.elemente)
             infos.append(SEI.BlattInfo(p.blaetter[i].name, ctx.elemente,
-                                       SEI.beschreibung_aus_layouts(ctx.layouts)))
+                                       SEI.beschreibung_aus_layouts(ctx.layouts),
+                                       p.blaetter[i].einbauort))
             indizes.append(i)
         return infos, indizes
 
@@ -8374,7 +8386,8 @@ class CadApp:
                 [(k, b.elemente) for k, b in enumerate(infos)],
                 lambda k: indizes[k] + 1,
                 SEI.spalten_ordner(programm, p.ordner),
-                bool(p.doku.get("klemmen_geraete", True)))
+                bool(p.doku.get("klemmen_geraete", True)),
+                {k: b.einbauort for k, b in enumerate(infos)})
             namen = {t: tr("rep." + t) for t in tabellen}
             pfade = ANW.csv_exportieren(ziel, tabellen, namen)
         except OSError as e:
