@@ -5,6 +5,7 @@
 - Menü: „Block/Gerät einfügen“ steht über „Block erzeugen“
 - Fix: Maßtext der Bemaßung stand versetzt und ist jetzt zentriert über der Maßlinie
 - Radius-/Durchmesser-Bemaßung klarer benannt (DR / DD)
+- Klemmenplan: Spalte „Klemme (NUM)“ zwischen „Anschluss oben“ und „Anschluss unten“, neue Spalte „Brücke“ mit Grafik für verbundene Klemmen (nur erste Klemme einer Brücke zeigt das Ziel)
 - Info-Fenster: Log-Button öffnet die Log-Datei im Editor (keine Reiter mehr)
 
 ## 1.0.1
