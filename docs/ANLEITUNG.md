@@ -173,7 +173,7 @@ Alle Werkzeuge stehen im Menü **Elektro** und in der Werkzeugleiste.
 ### Fertige Symbole
 
 Im Block-Browser (**Blöcke > Block/Gerät einfügen**, Taste `I`) gibt es den Eintrag
-**Symbolbibliothek** mit Grundsymbolen (Kontakte, Taster, Sicherungen,
+**Symbole** (die Symbolbibliothek) mit Grundsymbolen (Kontakte, Taster, Sicherungen,
 Schutzschalter, Spulen, Motoren, Bauteile, Messgeräte …). Doppelklick setzt ein
 Symbol; Maske und Pins sind schon vorbereitet. Die Liste steht in
 `symbols/README.md`.
