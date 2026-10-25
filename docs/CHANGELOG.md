@@ -1,5 +1,12 @@
 # Änderungen
 
+## 1.0.2
+- Einbauort pro Blatt (Blatt-Eigenschaften, F2): erscheint im Schriftfeld (`EINBAUORT` / `PLACE`) und unterscheidet Geräte-, Klemmen- und Kabellisten
+- Menü: „Block/Gerät einfügen“ steht über „Block erzeugen“
+- Fix: Maßtext der Bemaßung stand versetzt und ist jetzt zentriert über der Maßlinie
+- Radius-/Durchmesser-Bemaßung klarer benannt (DR / DD)
+- Info-Fenster: Log-Button öffnet die Log-Datei im Editor (keine Reiter mehr)
+
 ## 1.0.1
 - Kontaktspiegel für Hauptgeräte (rechts neben dem Symbol oder unter dem Relais), frei verschiebbar
 - Projektprüfung: doppelte Geräte, Querverweise (mit „extern“), Klemmen, offene Anschlüsse
