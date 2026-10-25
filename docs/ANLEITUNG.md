@@ -331,3 +331,5 @@ Mit **F2**, Doppelklick auf ein Blatt oder Rechtsklick > *Blatt-Eigenschaften…
 Spaltenfolge: Klemmleiste, Einbauort, Typ, **Anschluss oben, Klemme (NUM), Brücke, Anschluss unten**, Blatt/Spalte/Zeile. Klemmen derselben Leiste, die du oben oder unten direkt miteinander verbindest, gelten als Brücke: In der Spalte *Brücke* erscheint eine Linie mit Punkten an den verbundenen Klemmen (überlappende Brücken liegen in getrennten Bahnen). Das Ziel der Verbindung steht dann nur in der ersten Klemme der Brücke, bei den übrigen bleibt die Zelle leer. Die Spalte erscheint nur, wenn mindestens eine Brücke vorhanden ist.
 
 Hängt eine Klemme an einer Potentialschiene (z. B. PE oder N), steht in „Anschluss oben/unten“ nur der Potentialname. Voraussetzung: Im Netz gibt es einen freien Anschlusspunkt oder Querverweis, der genauso heißt wie die Klemme (NUM).
+
+Im Klemmenplan beginnt jede Klemmleiste (je Einbauort) auf einem eigenen Blatt; lange Leisten laufen auf Folgeblätter.
