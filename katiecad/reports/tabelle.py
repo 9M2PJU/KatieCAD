@@ -144,9 +144,10 @@ def zeilen_vorbereiten(zeilen, gruppe=None, leer_bei_wiederholung=()):
 
 
 def tabellen_seiten(spalten, zeilen, flaeche, titel="", textgroesse=2.5,
-                    zeilenhoehe=6.0, leer_text=""):
+                    zeilenhoehe=6.0, leer_text="", seite_pro_gruppe=False):
     """Draws the table in `flaeche` = (x1, y1, x2, y2) and, if needed, breaks
-    it across several pages (header row is repeated).
+    it across several pages (header row is repeated). seite_pro_gruppe: every
+    group (rows with `_gruppe` True, e.g. a terminal strip) starts a new page.
     -> list of pages; each page is a list of elements."""
     x1, y1, x2, y2 = flaeche
     breiten = spaltenbreiten(spalten, x2 - x1)
@@ -182,7 +183,8 @@ def tabellen_seiten(spalten, zeilen, flaeche, titel="", textgroesse=2.5,
     seiten, akt, benutzt = [], [], 0.0
     for eintrag in gemessen:
         h = eintrag[2]
-        if akt and benutzt + h > frei + 1e-6:
+        neu = seite_pro_gruppe and eintrag[0].get("_gruppe") is True
+        if akt and (neu or benutzt + h > frei + 1e-6):
             seiten.append(akt)
             akt, benutzt = [], 0.0
         akt.append(eintrag)
