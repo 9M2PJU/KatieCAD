@@ -11,6 +11,7 @@
 - Klemmenplan-Blätter heißen „Klemmenplan <Klemmleiste>“ (z. B. „Klemmenplan X1“)
 - Inhaltsverzeichnis: „Art“ und „Beschreibung“ sind jetzt Blatt-Eigenschaften (F2); Standard-Art bleibt „Schaltplan", der Kunde wird nicht mehr als Beschreibung verwendet
 - Block-Browser: Symbolbibliothek erscheint nur noch einmal („Symbole“ / „symbols“); ein zweiter, älterer Eintrag „symbols“ wird ausgeblendet
+- Fix Projektprüfung: Klemmen ohne eigene IND erben die Klemmleiste wie im Klemmenplan (keine falschen „mehrfach vergeben“-Fehler); gleiche Kennzeichen an verschiedenen Einbauorten gelten nicht als doppelt
 - Info-Fenster: Log-Button öffnet die Log-Datei im Editor (keine Reiter mehr)
 
 ## 1.0.1
