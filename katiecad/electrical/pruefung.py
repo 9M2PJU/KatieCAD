@@ -12,6 +12,7 @@ from katiecad.model.core import (Querverweis, BlockReferenz, ElektroMaske,
                                  Kabel, Klemme, Leitung)
 from katiecad.common.i18n import tr
 from katiecad.electrical.logic import REF_FELD, _pos, _nahe
+from katiecad.reports.netz import leisten_ermitteln
 
 FEHLER, WARNUNG, HINWEIS = "fehler", "warnung", "hinweis"
 STUFEN = (FEHLER, WARNUNG, HINWEIS)
@@ -39,8 +40,11 @@ def _geraet_daten(el):
     return None
 
 
-def pruefe(blaetter):
+def pruefe(blaetter, einbauorte=None):
+    """blaetter: [(index, name, elements)]; einbauorte: {index: location}.
+    The same identifier at different installation locations is no duplicate."""
     res = []
+    eo_von = lambda b: str((einbauorte or {}).get(b[0], "") or "").strip()
 
     def add(stufe, key, blatt, el, **kw):
         x, y = _pos(el)
@@ -53,6 +57,7 @@ def pruefe(blaetter):
     qvs = defaultdict(list)
     for b in blaetter:
         _i, _n, elemente = b
+        leisten = leisten_ermitteln([e for e in elemente if isinstance(e, Klemme)])
         for el in elemente:
             g = _geraet_daten(el)
             if g is not None:
@@ -61,34 +66,34 @@ def pruefe(blaetter):
                     if not per:
                         add(WARNUNG, "pr.haupt_ohne_ind", b, el)
                     else:
-                        haupt[per].append((b, el))
+                        haupt[(eo_von(b), per)].append((b, el))
                 elif rolle == "hilfs" and per:
                     hilfs.append((per, b, el))
             elif isinstance(el, Kabel):
                 c = el.werte.get("CAB", "").strip()
                 if c:
-                    kabel[c].append((b, el))
+                    kabel[(eo_von(b), c)].append((b, el))
             elif isinstance(el, Klemme):
-                ind = el.werte.get("IND", "").strip()
+                ind = leisten.get(id(el), "") or el.werte.get("IND", "").strip()
                 num = el.werte.get("NUM", "").strip()
                 if ind or num:
-                    klemmen[(ind, num)].append((b, el))
-                _klemme_offen(el, elemente, b, res)
+                    klemmen[(eo_von(b), ind, num)].append((b, el))
+                _klemme_offen(el, elemente, b, res, ind)
             elif isinstance(el, Querverweis) and el.text.strip():
                 qvs[el.text.strip()].append((b, el))
 
-    for per, liste in haupt.items():
+    for (_eo, per), liste in haupt.items():
         if len(liste) > 1:
             for b, el in liste:
                 add(FEHLER, "pr.haupt_doppelt", b, el, per=per, n=len(liste))
-    for c, liste in kabel.items():
+    for (_eo, c), liste in kabel.items():
         if len(liste) > 1:
             for b, el in liste:
                 add(FEHLER, "pr.kabel_doppelt", b, el, per=c, n=len(liste))
     for per, b, el in hilfs:
-        if per not in haupt:
+        if (eo_von(b), per) not in haupt:
             add(FEHLER, "pr.hilfs_ohne_haupt", b, el, per=per)
-    for (ind, num), liste in klemmen.items():
+    for (_eo, ind, num), liste in klemmen.items():
         if len(liste) > 1:
             for b, el in liste:
                 add(FEHLER, "pr.klemme_doppelt", b, el, ind=ind, num=num)
@@ -112,7 +117,7 @@ def pruefe(blaetter):
     return res
 
 
-def _klemme_offen(k, elemente, b, res):
+def _klemme_offen(k, elemente, b, res, ind=None):
     enden = []
     for l in elemente:
         if isinstance(l, Leitung):
@@ -120,7 +125,8 @@ def _klemme_offen(k, elemente, b, res):
             enden.append((l.x2, l.y2))
     for name, p in (("oben", k.anschluss_oben()), ("unten", k.anschluss_unten())):
         if not any(_nahe(p, e) for e in enden):
-            nm = (k.werte.get("IND", "") + ":" + k.werte.get("NUM", "")).strip(":")
+            nm = ((k.werte.get("IND", "") if ind is None else ind) + ":"
+                  + k.werte.get("NUM", "")).strip(":")
             res.append(Befund(HINWEIS, tr("pr.klemme_offen", name=nm or "-",
                                           seite=tr("pr.seite." + name)),
                               b[0], b[1], k.x, k.y))
@@ -134,3 +140,4 @@ def bericht_text(befunde):
     for f in befunde:
         zeilen.append(f"[{tr('pr.stufe.' + f.stufe)}] {f.blatt_name}: {f.text}")
     return "\n".join(zeilen)
+
