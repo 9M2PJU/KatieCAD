@@ -13,7 +13,7 @@ from collections import defaultdict
 from katiecad.model.core import ElektroMaske, ort_text
 from katiecad.electrical.logic import (REF_FELD, geraete, felder_aus_elementen, feld_an,
                                        _pos)
-from katiecad.reports.netz import (natuerlich, ziele_texte, ende_ziele,
+from katiecad.reports.netz import (natuerlich, ziele_texte, ende_ziele, knoten_text,
                                    wert_gesetzt)
 
 
@@ -147,6 +147,25 @@ def klemmenplan(netz, blaetter, nummer, einbauorte=None):
     return zeilen
 
 
+def _potential(treffer, num):
+    """Name of the potential (PE, N, ...) if the net reaches a free pin or a
+    cross reference carrying exactly the terminal's name - then only that
+    name is shown instead of every terminal/device on the rail."""
+    num = (num or "").strip()
+    if not num:
+        return ""
+    for n, _via in treffer:
+        if n.art == "klemme":
+            continue
+        if n.art == "qv":
+            name = n.text.strip()
+        else:
+            name = knoten_text(n).strip()      # 'PE' (symbol or free pin)
+        if name.upper() == num.upper():
+            return name
+    return ""
+
+
 def _bruecken(netz, zeilen):
     """Fills oben / unten / bruecke / _bruecke of the terminal rows."""
     nach_obj = {id(z["_kl"]["obj"]): i for i, z in enumerate(zeilen)}
@@ -191,7 +210,8 @@ def _bruecken(netz, zeilen):
                 continue
             # all targets of the group, without its own members
             t = [(n, v) for n, v in alle if id(n.bes) not in ids]
-        z[seite] = ziele_texte(t, node.bes)
+        pot = _potential(t, z["num"])
+        z[seite] = [pot] if pot else ziele_texte(t, node.bes)
     # Lanes: overlapping bridges get different lanes
     belegt = []                         # [(lane, first, last)]
     for seite, mitglieder in gruppen:
