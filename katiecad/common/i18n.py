@@ -290,6 +290,7 @@ TEXTE = {
         "dlg.blatt.einbauort_hinweis": "Gilt für alle Objekte auf diesem Blatt (Schriftfeld, Geräte-, Klemmen- und Kabelliste).",
         "dlg.blatt.nur_zeichnung": "Berichtsblätter haben keinen Einbauort.",
         "sb.spalte_ort": "Einbauort",
+        "rep.col.bruecke": "Brücke",
         "rep.col.einbauort": "Einbauort",
         "dlg.blatt.name": "Blattname:",
         "dlg.block.speichern.titel": "Block als Datei speichern",
@@ -998,6 +999,7 @@ TEXTE = {
         "dlg.blatt.einbauort_hinweis": "Applies to all objects on this sheet (title block, device, terminal and cable lists).",
         "dlg.blatt.nur_zeichnung": "Report sheets have no installation location.",
         "sb.spalte_ort": "Location",
+        "rep.col.bruecke": "Bridge",
         "rep.col.einbauort": "Location",
         "dlg.blatt.name": "Sheet name:",
         "dlg.block.speichern.titel": "Save block to file",
@@ -1446,4 +1448,3 @@ def tr(schluessel, **kwargs):
 def setze_sprache(code):
     if code in TEXTE:
         SPRACHE["aktuell"] = code
-
