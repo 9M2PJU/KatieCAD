@@ -117,7 +117,12 @@ def geraeteliste(blaetter, nummer, netz=None, klemmenleisten=True,
 # ------------------------------------------------------------------
 def klemmenplan(netz, blaetter, nummer, einbauorte=None):
     """One row per terminal, sorted by terminal strip (IND) and number (NUM).
-    Rows: leiste, einbauort, num, typ, per, oben (list), unten (list), ort."""
+    Rows: leiste, einbauort, num, typ, per, oben (list), unten (list), ort.
+
+    Terminals of the same strip whose top (or bottom) sides are wired
+    directly together form a BRIDGE group: only its first terminal lists the
+    targets on that side, and the rows carry `_bruecke` = [(lane, dot, up,
+    down)] for the bridge graphic."""
     felder = _felder(blaetter)
     zeilen = []
     for kl in netz.klemmen:
@@ -129,16 +134,83 @@ def klemmenplan(netz, blaetter, nummer, einbauorte=None):
             "num": wert_gesetzt(w.get("NUM"), "NUM"),
             "typ": wert_gesetzt(w.get("TYP"), "TYP"),
             "per": wert_gesetzt(w.get("PER"), "PER"),
-            "oben": ziele_texte(netz.ziele(kl["oben"]), kl["oben"].bes),
-            "unten": ziele_texte(netz.ziele(kl["unten"]), kl["unten"].bes),
             "ort": _ort(nummer, kl["blatt"],
                         feld_an(felder.get(kl["blatt"], []), *_pos(k))),
-            "_blatt": kl["blatt"], "_pos": _pos(k)})
+            "_blatt": kl["blatt"], "_pos": _pos(k), "_kl": kl})
     zeilen.sort(key=lambda r: (natuerlich(r["einbauort"]), r["leiste"] == "",
                                natuerlich(r["leiste"]),
                                natuerlich(r["num"]) if r["num"] else (),
                                r["_blatt"], -r["_pos"][1], r["_pos"][0]))
+    _bruecken(netz, zeilen)
+    for z in zeilen:
+        z.pop("_kl", None)
     return zeilen
+
+
+def _bruecken(netz, zeilen):
+    """Fills oben / unten / bruecke / _bruecke of the terminal rows."""
+    nach_obj = {id(z["_kl"]["obj"]): i for i, z in enumerate(zeilen)}
+    treffer = {}
+    gruppen = []                        # [(seite, [row indices])]
+    for seite in ("oben", "unten"):
+        eltern = list(range(len(zeilen)))
+
+        def wurzel(i):
+            while eltern[i] != i:
+                eltern[i] = eltern[eltern[i]]
+                i = eltern[i]
+            return i
+
+        for i, z in enumerate(zeilen):
+            node = z["_kl"][seite]
+            t = netz.ziele(node)
+            treffer[(i, seite)] = (node, t)
+            for n, _via in t:
+                j = nach_obj.get(id(n.bes)) if n.art == "klemme" else None
+                if (j is not None and j != i and n.seite == seite
+                        and zeilen[j]["_gk"] == z["_gk"]):
+                    eltern[wurzel(i)] = wurzel(j)
+        teile = {}
+        for i in range(len(zeilen)):
+            teile.setdefault(wurzel(i), []).append(i)
+        gruppen += [(seite, sorted(m)) for m in teile.values() if len(m) > 1]
+    gruppen.sort(key=lambda g: g[1][0])
+    # Targets: the first terminal of a group gets them, the others none
+    ersatz = {}
+    for seite, mitglieder in gruppen:
+        ids = {id(zeilen[m]["_kl"]["obj"]) for m in mitglieder}
+        alle = [x for m in mitglieder for x in treffer[(m, seite)][1]]
+        for pos, i in enumerate(mitglieder):
+            ersatz[(i, seite)] = (pos == 0, ids, alle)
+    for (i, seite), (node, t) in treffer.items():
+        z = zeilen[i]
+        if (i, seite) in ersatz:
+            erster, ids, alle = ersatz[(i, seite)]
+            if not erster:
+                z[seite] = []
+                continue
+            # all targets of the group, without its own members
+            t = [(n, v) for n, v in alle if id(n.bes) not in ids]
+        z[seite] = ziele_texte(t, node.bes)
+    # Lanes: overlapping bridges get different lanes
+    belegt = []                         # [(lane, first, last)]
+    for seite, mitglieder in gruppen:
+        von, bis = mitglieder[0], mitglieder[-1]
+        lane = 0
+        while any(l == lane and not (bis < v or von > b)
+                  for l, v, b in belegt):
+            lane += 1
+        belegt.append((lane, von, bis))
+        for i in range(von, bis + 1):
+            z = zeilen[i]
+            punkt = i in mitglieder
+            z.setdefault("_bruecke", []).append(
+                (lane, punkt, i > von, i < bis))
+        for i in mitglieder:
+            z = zeilen[i]
+            andere = [zeilen[m]["num"] or "?" for m in mitglieder if m != i]
+            z["bruecke"] = (z.get("bruecke", "") + " " if z.get("bruecke") else "") \
+                + seite + ": " + ",".join(andere)
 
 
 # ------------------------------------------------------------------
