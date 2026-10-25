@@ -1,37 +1,31 @@
-# Programm selbst bauen (Windows, Linux, macOS)
+# Building the Program Yourself (Windows, Linux, macOS)
 
-Gebaut wird **auf dem jeweiligen System** (Windows-Programm unter Windows usw.).
-Voraussetzung: Python 3.10+ mit Tk (Windows/macOS: python.org-Installer; Linux:
-`sudo apt install python3-tk python3-venv`) und das Repository von GitHub.
+The program must be built **on the respective operating system** (e.g., build the Windows version on Windows, etc.).
+Prerequisites: Python 3.10+ with Tk (for Windows/macOS, use the installer from python.org; for Linux, run `sudo apt install python3-tk python3-venv`) and the repository from GitHub.
 
-**Ohne Bauen** geht es immer: `pip install -r requirements.txt` und `python main.py`.
-Dann liegen Symbole, Blöcke und Vorlagen einfach im Repo-Ordner.
+Alternatively, you can run it **without building**: simply execute `pip install -r requirements.txt` followed by `python main.py`.
+In this case, symbols, blocks, and templates will remain directly within the repository folder.
 
-## Wie kommen Symbolbibliothek, Rahmen, Vorlagen mit?
-KatieCAD sucht `symbols/`, `title_blocks/`, `report_templates/` und `docs/` relativ zum
-Programm. PyInstaller packt diese Ordner mit der Option `--add-data` neben das Programm
-(bei Windows/Linux in den Ordner `_internal`, bei macOS ins App-Paket). Die Build-Skripte
-unten machen das bereits. Eigene Blöcke legst du weiter im Block-Browser/Projektordner ab.
+## How are the symbol library, title blocks, and templates included?
+KatieCAD looks for `symbols/`, `title_blocks/`, `report_templates/`, and `docs/` relative to the program's location. PyInstaller uses the `--add-data` option to bundle these folders alongside the program (placing them in an `_internal` folder on Windows/Linux, or within the app package on macOS). The build scripts provided below handle this automatically. You can continue to store your own custom blocks in the block browser or your project folder.
 
 ## Windows
-0. `KatieCAD.ico` und `KatieCAD.png` müssen im Hauptordner des Repos liegen (ebenso `LICENSE`).
-1. `installer\build_windows.bat` ausführen → `dist\KatieCAD\KatieCAD.exe`
-2. Installer: Inno Setup installieren, `installer\KatieCAD.iss` öffnen, „Compile“
-   (oder `iscc /DAppVersion=1.0.1 installer\KatieCAD.iss`) → `release\KatieCAD-1.0.1-Windows-Setup.exe`
-   Das Skript nimmt den ganzen Ordner `dist\KatieCAD` mit, also auch alle Bibliotheken.
-
-## Linux
+0. Ensure `KatieCAD.ico`, `KatieCAD.png`, and `LICENSE` are located in the repository's root folder.
+1. Run `installer\build_windows.bat` → this generates `dist\KatieCAD\KatieCAD.exe`.
+2. For the installer: Install Inno Setup, open `installer\KatieCAD.iss`, and select "Compile"
+(or run `iscc /DAppVersion=1.0.2 installer\KatieCAD.iss` from the command line) → this produces `release\KatieCAD-1.0.2-Windows-Setup.exe`.
+The script includes the entire `dist\KatieCAD` folder, ensuring all necessary libraries are bundled. ## Linux
 1. `sh installer/build_unix.sh` → `dist/KatieCAD/KatieCAD`
-2. Als Paket (Debian/Ubuntu): `installer/build_deb.sh 1.0.1` → `release/KatieCAD-1.0.1-Linux-amd64.deb`,
-   installieren mit `sudo apt install ./release/KatieCAD-1.0.1-Linux-amd64.deb`
-   (legt das Programm nach `/opt/katiecad`, Startmenü-Eintrag und Befehl `katiecad`).
-   Alternativ den Ordner `dist/KatieCAD` kopieren, er ist ohne Installation lauffähig.
+2. As a package (Debian/Ubuntu): `installer/build_deb.sh 1.0.2` → `release/KatieCAD-1.0.2-Linux-amd64.deb`,
+install using `sudo apt install ./release/KatieCAD-1.0.2-Linux-amd64.deb`
+(this places the program in `/opt/katiecad`, creates a start menu entry, and adds the `katiecad` command). 
+Alternatively, you can simply copy the `dist/KatieCAD` folder; it is ready to run without installation.
 
 ## macOS
 1. `sh installer/build_unix.sh` → `dist/KatieCAD.app`
-2. Disk-Image: `mkdir dmg && cp -R dist/KatieCAD.app dmg/ && ln -s /Applications dmg/Applications && hdiutil create -volname KatieCAD -srcfolder dmg -ov -format UDZO KatieCAD-1.0.1-macOS.dmg`
-   Beim ersten Start: Rechtsklick auf die App > Öffnen (nicht signiert).
+2. Disk image: `mkdir dmg && cp -R dist/KatieCAD.app dmg/ && ln -s /Applications dmg/Applications && hdiutil create -volname KatieCAD -srcfolder dmg -ov -format UDZO KatieCAD-1.0.2-macOS.dmg`
+Upon first launch: Right-click the app > Open (as it is unsigned).
 
-## Prüfen
-Nach dem Bauen das Programm starten und im Block-Browser nachsehen, ob „Symbolbibliothek“
-erscheint und unter Rahmen die Titelblock-Vorlagen auswählbar sind.
+## Verification
+After building, launch the program and check the block browser to see if "Symbol Library"
+appears, and verify that the title block templates can be selected under "Frames."
