@@ -318,3 +318,5 @@ Dimensions: **Insert > Radius dimension (DR)** and **Diameter dimension (DD)** -
 Column order: terminal strip, location, type, **connection top, terminal (NUM), bridge, connection bottom**, sheet/column/row. Terminals of the same strip that you wire together on the top or bottom side count as a bridge: the *Bridge* column shows a line with dots at the connected terminals (overlapping bridges use separate lanes). The target then appears only on the first terminal of the bridge; the other cells stay empty. The column only appears if at least one bridge exists.
 
 If a terminal sits on a potential rail (e.g. PE or N), "connection top/bottom" shows only the potential name. Requirement: the net contains a free connection point or cross reference named exactly like the terminal (NUM).
+
+In the terminal diagram every terminal strip (per location) starts on its own sheet; long strips continue on following sheets.
