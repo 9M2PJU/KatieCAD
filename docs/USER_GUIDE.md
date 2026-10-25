@@ -309,3 +309,9 @@ Bearbeiten › Eigenschaften öffnet ein Fenster für die aktuelle Auswahl – a
 
 **Bearbeiten › Spiegeln** (Befehl `SPIEGELN`/`MI`, auch im Rechtsklickmenü): Objekte wählen, Enter, zwei Punkte der Spiegelachse klicken (Vorschau live), dann entscheiden, ob die Originale gelöscht werden. Texte bleiben lesbar (nicht gespiegelt), Blöcke inklusive Pins und Beschriftung werden korrekt gespiegelt und bleiben Geräte.
 
+## Projekt als eine DXF-Datei
+**Datei › Projekt als eine DXF exportieren…** wertet alle Blätter wie beim Drucken aus (Layout mit Rahmen, Schriftfeld und Viewports) und legt sie in einer DXF-Datei nebeneinander ab: 4 Blätter pro Zeile, dann eine neue Zeile. Jedes Blatt liegt auf einem eigenen Layer (`Blatt_01` …), dazu `Blattgrenze` und `Blattnamen`.
+
+## Info-Fenster: Änderungen und Protokoll
+Hilfe › Info hat drei Reiter: *Info*, *Änderungen* (Versionsverlauf) und *Protokoll* (alles, was das Programm intern meldet – auch Ladefehler). Das Protokoll lässt sich kopieren oder als Textdatei speichern, praktisch für Fehlermeldungen.
+
