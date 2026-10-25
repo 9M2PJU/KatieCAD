@@ -327,3 +327,6 @@ Hilfe › Info zeigt Logo, Version und Lizenz. Mit **Lizenz** öffnest du den Li
 ## Einbauort (Blatt-Eigenschaften)
 Mit **F2**, Doppelklick auf ein Blatt oder Rechtsklick > *Blatt-Eigenschaften…* legst du Blattname und **Einbauort** (z. B. „Verteiler UV1“) fest. Der Einbauort gilt automatisch für alle Objekte auf dem Blatt und wird nicht in die Objekte kopiert: Ändert man ihn, ziehen Schriftfeld und Listen sofort nach. Im Schriftkopf füllt ihn ein Attribut mit dem Tag `EINBAUORT` (englisch `PLACE`). In der Geräte-, Klemmen- und Kabelliste erscheint die Spalte *Einbauort* (nur, wenn mindestens ein Blatt einen hat); gleiche Betriebsmittelkennzeichen an verschiedenen Einbauorten zählen als verschiedene Geräte. Berichtsblätter haben keinen Einbauort.
 
+## Klemmenplan: Brücken
+Spaltenfolge: Klemmleiste, Einbauort, Typ, **Anschluss oben, Klemme (NUM), Brücke, Anschluss unten**, Blatt/Spalte/Zeile. Klemmen derselben Leiste, die du oben oder unten direkt miteinander verbindest, gelten als Brücke: In der Spalte *Brücke* erscheint eine Linie mit Punkten an den verbundenen Klemmen (überlappende Brücken liegen in getrennten Bahnen). Das Ziel der Verbindung steht dann nur in der ersten Klemme der Brücke, bei den übrigen bleibt die Zelle leer. Die Spalte erscheint nur, wenn mindestens eine Brücke vorhanden ist.
+
