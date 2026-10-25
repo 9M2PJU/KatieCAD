@@ -279,6 +279,29 @@ def _liste_tabelle(typ, zeilen, ordner, flaeche, titel):
                            seite_pro_gruppe=(typ == "klemmen"))
 
 
+def seitennamen(typ, basis, seiten):
+    """Sheet names of the pages of a list. Terminal diagram: 'Klemmenplan X1'
+    (named after the terminal strip, 'X1 2/3' if it needs several sheets);
+    otherwise 'Name 1/3'."""
+    n = len(seiten)
+    if typ != "klemmen":
+        return [_name(basis, k + 1, n) for k in range(n)]
+    labels = []
+    for sp in seiten:
+        kopf = getattr(sp, "kopf", None)
+        eo, leiste = kopf if isinstance(kopf, tuple) and len(kopf) == 2 else ("", "")
+        t = leiste or "-"
+        labels.append(t + (f" ({eo})" if eo else ""))
+    zaehler, out = {}, []
+    for lab in labels:
+        zaehler[lab] = zaehler.get(lab, 0) + 1
+    lauf = {}
+    for lab in labels:
+        lauf[lab] = lauf.get(lab, 0) + 1
+        out.append(f"{basis} {_name(lab, lauf[lab], zaehler[lab])}")
+    return out
+
+
 def _name(basis, k, n):
     return basis if n == 1 else f"{basis} {k}/{n}"
 
@@ -336,9 +359,8 @@ def berichte_erzeugen(blaetter, projektname, daten, aktiv, vorlage, sprache,
             eintraege.append((b.name, b.beschreibung, tr("rep.art.zeichnung")))
         for typ in LISTEN:
             seiten = listen.get(typ, [])
-            for k in range(len(seiten)):
-                eintraege.append((_name(namen[typ], k + 1, len(seiten)), "",
-                                  namen[typ]))
+            for nm in seitennamen(typ, namen[typ], seiten):
+                eintraege.append((nm, "", namen[typ]))
         zeilen = D.inhaltsverzeichnis(
             [{"nr": i + 1, "name": n, "beschreibung": b, "typ": t}
              for i, (n, b, t) in enumerate(eintraege)])
@@ -366,10 +388,9 @@ def berichte_erzeugen(blaetter, projektname, daten, aktiv, vorlage, sprache,
     nr = len(vorne) + len(blaetter)
     for typ in LISTEN:
         seiten = listen.get(typ, [])
-        for k, el in enumerate(seiten):
+        for nm, el in zip(seitennamen(typ, namen[typ], seiten), seiten):
             nr += 1
-            hinten.append(_seite(typ, _name(namen[typ], k + 1, len(seiten)),
-                                 namen[typ], el, ctx, nr, gesamt))
+            hinten.append(_seite(typ, nm, namen[typ], el, ctx, nr, gesamt))
     return vorne, hinten
 
 
