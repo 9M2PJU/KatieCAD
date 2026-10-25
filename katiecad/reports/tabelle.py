@@ -7,7 +7,7 @@ The tables consist of ordinary lines and texts. They are therefore
 visible in the layout of the report sheet, printable and included in the PDF.
 """
 
-from katiecad.model.core import (Linie, Text, Rechteck, pdf_textbreite,
+from katiecad.model.core import (Linie, Text, Rechteck, Schraffur, pdf_textbreite,
                                  CAD_VERSALHOEHE, TEXT_ZEILE)
 
 LINIE = dict(layer="0", eig_farbe=False, linientyp="Volllinie (schmal)")
@@ -18,6 +18,31 @@ RAND_X = 1.5            # mm distance text <-> column line
 RAND_Y = 1.0            # mm distance text <-> row line
 TITEL_HOEHE = 4.0       # mm text height of the table heading
 TITEL_PLATZ = 9.0       # mm space for the heading
+GRAFIK_SPALTE = "bruecke"   # column with the bridge graphic (rows: _bruecke)
+PUNKT_R = 0.9           # mm radius of a bridge dot
+
+
+def _punkt(x, y):
+    """Filled dot (hatch over a 16-gon)."""
+    import math
+    pts = [(x + PUNKT_R * math.cos(2 * math.pi * i / 16),
+            y + PUNKT_R * math.sin(2 * math.pi * i / 16)) for i in range(16)]
+    return Schraffur(pts, "solid", staerke=0.25, **LINIE)
+
+
+def _bruecken_zeichnen(el, z, xa, b, y, hoehe, lanes):
+    """Bridge graphic of one row in the column [xa, xa + b]."""
+    yc = y - hoehe / 2.0
+    for lane, punkt, hoch, runter in z.get("_bruecke", ()):
+        x = xa + b * (lane + 1) / (lanes + 1.0)
+        if hoch and runter:
+            el.append(Linie(x, y, x, y - hoehe, staerke=0.35, **LINIE))
+        elif hoch:
+            el.append(Linie(x, y, x, yc, staerke=0.35, **LINIE))
+        elif runter:
+            el.append(Linie(x, yc, x, y - hoehe, staerke=0.35, **LINIE))
+        if punkt:
+            el.append(_punkt(x, yc))
 
 
 class Spalte:
@@ -139,6 +164,9 @@ def tabellen_seiten(spalten, zeilen, flaeche, titel="", textgroesse=2.5,
     for z in zeilen:
         zellen, hoehe = [], zeilenhoehe
         for sp, b in zip(spalten, breiten):
+            if sp.key == GRAFIK_SPALTE:             # graphics only, no text
+                zellen.append(([], textgroesse))
+                continue
             lines, h = umbrechen(z.get(sp.key, ""), b - 2 * RAND_X, textgroesse)
             zellen.append((lines, h))
             if lines:
@@ -178,9 +206,13 @@ def tabellen_seiten(spalten, zeilen, flaeche, titel="", textgroesse=2.5,
                                 h, sp.ausr))
         # Rows
         y = oben - kopf_h
+        lanes = 1 + max([l for e in gemessen for l, *_r in e[0].get("_bruecke", ())] or [0])
         for z, zellen, hoehe in seite:
             yc = y - hoehe / 2.0
             for sp, xa, b, (lines, h) in zip(spalten, xs, breiten, zellen):
+                if sp.key == GRAFIK_SPALTE:
+                    _bruecken_zeichnen(el, z, xa, b, y, hoehe, lanes)
+                    continue
                 if not lines:
                     continue
                 tx = {"l": xa + RAND_X, "r": xa + b - RAND_X,
@@ -198,4 +230,5 @@ def tabellen_seiten(spalten, zeilen, flaeche, titel="", textgroesse=2.5,
         el.append(Rechteck(x1, unten, x2, oben, staerke=0.5, **LINIE))
         ergebnis.append(el)
     return ergebnis
+
 
