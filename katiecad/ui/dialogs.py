@@ -206,6 +206,53 @@ class _LayoutNameDialog(tk.Toplevel):
 
 
 # ============================================================
+# Sheet properties (name + installation location)
+# ============================================================
+class BlattEigenschaftenDialog(tk.Toplevel):
+    """Name and installation location of a sheet.
+    result = (name, einbauort) or None."""
+
+    def __init__(self, parent, titel, name, einbauort="", vorschlaege=(),
+                 mit_ort=True):
+        super().__init__(parent)
+        self.result = None
+        self.title(titel)
+        self.geometry("440x230")
+        self.transient(parent)
+        _modal(self)
+        self.configure(bg=FARBEN["bg_mittel"])
+        f = ttk.Frame(self, padding=12)
+        f.pack(fill=tk.BOTH, expand=True)
+        ttk.Label(f, text=tr("dlg.blatt.name")).pack(anchor=tk.W)
+        self.name_var = tk.StringVar(value=name)
+        e = ttk.Entry(f, textvariable=self.name_var, width=40)
+        e.pack(fill=tk.X, pady=(2, 8))
+        e.focus_set()
+        e.select_range(0, tk.END)
+        ttk.Label(f, text=tr("dlg.blatt.einbauort")).pack(anchor=tk.W)
+        self.ort_var = tk.StringVar(value=einbauort)
+        self.cb = ttk.Combobox(f, textvariable=self.ort_var, width=38,
+                               values=list(vorschlaege),
+                               state="normal" if mit_ort else "disabled")
+        self.cb.pack(fill=tk.X, pady=(2, 2))
+        ttk.Label(f, text=tr("dlg.blatt.einbauort_hinweis" if mit_ort
+                             else "dlg.blatt.nur_zeichnung"),
+                  wraplength=400, justify=tk.LEFT).pack(anchor=tk.W, pady=(2, 0))
+        bf = ttk.Frame(f)
+        bf.pack(pady=10)
+        ttk.Button(bf, text=tr("dlg.ok"), command=self._ok).pack(side=tk.LEFT, padx=4)
+        ttk.Button(bf, text=tr("dlg.abbrechen"),
+                   command=self.destroy).pack(side=tk.LEFT, padx=4)
+        self.bind("<Return>", lambda ev: self._ok())
+        self.bind("<Escape>", lambda ev: self.destroy())
+        self.wait_window(self)
+
+    def _ok(self):
+        self.result = (self.name_var.get().strip(), self.ort_var.get().strip())
+        self.destroy()
+
+
+# ============================================================
 # PropertiesDialog
 # ============================================================
 class PropertiesDialog(tk.Toplevel):
