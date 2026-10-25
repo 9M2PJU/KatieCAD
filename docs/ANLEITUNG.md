@@ -321,6 +321,5 @@ Bearbeiten › Eigenschaften öffnet ein Fenster für die aktuelle Auswahl – a
 ## Projekt als eine DXF-Datei
 **Projekt › Projekt als eine DXF exportieren…** wertet alle Blätter wie beim Drucken aus (Layout mit Rahmen, Schriftfeld und Viewports) und legt sie in einer DXF-Datei nebeneinander ab: 4 Blätter pro Zeile, dann eine neue Zeile. Jedes Blatt liegt auf einem eigenen Layer (`Blatt_01` …), dazu `Blattgrenze` und `Blattnamen`.
 
-## Info-Fenster: Änderungen und Protokoll
-Hilfe › Info hat drei Reiter: *Info*, *Änderungen* (Versionsverlauf) und *Protokoll* (alles, was das Programm intern meldet – auch Ladefehler). Das Protokoll lässt sich kopieren oder als Textdatei speichern, praktisch für Fehlermeldungen.
-
+## Info-Fenster und Log
+Hilfe › Info zeigt Logo, Version und Lizenz. Mit **Lizenz** öffnest du den Lizenztext, mit **Log** öffnet sich die Log-Datei (`katiecad-log.txt` im KatieCAD-Einstellungsordner) im Standard-Editor – hilfreich bei Fehlermeldungen. Die Datei der vorherigen Sitzung bleibt als `katiecad-log.txt.old` erhalten.
