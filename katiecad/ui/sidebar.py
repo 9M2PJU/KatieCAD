@@ -151,12 +151,14 @@ class Seitenleiste(ttk.Frame):
 
         tf = ttk.Frame(self.f_blaetter)
         tf.pack(fill=tk.BOTH, expand=True)
-        self.tree = ttk.Treeview(tf, columns=("nr", "name"),
+        self.tree = ttk.Treeview(tf, columns=("nr", "name", "ort"),
                                  show="headings", selectmode="browse")
         self.tree.heading("nr", text=tr("sb.spalte_nr"))
         self.tree.heading("name", text=tr("sb.spalte_name"))
         self.tree.column("nr", width=46, anchor=tk.CENTER, stretch=False)
-        self.tree.column("name", width=140, anchor=tk.W)
+        self.tree.heading("ort", text=tr("sb.spalte_ort"))
+        self.tree.column("name", width=110, anchor=tk.W)
+        self.tree.column("ort", width=80, anchor=tk.W)
         sb = ttk.Scrollbar(tf, orient=tk.VERTICAL, command=self.tree.yview)
         self.tree.configure(yscrollcommand=sb.set)
         self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
@@ -176,7 +178,7 @@ class Seitenleiste(ttk.Frame):
                           ("\u2212", app.blatt_loeschen),
                           ("\u25B2", lambda: app.blatt_verschieben(-1)),
                           ("\u25BC", lambda: app.blatt_verschieben(+1)),
-                          ("Abc", app.blatt_umbenennen)):
+                          ("Eig", app.blatt_umbenennen)):
             ttk.Button(bz, text=text, width=3, padding=(2, 3),
                        command=cmd).pack(side=tk.LEFT, expand=True,
                                          fill=tk.X, padx=1)
@@ -227,10 +229,10 @@ class Seitenleiste(ttk.Frame):
                     self.tree.delete(item)
                 for i, b in enumerate(p.blaetter):
                     self.tree.insert("", "end", iid=str(i),
-                                     values=(p.nummer(i), b.name))
+                                     values=(p.nummer(i), b.name, b.einbauort))
             else:
                 for i, b in enumerate(p.blaetter):
-                    self.tree.item(str(i), values=(p.nummer(i), b.name))
+                    self.tree.item(str(i), values=(p.nummer(i), b.name, b.einbauort))
             if p.blaetter and 0 <= p.aktiv < len(p.blaetter):
                 if self.tree.selection() != (str(p.aktiv),):
                     self.tree.selection_set(str(p.aktiv))
