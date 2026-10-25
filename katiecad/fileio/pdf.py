@@ -191,7 +191,8 @@ def _pdf_viewport(seite, vp, elemente, layers, farbig, rahmen,
                     0.25, "#000000", None, True)
 
 
-def pdf_seite_erzeugen(app, quelle, farbig, vp_rahmen, layout_index=None):
+def pdf_seite_erzeugen(app, quelle, farbig, vp_rahmen, layout_index=None,
+                       seite_klasse=PdfSeite):
     """Creates a PdfSeite for model or layout.
     app must provide: elemente, layers, layouts, aktives_layout,
                      layout_format, _einh_faktor(), dezimalkomma.get()."""
@@ -204,7 +205,7 @@ def pdf_seite_erzeugen(app, quelle, farbig, vp_rahmen, layout_index=None):
             layout_index = app.aktives_layout
         lay = app.layouts[layout_index]
         b, h = ZEICHNUNGSFORMATE[lay.format]
-        seite = PdfSeite(b, h)
+        seite = seite_klasse(b, h)
         for el in lay.elemente:
             l = app.layers.get(el.layer)
             if l and not l.sichtbar:
@@ -237,7 +238,7 @@ def pdf_seite_erzeugen(app, quelle, farbig, vp_rahmen, layout_index=None):
     def tf(x, y):
         return (b / 2 + (x - cx) * z, h / 2 + (y - cy) * z)
 
-    seite = PdfSeite(b, h)
+    seite = seite_klasse(b, h)
     for el in sichtbar:
         _pdf_element(seite, el, tf, z, farbig, app.layers, einh, komma)
     seite.text(rand, 4.0,
