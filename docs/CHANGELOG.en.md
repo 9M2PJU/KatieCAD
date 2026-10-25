@@ -11,6 +11,7 @@
 - Terminal diagram sheets are named "Klemmenplan <strip>" after the terminal strip (e.g. "Klemmenplan X1")
 - Table of contents: "type" and "description" are now sheet properties (F2); default type stays "Circuit diagram", the customer is no longer used as description
 - Block browser: the symbol library is listed only once ("Symbole" / "symbols"); a second, older "symbols" entry is hidden
+- Fix project check: terminals without their own IND inherit the terminal strip like in the terminal diagram (no false "assigned more than once" errors); the same identifier at different installation locations is not a duplicate
 - Info window: Log button opens the log file in the editor (no tabs)
 
 ## 1.0.1
