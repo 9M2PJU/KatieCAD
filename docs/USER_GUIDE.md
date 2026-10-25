@@ -321,3 +321,5 @@ If a terminal sits on a potential rail (e.g. PE or N), "connection top/bottom" s
 
 In the terminal diagram every terminal strip (per location) starts on its own sheet; long strips continue on following sheets.
 The terminal diagram sheets are named after their terminal strip, e.g. "Klemmenplan X1" (with a location, placed first: "Klemmenplan +1 -X1"; several sheets for one strip: "... X1 2/3"). This also applies to the table of contents and the title block.
+
+In **Sheet properties (F2)** you also set the **sheet type** (circuit diagram, panel layout, overview, layout or custom text) and a **description**. Both appear in the table of contents; without an entry the type is "Circuit diagram" and the description stays empty.
