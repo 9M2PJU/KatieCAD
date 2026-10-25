@@ -281,7 +281,7 @@ def _liste_tabelle(typ, zeilen, ordner, flaeche, titel):
 
 def seitennamen(typ, basis, seiten):
     """Sheet names of the pages of a list. Terminal diagram: 'Klemmenplan X1'
-    (named after the terminal strip, 'X1 2/3' if it needs several sheets);
+    (location first: 'Klemmenplan +1 -X1'; '... -X1 2/3' if the strip needs several sheets);
     otherwise 'Name 1/3'."""
     n = len(seiten)
     if typ != "klemmen":
@@ -291,7 +291,7 @@ def seitennamen(typ, basis, seiten):
         kopf = getattr(sp, "kopf", None)
         eo, leiste = kopf if isinstance(kopf, tuple) and len(kopf) == 2 else ("", "")
         t = leiste or "-"
-        labels.append(t + (f" ({eo})" if eo else ""))
+        labels.append((eo + " " if eo else "") + t)
     zaehler, out = {}, []
     for lab in labels:
         zaehler[lab] = zaehler.get(lab, 0) + 1
