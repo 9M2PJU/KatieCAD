@@ -39,8 +39,9 @@ DATEN_SCHLUESSEL = ("anlage", "kunde", "auftrag", "zeichnungsnummer", "firma",
 class BlattInfo:
     """A drawing sheet of the project (without report sheets)."""
 
-    def __init__(self, name, elemente, beschreibung="", einbauort=""):
+    def __init__(self, name, elemente, beschreibung="", einbauort="", art=""):
         self.einbauort = einbauort
+        self.art = art
         self.name = name
         self.elemente = elemente
         self.beschreibung = beschreibung
@@ -356,7 +357,8 @@ def berichte_erzeugen(blaetter, projektname, daten, aktiv, vorlage, sprache,
             eintraege.append((_name(namen["inhalt"], k + 1, n_inh), "",
                               namen["inhalt"]))
         for b in blaetter:
-            eintraege.append((b.name, b.beschreibung, tr("rep.art.zeichnung")))
+            eintraege.append((b.name, b.beschreibung,
+                              getattr(b, "art", "") or tr("rep.art.zeichnung")))
         for typ in LISTEN:
             seiten = listen.get(typ, [])
             for nm in seitennamen(typ, namen[typ], seiten):
@@ -406,3 +408,4 @@ def beschreibung_aus_layouts(layouts):
                 if teile:
                     return " - ".join(teile[:2])
     return ""
+
