@@ -7,6 +7,7 @@
 - Radius-/Durchmesser-Bemaßung klarer benannt (DR / DD)
 - Klemmenplan: Spalte „Klemme (NUM)“ zwischen „Anschluss oben“ und „Anschluss unten“, neue Spalte „Brücke“ mit Grafik für verbundene Klemmen (nur erste Klemme einer Brücke zeigt das Ziel)
 - Klemmenplan: an Potentialschienen (PE, N, …) steht nur noch der Potentialname statt aller Klemmen
+- Klemmenplan: jede Klemmleiste beginnt auf einem eigenen Blatt
 - Info-Fenster: Log-Button öffnet die Log-Datei im Editor (keine Reiter mehr)
 
 ## 1.0.1
