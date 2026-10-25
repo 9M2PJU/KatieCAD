@@ -1,6 +1,6 @@
 name: Release
 
-# Start: push a tag  (git tag v1.0.1 && git push origin v1.0.1)
+# Start: push a tag  (git tag v1.0.2 && git push origin v1.0.2)
 # or manually under  Actions > Release > Run workflow.
 on:
   push:
@@ -102,3 +102,4 @@ jobs:
         with:
           files: release/*
           generate_release_notes: true
+
