@@ -5,6 +5,7 @@
 - Menu: "Insert block/device" now sits above "Create block"
 - Fix: dimension text was offset; it is now centred above the dimension line
 - Radius/diameter dimensions named more clearly (DR / DD)
+- Terminal diagram: column "Terminal (NUM)" now sits between "Connection top" and "Connection bottom"; new column "Bridge" with a graphic for terminals wired together (only the first terminal of a bridge shows the target)
 - Info window: Log button opens the log file in the editor (no tabs)
 
 ## 1.0.1
