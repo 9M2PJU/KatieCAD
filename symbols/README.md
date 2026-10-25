@@ -1,11 +1,11 @@
 # Symbol library
 
 Basic symbols for electrical diagrams, ready to use in KatieCAD. Open them with
-**Blocks > Insert block (I)**; the library appears there as **Symbol library**
-(German UI: *Symbolbibliothek*) with one sub-folder per category.
+**Blocks > Insert block/device (I)**; the library appears there as **symbols**
+(German UI: *Symbole*) with one sub-folder per category.
 
-Deutsch: Grundsymbole für Stromlaufpläne. Zu finden unter **Blöcke > Block einfügen (I)**
-im Eintrag **Symbolbibliothek**, je Kategorie ein Unterordner.
+Deutsch: Grundsymbole für Stromlaufpläne. Zu finden unter **Blöcke > Block/Gerät einfügen (I)**
+im Eintrag **Symbole**, je Kategorie ein Unterordner.
 
 ## Conventions
 
