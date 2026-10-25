@@ -65,6 +65,27 @@ def _verbinden(a, b, kabel=None):
     return k
 
 
+def leisten_ermitteln(klemmen):
+    """Terminal strip of every terminal of ONE sheet: {id(terminal): IND}.
+    A terminal without IND inherits the strip of the nearest terminal to its
+    left in the same row (the strip is usually entered at the first terminal)."""
+    reihen = []
+    for k in sorted(klemmen, key=lambda c: (c.y, c.x)):
+        if reihen and abs(reihen[-1][0] - k.y) <= 0.5:
+            reihen[-1][1].append(k)
+        else:
+            reihen.append([k.y, [k]])
+    out = {}
+    for _y, reihe in reihen:
+        aktuell = ""
+        for k in sorted(reihe, key=lambda c: c.x):
+            kz = wert_gesetzt(k.werte.get("IND"), "IND")
+            if kz:
+                aktuell = kz
+            out[id(k)] = kz or aktuell
+    return out
+
+
 def wert_gesetzt(wert, tag):
     """Field value without placeholder: empty or equal to the field name ('IND'
     in field IND, as shown by a symbol's template) counts as not filled in."""
@@ -138,21 +159,12 @@ class Netz:
         """Terminals without a terminal strip inherit that of the nearest terminal to
         their left in the same row (the strip is usually entered only at the
         first terminal)."""
-        reihen = []
-        for kl in sorted(klemmen, key=lambda c: (c["obj"].y, c["obj"].x)):
-            if reihen and abs(reihen[-1][0] - kl["obj"].y) <= 0.5:
-                reihen[-1][1].append(kl)
-            else:
-                reihen.append([kl["obj"].y, [kl]])
-        for _y, reihe in reihen:
-            aktuell = ""
-            for kl in sorted(reihe, key=lambda c: c["obj"].x):
-                if kl["leiste"]:
-                    aktuell = kl["leiste"]
-                elif aktuell:
-                    kl["leiste"] = aktuell
-                    kl["geerbt"] = True
-                    kl["oben"].kennz = kl["unten"].kennz = aktuell
+        zuordnung = leisten_ermitteln([kl["obj"] for kl in klemmen])
+        for kl in klemmen:
+            if not kl["leiste"] and zuordnung.get(id(kl["obj"])):
+                kl["leiste"] = zuordnung[id(kl["obj"])]
+                kl["geerbt"] = True
+                kl["oben"].kennz = kl["unten"].kennz = kl["leiste"]
 
     def blatt_hinzufuegen(self, blatt, elemente):
         """`blatt`: arbitrary key (e.g. 0-based index)."""
