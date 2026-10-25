@@ -80,8 +80,10 @@ _STANDARD = {
                 ("ort", "rep.col.fundstellen", 50, "l")],
     "klemmen": [("leiste", "rep.col.leiste", 16, "l"),
                 ("einbauort", "rep.col.einbauort", 26, "l"),
+                ("typ", "rep.col.typ", 26, "l"),
+                ("oben", "rep.col.oben", 48, "l"),
                 ("num", "rep.col.num", 10, "l"),
-                ("typ", "rep.col.typ", 26, "l"), ("oben", "rep.col.oben", 48, "l"),
+                ("bruecke", "rep.col.bruecke", 16, "c"),
                 ("unten", "rep.col.unten", 48, "l"), ("ort", "rep.col.ort", 20, "l")],
     "kabel": [("cab", "rep.col.cab", 14, "l"),
               ("einbauort", "rep.col.einbauort", 26, "l"),
@@ -241,10 +243,11 @@ def netz_aufbauen(blaetter):
 
 
 def _ohne_leere_einbauorte(spalten, zeilen):
-    """The column 'einbauort' only appears if at least one row has a value."""
-    if any(z.get("einbauort") for z in zeilen):
-        return spalten
-    return [sp for sp in spalten if sp.key != "einbauort"]
+    """Columns without content disappear: 'einbauort' without any location,
+    'bruecke' without any bridge."""
+    return [sp for sp in spalten
+            if not (sp.key == "einbauort" and not any(z.get("einbauort") for z in zeilen))
+            and not (sp.key == "bruecke" and not any(z.get("_bruecke") for z in zeilen))]
 
 
 def tabellen_fuer_export(blaetter, nummer, ordner=(), klemmen_in_geraeteliste=True,
