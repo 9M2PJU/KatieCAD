@@ -304,7 +304,7 @@ Edit › Properties opens a window for the current selection, also mixed (lines,
 **Edit › Mirror** (command `MIRROR`/`MI`, also in the right-click menu): select objects, Enter, pick two points of the mirror line (live preview), then decide whether the originals are deleted. Texts stay readable (not mirrored); blocks including pins and labels are mirrored correctly and remain devices.
 
 ## Whole project as one DXF file
-**File › Export project as one DXF…** evaluates all sheets like printing (layout with frame, title block and viewports) and places them side by side in one DXF file: 4 sheets per row, then a new row. Every sheet is on its own layer (`Blatt_01` ...), plus `Blattgrenze` and `Blattnamen`.
+**Project › Export project as one DXF…** evaluates all sheets like printing (layout with frame, title block and viewports) and places them side by side in one DXF file: 4 sheets per row, then a new row. Every sheet is on its own layer (`Blatt_01` ...), plus `Blattgrenze` and `Blattnamen`.
 
 ## Info window: changes and log
 Help › About has three tabs: *Info*, *Changes* (version history) and *Log* (everything the program reports internally, including load errors). The log can be copied or saved as a text file - handy for bug reports.
