@@ -15,6 +15,14 @@ MAX_ZEILEN = 2000
 _zeilen = deque(maxlen=MAX_ZEILEN)
 _lock = threading.Lock()
 _installiert = False
+_datei = None
+_pfad = None
+DATEINAME = "katiecad-log.txt"
+
+
+def pfad():
+    """Path of the current log file (or None)."""
+    return _pfad
 
 
 class _Tee:
@@ -55,15 +63,45 @@ class _Tee:
 
 def eintragen(text, kanal="info"):
     with _lock:
-        _zeilen.append((time.strftime("%H:%M:%S"), kanal, str(text)))
+        t = time.strftime("%H:%M:%S")
+        _zeilen.append((t, kanal, str(text)))
+        if _datei is not None:
+            try:
+                _datei.write(f"{t}  {'!' if kanal == 'fehler' else ' '}  {text}\n")
+                _datei.flush()
+            except Exception:
+                pass
 
 
-def installieren():
-    """Mirrors stdout/stderr into the log (once)."""
+def _datei_oeffnen(verzeichnis, kopf):
+    """Opens the log file of this session (the previous one becomes .old)."""
+    global _datei, _pfad
+    import os
+    try:
+        os.makedirs(verzeichnis, exist_ok=True)
+        pf = os.path.join(verzeichnis, DATEINAME)
+        if os.path.exists(pf):
+            try:
+                os.replace(pf, pf + ".old")
+            except OSError:
+                pass
+        _datei = open(pf, "w", encoding="utf-8")
+        _pfad = pf
+        _datei.write(kopf + "\n" + "-" * 60 + "\n")
+        _datei.flush()
+    except Exception:
+        _datei = None
+
+
+def installieren(verzeichnis=None, kopf="KatieCAD"):
+    """Mirrors stdout/stderr into the log (once) and, if a directory is
+    given, into a log file there."""
     global _installiert
     if _installiert:
         return
     _installiert = True
+    if verzeichnis:
+        _datei_oeffnen(verzeichnis, kopf)
     sys.stdout = _Tee(sys.stdout, "info")
     sys.stderr = _Tee(sys.stderr, "fehler")
 
