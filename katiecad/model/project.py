@@ -56,8 +56,11 @@ def _json_schreiben(pfad, daten):
 
 
 class Blatt:
-    def __init__(self, name, datei, bericht=None):
+    def __init__(self, name, datei, bericht=None, einbauort=""):
         self.name = name
+        # Installation location (e.g. "Verteiler UV1"): applies to every object
+        # on this sheet; derived when needed (title block, lists), not copied.
+        self.einbauort = str(einbauort or "").strip()
         self.datei = datei          # File name relative to the project folder
         # None = drawing sheet; otherwise type of a generated report sheet
         # ("deckblatt", "inhalt", "geraete", "klemmen", "kabel")
@@ -67,6 +70,8 @@ class Blatt:
         d = {"name": self.name, "datei": self.datei}
         if self.bericht:
             d["bericht"] = self.bericht
+        if self.einbauort:
+            d["einbauort"] = self.einbauort
         return d
 
 
@@ -139,7 +144,8 @@ class Projekt:
         for bd in d.get("blaetter", []):
             if isinstance(bd, dict) and bd.get("datei"):
                 blaetter.append(Blatt(bd.get("name") or bd["datei"],
-                                      bd["datei"], bd.get("bericht") or None))
+                                      bd["datei"], bd.get("bericht") or None,
+                                      bd.get("einbauort") or ""))
         p = cls(name, ordner, blaetter,
                 aktiv=int(d.get("aktiv", 0) or 0),
                 naechste_id=int(d.get("naechste_id", len(blaetter) + 1)),
@@ -276,6 +282,7 @@ class Projekt:
             raise ProjektFehler(f"sheet file missing: {quelle}")
         name = (name or "").strip() or self.kopie_name(self.blaetter[index].name)
         b = self.blatt_hinzufuegen(name, nach_index=index)
+        b.einbauort = self.blaetter[index].einbauort
         try:
             shutil.copy2(quelle, self.blatt_pfad(b))
         except OSError:
