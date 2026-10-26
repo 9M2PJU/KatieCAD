@@ -665,6 +665,15 @@ class PdfSeite:
     def __init__(self, breite_mm, hoehe_mm):
         self.b, self.h = float(breite_mm), float(hoehe_mm)
         self.ops = []
+        self.ebene = None        # current layer name (-> PDF optional content)
+        self.ebenen = []         # layer names in order of first use
+
+    def _op(self, op):
+        if self.ebene:
+            if self.ebene not in self.ebenen:
+                self.ebenen.append(self.ebene)
+            op = "/OC /OC%d BDC %s EMC" % (self.ebenen.index(self.ebene) + 1, op)
+        self.ops.append(op)
 
     def clip_start(self, x1, y1, x2, y2):
         self.ops.append("q %.4f %.4f %.4f %.4f re W n" % (x1, y1, x2 - x1, y2 - y1))
@@ -684,7 +693,7 @@ class PdfSeite:
             o.append("%.4f %.4f l" % p)
         o.append("s" if geschlossen else "S")
         o.append("Q")
-        self.ops.append(" ".join(o))
+        self._op(" ".join(o))
 
     def flaeche(self, pts, farbe="#000000"):
         if len(pts) < 3:
@@ -695,7 +704,7 @@ class PdfSeite:
             o.append("%.4f %.4f l" % p)
         o.append("f")
         o.append("Q")
-        self.ops.append(" ".join(o))
+        self._op(" ".join(o))
 
     def text(self, x, y, inhalt, hoehe, winkel=0.0, farbe="#000000", mitte=False):
         fs = hoehe / CAD_VERSALHOEHE
@@ -711,7 +720,7 @@ class PdfSeite:
                 w = pdf_textbreite(z, fs)
                 ox -= ex[0] * w / 2 + ey[0] * hoehe / 2
                 oy -= ex[1] * w / 2 + ey[1] * hoehe / 2
-            self.ops.append(
+            self._op(
                 "BT /F1 %.4f Tf %.4f %.4f %.4f rg %.6f %.6f %.6f %.6f %.4f %.4f Tm (%s) Tj ET"
                 % (fs, r, g, b, ex[0], ex[1], -ex[1], ex[0], ox, oy, _pdf_str(z)))
 
@@ -721,7 +730,7 @@ class PdfSeite:
             self.bilder = []
         name = "Im%d" % (len(self.bilder) + 1)
         self.bilder.append((name, daten, format, pw, ph))
-        self.ops.append("q %.4f 0 0 %.4f %.4f %.4f cm /%s Do Q"
+        self._op("q %.4f 0 0 %.4f %.4f %.4f cm /%s Do Q"
                         % (breite, hoehe, x, y, name))
 
     def to_bytes(self):
@@ -763,6 +772,12 @@ def pdf_mehrseitig(seiten):
     objs[3] = (b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica "
                b"/Encoding /WinAnsiEncoding >>")
     naechste = 4 + 2 * n                    # first free object number (images)
+    ocg = {}                                # layer name -> object number
+    for sp in seiten:
+        for nm in sp.ebenen:
+            if nm not in ocg:
+                ocg[nm] = naechste
+                naechste += 1
     for i, sp in enumerate(seiten):
         pid, cid = 4 + 2 * i, 5 + 2 * i
         inhalt = ("%.9f 0 0 %.9f 0 0 cm\n" % (sp.MM, sp.MM)
@@ -780,12 +795,23 @@ def pdf_mehrseitig(seiten):
                 objs[nr + k] = t
             xobj += "/%s %d 0 R " % (name, nr)
         res = "/Font << /F1 3 0 R >>" + (" /XObject << %s>>" % xobj if xobj else "")
+        if sp.ebenen:
+            res += " /Properties << %s>>" % "".join(
+                "/OC%d %d 0 R " % (k + 1, ocg[nm]) for k, nm in enumerate(sp.ebenen))
         objs[pid] = ("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 %.3f %.3f] "
                      "/Contents %d 0 R /Resources << %s >> >>"
                      % (w, h, cid, res)).encode("latin-1")
         objs[cid] = (b"<< /Length %d /Filter /FlateDecode >>\nstream\n" % len(strom)
                      + strom + b"\nendstream")
-    out = bytearray(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
+    if ocg:
+        refs = " ".join("%d 0 R" % nr for nr in ocg.values())
+        objs[1] = ("<< /Type /Catalog /Pages 2 0 R /OCProperties << /OCGs [%s] "
+                   "/D << /Order [%s] /ON [%s] >> >> >>" % (refs, refs, refs)
+                   ).encode("latin-1")
+        for nm, nr in ocg.items():
+            hexname = ("\ufeff" + nm).encode("utf-16-be").hex().upper()
+            objs[nr] = ("<< /Type /OCG /Name <%s> >>" % hexname).encode("latin-1")
+    out = bytearray((b"%PDF-1.5" if ocg else b"%PDF-1.4") + b"\n%\xe2\xe3\xcf\xd3\n")
     offs = []
     total = naechste - 1
     for i in range(1, total + 1):
