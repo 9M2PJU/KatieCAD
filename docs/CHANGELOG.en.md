@@ -14,6 +14,7 @@
 - Fix project check: terminals without their own IND inherit the terminal strip like in the terminal diagram (no false "assigned more than once" errors); the same identifier at different installation locations is not a duplicate
 - Info window: new subtitle with a focus on electrical engineering
 - PDF import (File > Import PDF...): vector lines, circles, text and fills; PDF layers become KatieCAD layers (own reader based on pypdf, BSD licence; the MIT licence is unaffected)
+- Image import (File > Import image...): images are stored inside the drawing, written to PDF output, and saved as a file next to the DXF on DXF export
 - Info window: Log button opens the log file in the editor (no tabs)
 
 ## 1.0.1
