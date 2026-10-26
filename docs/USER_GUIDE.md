@@ -326,3 +326,6 @@ In **Sheet properties (F2)** you also set the **sheet type** (circuit diagram, p
 
 ## Importing a PDF
 **File > Import PDF...** reads one page of a PDF as vector geometry (not as a picture). Choose the page and a **scale factor** (1 = paper size; enter 50 for a 1:50 plot). If the PDF contains layers (as written by AutoCAD or BricsCAD with "include layer information"), they become KatieCAD layers with the same names; layers hidden in the PDF stay hidden. Without layers everything goes onto layer "PDF". Imported: lines, polylines, rectangles, curves, circles, text and solid fills. Not imported: raster images (e.g. scanned PDFs), hatch patterns, dash line types and clipping. Text sometimes arrives in fragments. The import only uses freely licensed libraries (pypdf); KatieCAD stays MIT-licensed. To try it from source: `pip install pypdf` (also in `requirements.txt`).
+
+## Importing an image
+**File > Import image...** inserts a photo or graphic (PNG, JPG, BMP, GIF, TIFF). The image is stored inside the drawing, so the original file is no longer needed. Resize with the yellow corner grip or **Scale**; move, rotate and mirror work as for other objects. Large images are reduced to at most 2400 pixels on the long side. Images appear in PDF output; on DXF export the image file is written next to the DXF file. Project DXF export does not include images.
