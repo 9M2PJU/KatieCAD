@@ -430,6 +430,7 @@ TEXTE = {
         "menu.datei.speichern": "Speichern...",
         "menu.datei.import_dxf": "Import DXF...",
         "menu.datei.import_dwg": "Import DWG...",
+        "menu.datei.import_pdf": "PDF importieren...",
         "menu.datei.export_dxf": "Export DXF...",
         "menu.datei.export_dwg": "Export DWG...",
         "menu.datei.drucken": "Drucken... (Strg+P)",
@@ -718,7 +719,7 @@ TEXTE = {
         "vp.leiste.kein_layout_hinweis": "Bitte ein Layout öffnen, um die Viewport-Ansicht zu nutzen.",
         "vp.leiste.viewport_waehlen": "Bitte zuerst einen Viewport durch Doppelklick aktivieren.",
         "info.titel": "Info",
-        "info.untertitel": "Ein leichtgewichtiges 2D-CAD-System auf Python/Tkinter-Basis mit vollständigen Konstruktions-, Bearbeitungs- und Bemaßungsfunktionen sowie DXF-Unterstützung.",
+        "info.untertitel": "Ein Open-Source-CAD-System für Elektrotechnik: Stromlaufpläne zeichnen, Projekte mit mehreren Blättern verwalten und Geräteliste, Klemmenplan und Kabelplan automatisch erzeugen,  mit vollständigen 2D-Konstruktions- und Bemaßungsfunktionen sowie DXF- und PDF-Export.",
         "info.gebaut_mit": "Entwickelt mit Python und ein wenig Hilfe von KI.",
         "info.copyright": "(c) 2026 Merecete",
         "info.version": "Version 1.0.2",
@@ -1144,6 +1145,7 @@ TEXTE = {
         "menu.datei.speichern": "Save...",
         "menu.datei.import_dxf": "Import DXF...",
         "menu.datei.import_dwg": "Import DWG...",
+        "menu.datei.import_pdf": "Import PDF...",
         "menu.datei.export_dxf": "Export DXF...",
         "menu.datei.export_dwg": "Export DWG...",
         "menu.datei.drucken": "Print... (Ctrl+P)",
@@ -1432,7 +1434,7 @@ TEXTE = {
         "vp.leiste.kein_layout_hinweis": "Please open a layout to use the viewport view.",
         "vp.leiste.viewport_waehlen": "Please activate a viewport by double-clicking it first.",
         "info.titel": "About",
-        "info.untertitel": "A lightweight 2D CAD system powered by Python/Tkinter featuring essential drafting, editing, dimensioning, and full DXF support.",
+        "info.untertitel": "An Open-Source CAD for electrical engineering: draw circuit diagrams, manage multi-sheet projects and generate device lists, terminal diagrams and cable plans automatically, with full 2D drafting and dimensioning tools and DXF and PDF export.",
         "info.gebaut_mit": "Built with Python and a little help from AI.",
         "info.copyright": "(c) 2026 Merecete",
         "info.version": "Version 1.0.2",
@@ -1458,3 +1460,4 @@ def tr(schluessel, **kwargs):
 def setze_sprache(code):
     if code in TEXTE:
         SPRACHE["aktuell"] = code
+
