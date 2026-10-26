@@ -15,7 +15,7 @@ from katiecad.model.core import (
     ZEICHNUNGSFORMATE, MASSSTAEBE, LINIENTYPEN, PdfSeite,
     Text, Bemassung, Viewport,
     Linie, Rechteck, Polylinie, Kreis, Bogen,
-    BlockReferenz, Schraffur, Querverweis, Verbindungspunkt,
+    BlockReferenz, Schraffur, Bild, Querverweis, Verbindungspunkt,
     Verbindung, ElektroMaske, Klemme, Koordinatenfeld, Kabel,
     pdf_mehrseitig,
     bogen_sweep, bogen_punkte,
@@ -103,6 +103,13 @@ def _pdf_element(seite, el, tf, zs, farbig, layers, einh_faktor, dezimalkomma):
         if t is not None:
             _pdf_element(seite, t, tf, zs, farbig, layers,
                          einh_faktor, dezimalkomma)
+        return
+
+    if isinstance(el, Bild):
+        x1, y1 = tf(el.x, el.y)
+        x2, y2 = tf(el.x + el.breite, el.y + el.hoehe)
+        seite.bild(min(x1, x2), min(y1, y2), abs(x2 - x1), abs(y2 - y1),
+                   el.daten, el.format, el.pw, el.ph)
         return
 
     # NEW: output hatching
