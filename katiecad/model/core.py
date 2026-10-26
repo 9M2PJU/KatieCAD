@@ -715,8 +715,40 @@ class PdfSeite:
                 "BT /F1 %.4f Tf %.4f %.4f %.4f rg %.6f %.6f %.6f %.6f %.4f %.4f Tm (%s) Tj ET"
                 % (fs, r, g, b, ex[0], ex[1], -ex[1], ex[0], ox, oy, _pdf_str(z)))
 
+    def bild(self, x, y, breite, hoehe, daten, format, pw, ph):
+        """Places an image (lower left corner x/y in mm)."""
+        if not hasattr(self, "bilder"):
+            self.bilder = []
+        name = "Im%d" % (len(self.bilder) + 1)
+        self.bilder.append((name, daten, format, pw, ph))
+        self.ops.append("q %.4f 0 0 %.4f %.4f %.4f cm /%s Do Q"
+                        % (breite, hoehe, x, y, name))
+
     def to_bytes(self):
         return pdf_mehrseitig([self])
+
+
+def _pdf_bild_objekte(daten, format, pw, ph):
+    """-> list of PDF object bodies (bytes) for one image: [image, (smask)].
+    Object numbers inside are written as %(smask)d and filled in by the caller."""
+    import base64
+    roh = base64.b64decode(daten)
+    if format == "jpeg":
+        return [(b"<< /Type /XObject /Subtype /Image /Width %d /Height %d "
+                 b"/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode "
+                 b"/Length %d >>\nstream\n" % (pw, ph, len(roh))) + roh + b"\nendstream"]
+    import io
+    from PIL import Image
+    im = Image.open(io.BytesIO(roh)).convert("RGBA")
+    rgb = zlib.compress(im.convert("RGB").tobytes())
+    alpha = zlib.compress(im.getchannel("A").tobytes())
+    return [(b"<< /Type /XObject /Subtype /Image /Width %d /Height %d "
+             b"/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /FlateDecode "
+             b"/SMask %%(smask)d 0 R /Length %d >>\nstream\n" % (pw, ph, len(rgb)))
+            + rgb + b"\nendstream",
+            (b"<< /Type /XObject /Subtype /Image /Width %d /Height %d "
+             b"/ColorSpace /DeviceGray /BitsPerComponent 8 /Filter /FlateDecode "
+             b"/Length %d >>\nstream\n" % (pw, ph, len(alpha))) + alpha + b"\nendstream"]
 
 
 def pdf_mehrseitig(seiten):
@@ -730,20 +762,32 @@ def pdf_mehrseitig(seiten):
     objs[2] = ("<< /Type /Pages /Kids [%s] /Count %d >>" % (kids, n)).encode("latin-1")
     objs[3] = (b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica "
                b"/Encoding /WinAnsiEncoding >>")
+    naechste = 4 + 2 * n                    # first free object number (images)
     for i, sp in enumerate(seiten):
         pid, cid = 4 + 2 * i, 5 + 2 * i
         inhalt = ("%.9f 0 0 %.9f 0 0 cm\n" % (sp.MM, sp.MM)
                   + "\n".join(sp.ops)).encode("latin-1")
         strom = zlib.compress(inhalt)
         w, h = sp.b * sp.MM, sp.h * sp.MM
+        xobj = ""
+        for name, daten, fmt, pw, ph in getattr(sp, "bilder", []):
+            teile = _pdf_bild_objekte(daten, fmt, pw, ph)
+            nr = naechste
+            naechste += len(teile)
+            if len(teile) == 2:
+                teile[0] = teile[0].replace(b"%(smask)d", b"%d" % (nr + 1))
+            for k, t in enumerate(teile):
+                objs[nr + k] = t
+            xobj += "/%s %d 0 R " % (name, nr)
+        res = "/Font << /F1 3 0 R >>" + (" /XObject << %s>>" % xobj if xobj else "")
         objs[pid] = ("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 %.3f %.3f] "
-                     "/Contents %d 0 R /Resources << /Font << /F1 3 0 R >> >> >>"
-                     % (w, h, cid)).encode("latin-1")
+                     "/Contents %d 0 R /Resources << %s >> >>"
+                     % (w, h, cid, res)).encode("latin-1")
         objs[cid] = (b"<< /Length %d /Filter /FlateDecode >>\nstream\n" % len(strom)
                      + strom + b"\nendstream")
     out = bytearray(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
     offs = []
-    total = 3 + 2 * n
+    total = naechste - 1
     for i in range(1, total + 1):
         offs.append(len(out))
         out += b"%d 0 obj\n" % i + objs[i] + b"\nendobj\n"
@@ -1399,6 +1443,44 @@ class Bemassung(Element):
             self.tx, self.ty = punkte_drehen(self.tx, self.ty, cx, cy, winkel_deg)
         if self.richtung in ("horizontal", "vertikal"):
             self.richtung = "ausgerichtet"
+
+
+class Bild(Element):
+    """Raster image (imported PNG/JPG ...). Lower left corner x/y, size in mm.
+    The picture data is stored in the element (base64, `format` = jpeg|png)."""
+
+    def __init__(self, x, y, breite, hoehe, daten="", format="jpeg",
+                 pw=1, ph=1, **kw):
+        super().__init__("bild", **kw)
+        self.x, self.y = float(x), float(y)
+        self.breite, self.hoehe = float(breite), float(hoehe)
+        self.daten = daten
+        self.format = format
+        self.pw, self.ph = int(pw), int(ph)
+
+    def bbox(self):
+        return (self.x, self.y, self.x + self.breite, self.y + self.hoehe)
+
+    def rahmen(self):
+        return [(self.x, self.y), (self.x + self.breite, self.y),
+                (self.x + self.breite, self.y + self.hoehe),
+                (self.x, self.y + self.hoehe)]
+
+    def verschieben(self, dx, dy):
+        self.x += dx; self.y += dy
+
+    def griffe(self):
+        return [("ecke", self.x + self.breite, self.y + self.hoehe),
+                ("mitte", self.x + self.breite / 2, self.y + self.hoehe / 2)]
+
+    def griff_bewegen(self, griff_id, x, y):
+        if griff_id == "ecke":              # resize, aspect ratio stays
+            b = max(0.1, x - self.x)
+            self.hoehe = b * self.ph / float(self.pw)
+            self.breite = b
+        elif griff_id == "mitte":
+            self.x = x - self.breite / 2
+            self.y = y - self.hoehe / 2
 
 
 class Viewport(Element):
@@ -3206,3 +3288,4 @@ _inst(Verbindung, skalieren=_sk_pos, spiegeln=_sp_verbindung)
 _inst(_FestMaske, skalieren=_sk_pos, spiegeln=_sp_pos)
 _inst(Kabel, skalieren=_sk_kabel, spiegeln=_sp_kabel)
 _inst(Koordinatenfeld, skalieren=_sk_kf, spiegeln=_sp_kf)
+_inst(Bild, skalieren=_sk_kf, spiegeln=_sp_kf)
