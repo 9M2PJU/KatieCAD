@@ -957,6 +957,7 @@ class CadApp:
         m_datei.add_separator()
         m_datei.add_command(label=tr("menu.datei.import_dxf"), command=self.import_dxf)
         m_datei.add_command(label=tr("menu.datei.import_dwg"), command=self.import_dwg)
+        m_datei.add_command(label=tr("menu.datei.import_pdf"), command=self.import_pdf)
         m_datei.add_command(label=tr("menu.datei.export_dxf"), command=self.export_dxf)
         m_datei.add_command(label=tr("menu.datei.export_dwg"), command=self.export_dwg)
         m_datei.add_separator()
@@ -4414,7 +4415,7 @@ class CadApp:
     def zeige_info_fenster(self):
         info_win = tk.Toplevel(self.root)
         info_win.title(tr("info.titel") + " - KatieCAD")
-        info_win.geometry("560x460")
+        info_win.geometry("560x500")
         info_win.transient(self.root)
         info_win.configure(bg=FARBEN["bg_mittel"])
         info_win.resizable(False, False)
@@ -4889,6 +4890,82 @@ class CadApp:
 
     def import_dwg(self):
         self._cad_import("dwg")
+
+    def import_pdf(self):
+        """Imports one page of a PDF as vector geometry; PDF layers (optional
+        content groups) become KatieCAD layers."""
+        de = SPRACHE["aktuell"] == "de"
+        titel = "PDF"
+        try:
+            from katiecad.fileio import pdf_import
+        except Exception as ex:
+            messagebox.showwarning(titel, (f"PDF-Import nicht verfügbar: {ex}" if de
+                                           else f"PDF import not available: {ex}"))
+            return
+        if not pdf_import.PYPDF_OK:
+            messagebox.showwarning(titel, ("pypdf nicht installiert:  pip install pypdf"
+                                           if de else "pypdf is not installed:  pip install pypdf"))
+            return
+        if self._ist_layout():
+            self.status.set("Bitte in die Modell-Ansicht wechseln." if de
+                            else "Please switch to model view.")
+            return
+        pfad = filedialog.askopenfilename(
+            filetypes=[(("PDF-Datei" if de else "PDF file"), "*.pdf"),
+                       (("Alle Dateien" if de else "All files"), "*.*")])
+        if not pfad:
+            return
+        try:
+            n = pdf_import.seitenzahl(pfad)
+        except Exception as ex:
+            messagebox.showerror(titel, (f"Die PDF-Datei konnte nicht gelesen werden:\n{ex}"
+                                         if de else f"The PDF could not be read:\n{ex}"))
+            return
+        seite = 1
+        if n > 1:
+            seite = simpledialog.askinteger(
+                titel, (f"Welche Seite importieren? (1-{n})" if de
+                        else f"Which page to import? (1-{n})"),
+                initialvalue=1, minvalue=1, maxvalue=n, parent=self.root)
+            if seite is None:
+                return
+        faktor = simpledialog.askfloat(
+            titel, ("Maßstabsfaktor (1 = Papiergröße, z. B. 50 für einen Plot 1:50):"
+                    if de else "Scale factor (1 = paper size, e.g. 50 for a 1:50 plot):"),
+            initialvalue=1.0, minvalue=0.001, maxvalue=100000.0, parent=self.root)
+        if faktor is None:
+            return
+        try:
+            self.root.config(cursor="watch")
+            self.root.update_idletasks()
+        except Exception:
+            pass
+        try:
+            erg = pdf_import.importiere_pdf(pfad, self.layers, seite, faktor)
+            if not erg.elemente:
+                messagebox.showwarning(titel, ("Es konnten keine Vektordaten importiert werden "
+                                               "(gescanntes PDF?).\n" if de else
+                                               "No vector data could be imported "
+                                               "(scanned PDF?).\n") + self._import_bericht(erg, de))
+                return
+            self._snapshot()
+            self.elemente.extend(erg.elemente)
+            self.layer_cb.config(values=list(self.layers.keys()))
+            self.zoom_grenzen()
+            msg = (f"PDF importiert ({len(erg.elemente)} Elemente, {len(erg.neue_layer)} Layer): {pfad}"
+                   if de else
+                   f"PDF imported ({len(erg.elemente)} elements, {len(erg.neue_layer)} layers): {pfad}")
+            self.status.set(msg)
+            if erg.uebersprungen or erg.fehler or erg.hinweise:
+                messagebox.showinfo(titel, msg + "\n\n" + self._import_bericht(erg, de))
+        except Exception as e:
+            messagebox.showerror(titel, (f"Fehler beim Import:\n{e}" if de
+                                         else f"Import error:\n{e}"))
+        finally:
+            try:
+                self.root.config(cursor="")
+            except Exception:
+                pass
 
     def _update_eingabe_hinweis(self):
         h = self.lbl_hinweis.config
@@ -8914,5 +8991,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
