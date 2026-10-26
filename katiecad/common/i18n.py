@@ -431,6 +431,7 @@ TEXTE = {
         "menu.datei.import_dxf": "Import DXF...",
         "menu.datei.import_dwg": "Import DWG...",
         "menu.datei.import_pdf": "PDF importieren...",
+        "menu.datei.import_bild": "Bild importieren...",
         "menu.datei.export_dxf": "Export DXF...",
         "menu.datei.export_dwg": "Export DWG...",
         "menu.datei.drucken": "Drucken... (Strg+P)",
@@ -1146,6 +1147,7 @@ TEXTE = {
         "menu.datei.import_dxf": "Import DXF...",
         "menu.datei.import_dwg": "Import DWG...",
         "menu.datei.import_pdf": "Import PDF...",
+        "menu.datei.import_bild": "Import image...",
         "menu.datei.export_dxf": "Export DXF...",
         "menu.datei.export_dwg": "Export DWG...",
         "menu.datei.drucken": "Print... (Ctrl+P)",
@@ -1460,4 +1462,3 @@ def tr(schluessel, **kwargs):
 def setze_sprache(code):
     if code in TEXTE:
         SPRACHE["aktuell"] = code
-
