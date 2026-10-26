@@ -342,3 +342,5 @@ Im Dialog **Blatt-Eigenschaften (F2)** legst du außerdem die **Art des Blatts**
 
 ## Bild importieren
 **Datei > Bild importieren…** fügt ein Foto oder eine Grafik (PNG, JPG, BMP, GIF, TIFF) ein. Das Bild wird in der Zeichnung gespeichert, die Originaldatei wird also nicht mehr gebraucht. Die Größe änderst du am gelben Eckgriff oder mit **Skalieren**; verschieben, drehen und spiegeln gehen wie bei anderen Objekten. Große Bilder werden auf höchstens 2400 Pixel Kantenlänge verkleinert. Im PDF-Export erscheint das Bild, beim DXF-Export wird die Bilddatei neben die DXF-Datei geschrieben. Der Projekt-DXF-Export enthält keine Bilder.
+
+Hinweis: Beim PDF-Export (Drucken als PDF) werden die KatieCAD-Layer als PDF-Layer mitgeschrieben. Solche PDFs kannst du in PDF-Programmen layerweise ein- und ausblenden und in KatieCAD wieder mit denselben Layernamen importieren.
