@@ -54,7 +54,7 @@ jobs:
           [ "$RUNNER_OS" = "Windows" ] && ICON=KatieCAD.ico
           [ "$RUNNER_OS" = "macOS" ] && ICON=build/KatieCAD.icns
           pyinstaller --noconfirm --windowed --name KatieCAD --icon "$ICON" \
-            --collect-submodules katiecad --collect-submodules ezdxf --collect-all ezdwg \
+            --collect-submodules katiecad --collect-submodules ezdxf --collect-submodules pypdf --collect-all ezdwg \
             --add-data "symbols${SEP}symbols" \
             --add-data "title_blocks${SEP}title_blocks" \
             --add-data "report_templates${SEP}report_templates" \
@@ -102,4 +102,3 @@ jobs:
         with:
           files: release/*
           generate_release_notes: true
-
