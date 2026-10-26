@@ -4592,10 +4592,12 @@ class CadApp:
                  font=("Helvetica", 18, "bold"),
                  bg=FARBEN["bg_mittel"], fg=FARBEN["cyan"]).pack(side="left", anchor="w")
 
+        tk.Frame(frame, bg=FARBEN["rand"], height=1).pack(fill="x", pady=(12, 8))
+
         tk.Label(frame, text=tr("info.untertitel"),
                  font=("Helvetica", 10, "italic"),
                  wraplength=440, justify="left",
-                 bg=FARBEN["bg_mittel"], fg=FARBEN["cyan"]).pack(anchor="w", pady=(10, 6))
+                 bg=FARBEN["bg_mittel"], fg=FARBEN["text"]).pack(anchor="w", pady=(0, 6))
 
         tk.Frame(frame, bg=FARBEN["rand"], height=1).pack(fill="x", pady=8)
 
@@ -4605,7 +4607,7 @@ class CadApp:
 
         tk.Label(frame, text=tr("info.version"),
                  font=("Helvetica", 9),
-                 bg=FARBEN["bg_mittel"], fg=FARBEN["text"]).pack(anchor="w", pady=(0, 6))
+                 bg=FARBEN["bg_mittel"], fg=FARBEN["text_dim"]).pack(anchor="w", pady=(0, 6))
 
         tk.Label(frame, text=tr("info.copyright"),
                  font=("Helvetica", 9, "italic"),
