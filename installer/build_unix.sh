@@ -13,8 +13,9 @@ ICON=KatieCAD.png
 # so symbols, title blocks, report templates and docs are found.
 DOCS=""; [ -d docs ] && DOCS="--add-data docs:docs"
 pyinstaller --noconfirm $DOCS --windowed --name KatieCAD --icon "$ICON" \
-  --collect-submodules katiecad --collect-submodules ezdxf --collect-all ezdwg \
+  --collect-submodules katiecad --collect-submodules ezdxf --collect-submodules pypdf --collect-all ezdwg \
   --add-data "symbols:symbols" --add-data "title_blocks:title_blocks" \
   --add-data "report_templates:report_templates" \
   --add-data "KatieCAD.ico:." --add-data "KatieCAD.png:." main.py
+[ "$(uname)" = "Darwin" ] && python tools/macos_plist.py dist/KatieCAD.app "$(python -c 'from katiecad.manifest import VERSION; print(VERSION)')"
 echo "Done: dist/KatieCAD (Linux) or dist/KatieCAD.app (macOS)"
