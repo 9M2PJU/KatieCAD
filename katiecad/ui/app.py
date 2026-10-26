@@ -76,7 +76,7 @@ from katiecad.model.core import (
 from katiecad.ui.dialogs import (
     MIT_LICENSE_TEXT, zeige_lizenz_fenster,
     _LayoutNameDialog, BlattEigenschaftenDialog, PropertiesDialog, ViewportDialog,
-    LayerDialog, LayerEditDialog, TextDialog, ArrayDialog, DruckDialog,
+    LayerDialog, LayerEditDialog, TextDialog, ArrayDialog, SchraffurDialog, DruckDialog,
     _BlockNameDialog, _BlockAuswahlDialog, BlockBrowserDialog,
     BlockSpeichernDialog,
     ProjektNeuDialog, AttributDefinitionDialog, BlockAttributeDialog,
@@ -4549,12 +4549,11 @@ class CadApp:
     def zeige_info_fenster(self):
         info_win = tk.Toplevel(self.root)
         info_win.title(tr("info.titel") + " - KatieCAD")
-        info_win.geometry("560x500")
         info_win.transient(self.root)
         info_win.configure(bg=FARBEN["bg_mittel"])
         info_win.resizable(False, False)
 
-        frame = tk.Frame(info_win, bg=FARBEN["bg_mittel"], padx=26, pady=22)
+        frame = tk.Frame(info_win, bg=FARBEN["bg_mittel"], padx=22, pady=16)
         frame.pack(fill=tk.BOTH, expand=True)
 
         title_row = tk.Frame(frame, bg=FARBEN["bg_mittel"])
@@ -4571,14 +4570,14 @@ class CadApp:
             if PILLOW_VERFUEGBAR:
                 try:
                     logo_img = Image.open(logo_path).convert("RGBA")
-                    logo_img = logo_img.resize((96, 96), Image.Resampling.LANCZOS)
+                    logo_img = logo_img.resize((72, 72), Image.Resampling.LANCZOS)
                     logo_photo = ImageTk.PhotoImage(logo_img)
                 except Exception as e:
                     print(f"[KatieCAD] Logo (Pillow): {e}")
             if logo_photo is None:           # without Pillow/ImageTk: plain Tk
                 try:
                     p = tk.PhotoImage(file=logo_path)
-                    n = max(1, round(p.width() / 96))
+                    n = max(1, round(p.width() / 72))
                     logo_photo = p.subsample(n, n) if n > 1 else p
                 except tk.TclError as e:
                     print(f"[KatieCAD] Logo konnte nicht geladen werden: {e}")
@@ -4587,7 +4586,7 @@ class CadApp:
                                     bg=FARBEN["bg_mittel"], bd=0,
                                     highlightthickness=0)
                 logo_lbl.image = logo_photo
-                logo_lbl.pack(side="left", padx=(0, 20))
+                logo_lbl.pack(side="left", padx=(0, 16))
 
         tk.Label(title_row, text="KatieCAD",
                  font=("Helvetica", 18, "bold"),
@@ -4595,14 +4594,14 @@ class CadApp:
 
         tk.Label(frame, text=tr("info.untertitel"),
                  font=("Helvetica", 10, "italic"),
-                 wraplength=480, justify="left",
-                 bg=FARBEN["bg_mittel"], fg=FARBEN["cyan"]).pack(anchor="w", pady=(16, 10))
+                 wraplength=440, justify="left",
+                 bg=FARBEN["bg_mittel"], fg=FARBEN["cyan"]).pack(anchor="w", pady=(10, 6))
 
-        tk.Frame(frame, bg=FARBEN["rand"], height=1).pack(fill="x", pady=14)
+        tk.Frame(frame, bg=FARBEN["rand"], height=1).pack(fill="x", pady=8)
 
         tk.Label(frame, text=tr("info.gebaut_mit"),
                  font=("Helvetica", 9),
-                 bg=FARBEN["bg_mittel"], fg=FARBEN["text"]).pack(anchor="w", pady=(0, 16))
+                 bg=FARBEN["bg_mittel"], fg=FARBEN["text"]).pack(anchor="w", pady=(0, 8))
 
         tk.Label(frame, text=tr("info.version"),
                  font=("Helvetica", 9),
@@ -4617,7 +4616,7 @@ class CadApp:
                  bg=FARBEN["bg_mittel"], fg=FARBEN["text_dim"]).pack(anchor="w", pady=(0, 6))
 
         btn_row = tk.Frame(frame, bg=FARBEN["bg_mittel"])
-        btn_row.pack(fill="x", side="bottom", pady=(10, 0))
+        btn_row.pack(fill="x", side="bottom", pady=(12, 0))
 
         def make_btn(text, cmd):
             b = ttk.Button(btn_row, text=text, command=cmd)
@@ -4628,6 +4627,7 @@ class CadApp:
         make_btn(tr("dlg.schliessen"), info_win.destroy).pack(side="right", padx=4)
 
         info_win.update_idletasks()
+        info_win.minsize(info_win.winfo_reqwidth(), info_win.winfo_reqheight())
         mx = self.root.winfo_rootx() + self.root.winfo_width() // 2
         my = self.root.winfo_rooty() + self.root.winfo_height() // 2
         w = info_win.winfo_width()
@@ -9020,36 +9020,10 @@ class CadApp:
                 "polyline or a gap-free chain of lines.")
             return
 
-        titel = "Schraffur" if de else "Hatch"
-        typ = simpledialog.askstring(titel,
-                                     "Typ (solid oder linien):" if de
-                                     else "Type (solid or linien):",
-                                     initialvalue="linien", parent=self.root)
-        if not typ:
+        dlg = SchraffurDialog(self.root)
+        if not dlg.result:
             return
-        typ = typ.lower().strip()
-        if typ not in ("solid", "linien"):
-            return
-
-        abstand, winkel = 5.0, 45.0
-        if typ == "linien":
-            try:
-                abstand_str = simpledialog.askstring(
-                    titel, "Abstand (mm):" if de else "Spacing (mm):",
-                    initialvalue="5.0", parent=self.root)
-                if not abstand_str:
-                    return
-                abstand = float(abstand_str.replace(",", "."))
-                winkel_str = simpledialog.askstring(
-                    titel, "Winkel (Grad):" if de else "Angle (deg):",
-                    initialvalue="45", parent=self.root)
-                if not winkel_str:
-                    return
-                winkel = float(winkel_str.replace(",", "."))
-            except ValueError:
-                return
-            if abstand <= 0:
-                return
+        typ, abstand, winkel = dlg.result
 
         self._snapshot()
         liste = self._aktuelle_elemente_liste()
