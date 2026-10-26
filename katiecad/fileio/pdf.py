@@ -83,6 +83,18 @@ def _prims(el, skala, einh_faktor, dezimalkomma):
 
 
 def _pdf_element(seite, el, tf, zs, farbig, layers, einh_faktor, dezimalkomma):
+    """Draws an element; its layer becomes a PDF layer (optional content)."""
+    aussen = getattr(seite, "ebene", None) is None
+    if aussen:
+        seite.ebene = str(getattr(el, "layer", "") or "0")
+    try:
+        _pdf_element_roh(seite, el, tf, zs, farbig, layers, einh_faktor, dezimalkomma)
+    finally:
+        if aussen:
+            seite.ebene = None
+
+
+def _pdf_element_roh(seite, el, tf, zs, farbig, layers, einh_faktor, dezimalkomma):
     # NEW: output block / cross reference resolved
     if isinstance(el, (ElektroMaske, Klemme, Kabel)):
         # Empty fields do not appear in the print (no <TAG> placeholders)
