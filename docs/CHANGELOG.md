@@ -12,6 +12,8 @@
 - Inhaltsverzeichnis: „Art“ und „Beschreibung“ sind jetzt Blatt-Eigenschaften (F2); Standard-Art bleibt „Schaltplan", der Kunde wird nicht mehr als Beschreibung verwendet
 - Block-Browser: Symbolbibliothek erscheint nur noch einmal („Symbole“ / „symbols“); ein zweiter, älterer Eintrag „symbols“ wird ausgeblendet
 - Fix Projektprüfung: Klemmen ohne eigene IND erben die Klemmleiste wie im Klemmenplan (keine falschen „mehrfach vergeben“-Fehler); gleiche Kennzeichen an verschiedenen Einbauorten gelten nicht als doppelt
+- Info-Fenster: neuer Untertitel mit Bezug zur Elektrotechnik
+- PDF-Import (Datei > PDF importieren…): Vektorlinien, Kreise, Text und Flächen, PDF-Layer werden zu KatieCAD-Layern (eigener Leser auf Basis von pypdf, BSD-Lizenz; die MIT-Lizenz bleibt unberührt)
 - Info-Fenster: Log-Button öffnet die Log-Datei im Editor (keine Reiter mehr)
 
 ## 1.0.1
