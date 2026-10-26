@@ -849,6 +849,81 @@ class TextDialog(tk.Toplevel):
         self.destroy()
 
 
+class SchraffurDialog(tk.Toplevel):
+    """Hatch type (selection box), spacing and angle in one dialog.
+    result = (muster, abstand_mm, winkel_deg) or None."""
+
+    def __init__(self, parent):
+        super().__init__(parent)
+        de = SPRACHE["aktuell"] == "de"
+        self.result = None
+        self.title("Schraffur" if de else "Hatch")
+        self.transient(parent)
+        _modal(self)
+        self.configure(bg=FARBEN["bg_mittel"])
+        f = ttk.Frame(self, padding=12)
+        f.pack(fill=tk.BOTH, expand=True)
+        self._arten = [("linien", "Linien" if de else "Lines"),
+                       ("solid", "Vollfläche" if de else "Solid fill")]
+        ttk.Label(f, text="Art:" if de else "Type:").grid(
+            row=0, column=0, sticky=tk.W, pady=4)
+        self.art = tk.StringVar(value=self._arten[0][1])
+        cb = ttk.Combobox(f, textvariable=self.art, state="readonly", width=16,
+                          values=[n for _, n in self._arten])
+        cb.grid(row=0, column=1, sticky=tk.W, pady=4, padx=(8, 0))
+        cb.bind("<<ComboboxSelected>>", lambda e: self._umschalten())
+        self.abstand = tk.StringVar(value="5.0")
+        self.winkel = tk.StringVar(value="45")
+        ttk.Label(f, text="Abstand (mm):" if de else "Spacing (mm):").grid(
+            row=1, column=0, sticky=tk.W, pady=4)
+        self.e1 = ttk.Entry(f, textvariable=self.abstand, width=18)
+        self.e1.grid(row=1, column=1, sticky=tk.W, pady=4, padx=(8, 0))
+        ttk.Label(f, text="Winkel (Grad):" if de else "Angle (deg):").grid(
+            row=2, column=0, sticky=tk.W, pady=4)
+        self.e2 = ttk.Entry(f, textvariable=self.winkel, width=18)
+        self.e2.grid(row=2, column=1, sticky=tk.W, pady=4, padx=(8, 0))
+        bf = ttk.Frame(f)
+        bf.grid(row=3, column=0, columnspan=2, pady=(10, 0))
+        ttk.Button(bf, text=tr("dlg.ok"), command=self._ok).pack(side=tk.LEFT, padx=6)
+        ttk.Button(bf, text=tr("dlg.abbrechen"),
+                   command=self.destroy).pack(side=tk.LEFT, padx=6)
+        self.bind("<Return>", lambda e: self._ok())
+        self.bind("<Escape>", lambda e: self.destroy())
+        self.wait_window(self)
+
+    def _muster(self):
+        for k, n in self._arten:
+            if n == self.art.get():
+                return k
+        return "linien"
+
+    def _umschalten(self):
+        st = "normal" if self._muster() == "linien" else "disabled"
+        self.e1.configure(state=st)
+        self.e2.configure(state=st)
+
+    def _ok(self):
+        muster = self._muster()
+        abstand, winkel = 5.0, 45.0
+        if muster == "linien":
+            try:
+                abstand = float(self.abstand.get().replace(",", "."))
+                winkel = float(self.winkel.get().replace(",", "."))
+            except ValueError:
+                messagebox.showerror(self.title(), "Bitte Zahlen eingeben."
+                                     if SPRACHE["aktuell"] == "de"
+                                     else "Please enter numbers.", parent=self)
+                return
+            if abstand <= 0:
+                messagebox.showerror(self.title(), "Abstand muss größer als 0 sein."
+                                     if SPRACHE["aktuell"] == "de"
+                                     else "Spacing must be greater than 0.",
+                                     parent=self)
+                return
+        self.result = (muster, abstand, winkel)
+        self.destroy()
+
+
 class ArrayDialog(tk.Toplevel):
     def __init__(self, parent, app):
         super().__init__(parent)
