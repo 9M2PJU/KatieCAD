@@ -59,7 +59,7 @@ from katiecad.model.core import (
     TEXT_BREITE, TEXT_ZEILE, CAD_VERSALHOEHE, LW_PX_FAKTOR, BEM_RICHTUNGEN,
     BEFEHLE, PdfSeite, ist_dunkel,
     Layer, Layout, Element, Linie, Kreis, Bogen, Rechteck, Polylinie, Text,
-    Bemassung, Viewport, Schraffur, konturen_aus_elementen,
+    Bemassung, Viewport, Schraffur, Bild, konturen_aus_elementen,
     AttributDefinition, Leitung, Verbindungspunkt, Querverweis,
     Verbindung, ElektroMaske, Klemme, Kabel, Koordinatenfeld, ZUSAMMENGESETZT,
     vp_tags_eindeutig, LEITUNG_FARBE, UI_SCHRIFT,
@@ -958,6 +958,7 @@ class CadApp:
         m_datei.add_command(label=tr("menu.datei.import_dxf"), command=self.import_dxf)
         m_datei.add_command(label=tr("menu.datei.import_dwg"), command=self.import_dwg)
         m_datei.add_command(label=tr("menu.datei.import_pdf"), command=self.import_pdf)
+        m_datei.add_command(label=tr("menu.datei.import_bild"), command=self.import_bild)
         m_datei.add_command(label=tr("menu.datei.export_dxf"), command=self.export_dxf)
         m_datei.add_command(label=tr("menu.datei.export_dwg"), command=self.export_dwg)
         m_datei.add_separator()
@@ -3109,6 +3110,9 @@ class CadApp:
         if isinstance(el, Viewport):
             return (el.x <= x_mm <= el.x + el.breite and
                     el.y <= y_mm <= el.y + el.hoehe)
+        if isinstance(el, Bild):
+            return (el.x - tol <= x_mm <= el.x + el.breite + tol
+                    and el.y - tol <= y_mm <= el.y + el.hoehe + tol)
         if isinstance(el, Schraffur):
             return punkt_in_gedrehtem_rechteck(x_mm, y_mm, (el.bbox()[0]+el.bbox()[2])/2, (el.bbox()[1]+el.bbox()[3])/2, el.bbox()[2]-el.bbox()[0], el.bbox()[3]-el.bbox()[1], 0.0)
         if isinstance(el, Verbindungspunkt):
@@ -4067,6 +4071,7 @@ class CadApp:
 
     def redraw(self):
         c = self.canvas
+        self._bild_live = []                # keeps the PhotoImages of this frame
         try:
             self._leitungen_automatisch()
             if not self._ist_layout():
@@ -4175,6 +4180,10 @@ class CadApp:
             if isinstance(el, Bemassung):
                 w = max(1, min(w, 2))
 
+        if isinstance(el, Bild):
+            self._zeichne_bild(el, tf, farbe, tags, clip)
+            return
+
         if isinstance(el, Schraffur):
             c = self.canvas
             pts_px = [tf(x, y) for (x, y) in el.punkte]
@@ -4190,6 +4199,131 @@ class CadApp:
             return
 
         self._zeichne_prims(self._prims(el, sk), farbe, w, dash, tf, sk, tags, clip)
+
+    def _bild_pil(self, el):
+        """Decoded PIL image of a Bild element (small cache)."""
+        from katiecad.fileio.bild_import import pil_bild
+        cache = self.__dict__.setdefault("_bild_pil_cache", {})
+        key = (len(el.daten), el.daten[:64], el.daten[-64:])
+        if key not in cache:
+            if len(cache) >= 6:
+                cache.pop(next(iter(cache)))
+            cache[key] = pil_bild(el.daten)
+        return cache[key]
+
+    def _zeichne_bild(self, el, tf, farbe, tags, clip):
+        """Frame + the visible part of the image (cropped and scaled)."""
+        c = self.canvas
+        xa, ya = tf(el.x, el.y + el.hoehe)          # upper left (screen)
+        xb, yb = tf(el.x + el.breite, el.y)         # lower right (screen)
+        if xb < xa:
+            xa, xb = xb, xa
+        if yb < ya:
+            ya, yb = yb, ya
+        c.create_rectangle(xa, ya, xb, yb, outline=farbe, tags=tags)
+        w, h = xb - xa, yb - ya
+        if w < 2 or h < 2 or not el.daten:
+            return
+        xmin, ymin, xmax, ymax = clip
+        vx1, vy1 = max(xa, xmin), max(ya, ymin)
+        vx2, vy2 = min(xb, xmax), min(yb, ymax)
+        if vx2 - vx1 < 1 or vy2 - vy1 < 1:
+            return
+        zw, zh = int(round(vx2 - vx1)), int(round(vy2 - vy1))
+        if zw > 4000 or zh > 4000:
+            return
+        try:
+            import base64, io
+            from PIL import Image
+            cache = self.__dict__.setdefault("_bild_tk_cache", {})
+            box = (int(round((vx1 - xa) / w * el.pw)), int(round((vy1 - ya) / h * el.ph)),
+                   int(round((vx2 - xa) / w * el.pw)), int(round((vy2 - ya) / h * el.ph)))
+            key = (len(el.daten), el.daten[:48], box, zw, zh)
+            ph = cache.get(key)
+            if ph is None:
+                im = self._bild_pil(el)
+                box = (max(0, box[0]), max(0, box[1]),
+                       min(el.pw, max(box[0] + 1, box[2])), min(el.ph, max(box[1] + 1, box[3])))
+                teil = im.crop(box).resize((zw, zh), Image.BILINEAR)
+                buf = io.BytesIO()
+                teil.save(buf, "PNG")
+                ph = tk.PhotoImage(data=base64.b64encode(buf.getvalue()))
+                if len(cache) >= 24:
+                    cache.pop(next(iter(cache)))
+                cache[key] = ph
+            self._bild_live = getattr(self, "_bild_live", [])
+            self._bild_live.append(ph)
+            c.create_image(vx1, vy1, anchor="nw", image=ph, tags=tags)
+            c.tag_lower(c.create_rectangle(xa, ya, xb, yb, outline="", tags=tags))
+        except Exception as ex:
+            print(f"[KatieCAD] Bild: {ex}")
+
+    def _bild_zu_dxf(self, msp, el, attribs):
+        """IMAGE entity: the picture is written next to the DXF file."""
+        import base64
+        ziel = getattr(self, "_export_ziel", None)
+        if not ziel:
+            msp.add_lwpolyline(el.rahmen(), close=True, dxfattribs=attribs)
+            return
+        self._dxf_bild_nr = getattr(self, "_dxf_bild_nr", 0) + 1
+        basis = os.path.splitext(os.path.basename(ziel))[0]
+        name = f"{basis}_bild{self._dxf_bild_nr}." + ("jpg" if el.format == "jpeg" else "png")
+        pfad = os.path.join(os.path.dirname(os.path.abspath(ziel)), name)
+        with open(pfad, "wb") as f:
+            f.write(base64.b64decode(el.daten))
+        d = msp.doc.add_image_def(filename=name, size_in_pixel=(el.pw, el.ph))
+        msp.add_image(d, insert=(el.x, el.y), size_in_units=(el.breite, el.hoehe),
+                      rotation=0, dxfattribs=attribs)
+
+    def import_bild(self):
+        """Inserts a raster image (PNG, JPG, ...) as a scalable element."""
+        de = SPRACHE["aktuell"] == "de"
+        titel = "Bild" if de else "Image"
+        try:
+            from katiecad.fileio import bild_import
+        except Exception as ex:
+            messagebox.showwarning(titel, str(ex))
+            return
+        if not bild_import.PIL_OK:
+            messagebox.showwarning(titel, "Pillow nicht installiert:  pip install Pillow"
+                                   if de else "Pillow is not installed:  pip install Pillow")
+            return
+        if self._ist_layout():
+            self.status.set("Bitte in die Modell-Ansicht wechseln." if de
+                            else "Please switch to model view.")
+            return
+        pfad = filedialog.askopenfilename(
+            filetypes=[(("Bilder" if de else "Images"), bild_import.ENDUNGEN),
+                       (("Alle Dateien" if de else "All files"), "*.*")])
+        if not pfad:
+            return
+        try:
+            b = bild_import.lade_bild(pfad)
+        except RuntimeError as ex:
+            messagebox.showerror(titel, str(ex))
+            return
+        breite = simpledialog.askfloat(
+            titel, ("Breite des Bildes in mm (die Höhe folgt dem Seitenverhältnis):" if de
+                    else "Width of the image in mm (height follows the aspect ratio):"),
+            initialvalue=100.0, minvalue=0.1, maxvalue=100000.0, parent=self.root)
+        if breite is None:
+            return
+        hoehe = breite * b["ph"] / float(b["pw"])
+        cx, cy = self.px_to_mm(self.canvas.winfo_width() / 2.0,
+                               self.canvas.winfo_height() / 2.0)
+        daten = self._layer_daten()
+        daten["eig_farbe"] = False
+        daten["staerke"] = None
+        self._snapshot()
+        el = Bild(cx - breite / 2, cy - hoehe / 2, breite, hoehe, b["daten"],
+                  b["format"], b["pw"], b["ph"], **daten)
+        self._ziel_liste().append(el)
+        self.auswahl = [el]
+        self.redraw()
+        self.status.set((f"Bild eingefügt ({b['pw']} x {b['ph']} Pixel). Größe: gelbe Ecke ziehen "
+                         f"oder Skalieren-Befehl." if de else
+                         f"Image inserted ({b['pw']} x {b['ph']} px). Resize: drag the yellow "
+                         f"corner or use Scale."))
 
     def _zeichne_vp(self, el, tags, tf, skala, clip, stil):
         """Connection point: circle only in the model, label everywhere."""
@@ -4647,6 +4781,7 @@ class CadApp:
             if typ == "bemassung":  return Bemassung(**d)
             if typ == "viewport":   return Viewport(**d)
             if typ == "schraffur":  return Schraffur(**d)
+            if typ == "bild":       return Bild(**d)
             if typ == "attdef":     return AttributDefinition(**d)
             if typ == "vpunkt":     return Verbindungspunkt(**d)
             if typ == "leitung":    return Leitung(**d)
@@ -4699,6 +4834,7 @@ class CadApp:
         if not pfad:
             return
         try:
+            self._export_ziel = pfad            # images are written next to it
             doc = self._dxf_dokument()
             if art == "dwg":
                 from katiecad.fileio.cad_import import dxf_doc_als_dwg_speichern
@@ -4756,6 +4892,8 @@ class CadApp:
                 t_vp = el.text_element()
                 if t_vp is not None:
                     self._element_zu_dxf(msp, t_vp)
+            elif isinstance(el, Bild):
+                self._bild_zu_dxf(msp, el, attribs)
             elif isinstance(el, Schraffur):
                 if el.muster == "solid":
                     h = msp.add_hatch(dxfattribs=attribs)
@@ -5374,6 +5512,8 @@ class CadApp:
         return []
 
     def _el_polylinien(self, el, skala):
+        if isinstance(el, Bild):
+            return [(el.rahmen(), True)]
         if isinstance(el, Text):
             return [(el.rahmen(), True)]
         if isinstance(el, Schraffur):
