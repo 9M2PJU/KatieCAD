@@ -2,7 +2,7 @@
 
 ## 1.0.3
 - Title block "Standard (built-in)" removed (identical to "Example A3"); only the templates from the title_blocks folder remain
-- Linux: an open menu-bar menu now closes when another application gets the focus
+- Linux: own menu bar without grab instead of the Tk menu bar - open menus close on focus change, click elsewhere and ESC (Windows/macOS unchanged; old menus with `KATIECAD_NATIVE_MENU=1`)
 - Cross references: the same name over several sheets is resolved as a chain (outgoing → next sheet, incoming → previous sheet); `L1.1`/`L1.2` are no longer needed
 - Coordinate grid: labels 0.1 mm smaller (PDF print looked bolder)
 - Menu: "Trim" and "Break" moved from Insert to Edit
