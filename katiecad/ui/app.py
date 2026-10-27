@@ -4433,7 +4433,7 @@ class CadApp:
             return
         p = self.projekt
         ordner = TB.template_folders(p.ordner if p is not None else None)
-        eintraege = [(tr("dlg.tb.ohne"), None), (tr("dlg.tb.builtin"), "builtin")]
+        eintraege = [(tr("dlg.tb.ohne"), None)]
         eintraege += [(n, pf) for n, pf in TB.list_templates(ordner)]
         cfg = lade_konfiguration()
         dlg = TitleBlockDialog(
@@ -4444,9 +4444,7 @@ class CadApp:
             return
         wahl = dlg.result                       # "" = frame only
         elemente, name = [], ""
-        if wahl == "builtin":
-            elemente, name = TB.default_elements(SPRACHE["aktuell"]), "Standard"
-        elif wahl:
+        if wahl and wahl != "builtin":
             try:
                 elemente = TB.load_template(wahl, self._dict_zu_element)
             except (OSError, ValueError) as e:
@@ -7322,6 +7320,35 @@ class CadApp:
                 schliessen()
 
         self._menues_schliessen = schliessen
+
+        def menue_offen():
+            for m in alle_menues(self.root):
+                try:
+                    if m.winfo_ismapped():
+                        return True
+                except tk.TclError:
+                    pass
+            return False
+
+        def wache():
+            """X11: when another application gets the focus the open menu
+            of the menu bar stays on screen - no focus event arrives (the
+            menu holds a grab). Poll and close it."""
+            try:
+                if self.root.focus_displayof() is None and menue_offen():
+                    schliessen()
+                    try:
+                        mb = str(self.root.cget("menu"))
+                        self.root.tk.eval(
+                            "catch {tk::MenuUnpost {%s}};"
+                            "catch {grab release [grab current]}" % mb)
+                    except tk.TclError:
+                        pass
+            except Exception:
+                pass
+            self.root.after(250, wache)
+
+        self.root.after(250, wache)
         self.root.bind("<FocusOut>", fokus_weg, add="+")
         self.root.bind("<Unmap>", fokus_weg, add="+")
         self.root.bind_all("<ButtonPress>", klick, add="+")
