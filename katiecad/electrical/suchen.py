@@ -109,6 +109,7 @@ def ersetze(treffer, such, neu, gross=False, wort=False):
     """Replaces in all given hits; returns the number of changed fields."""
     n = 0
     for t in treffer:
+        t.text = _lies(t.halter, t.key)           # current value
         if isinstance(t.text, str):
             alt = t.text
             nt = ersetzt(alt, such, neu, gross, wort)
