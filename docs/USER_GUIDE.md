@@ -155,6 +155,8 @@ A **block** is a reusable group of objects (for example a symbol). **Blocks** me
 
 All tools are in the **Electrical** menu and in the toolbar.
 
+**Automatic layers:** electrical objects no longer go to layer 0 but to layers KatieCAD creates on demand: **E_DEVICES** (devices), **E_LINES** (wires, junctions, cross references), **E_CABLE** (cable definitions), **E_CLAMPS** (terminals) and **E_PIN** (single pins as long as they are not combined into a device; inside a device they belong to E_DEVICES). Existing objects stay unchanged; the layers can be hidden or recoloured like any other.
+
 ### Building blocks
 
 | Element | Purpose |
