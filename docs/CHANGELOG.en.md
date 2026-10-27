@@ -1,6 +1,9 @@
 # Changes
 
 ## 1.0.3
+- Cross references: the same name over several sheets is resolved as a chain (outgoing → next sheet, incoming → previous sheet); `L1.1`/`L1.2` are no longer needed
+- Coordinate grid: labels 0.1 mm smaller (PDF print looked bolder)
+- Menu: "Trim" and "Break" moved from Insert to Edit
 - Hatch like AutoCAD: with nothing selected, click straight into an enclosed area (crossing lines allowed), several areas in a row
 - Stretch: if objects were preselected with a crossing window, the second window drag is skipped; only the selected objects are stretched
 - Cross reference "outgoing west" / "incoming east": identifier next to the arrow tip/base, the target note behind it
