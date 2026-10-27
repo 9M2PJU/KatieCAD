@@ -305,8 +305,8 @@
       "linientyp": "Volllinie (schmal)",
       "eig_farbe": true,
       "staerke": 0.35,
-      "x": -19.268292682926813,
-      "y": 22.020905923344948,
+      "x": -19.0,
+      "y": 20.0,
       "inhalt": "Seite:",
       "hoehe": 3.440766550522648,
       "winkel": 0.0,
@@ -365,8 +365,8 @@
       "linientyp": "Volllinie (schmal)",
       "eig_farbe": true,
       "staerke": 0.35,
-      "x": -19.268292682926813,
-      "y": 8.257839721254356,
+      "x": -19.0,
+      "y": 6.0,
       "inhalt": "Format:",
       "hoehe": 3.440766550522648,
       "winkel": 0.0,
@@ -630,8 +630,8 @@
       "linientyp": "Volllinie (schmal)",
       "eig_farbe": true,
       "staerke": null,
-      "x": -19.268292682926813,
-      "y": 14.107142857142858,
+      "x": -19.0,
+      "y": 14.0,
       "inhalt": "<SEITE>",
       "hoehe": 3.440766550522648,
       "winkel": 0.0,
@@ -649,8 +649,8 @@
       "linientyp": "Volllinie (schmal)",
       "eig_farbe": true,
       "staerke": null,
-      "x": -19.268292682926813,
-      "y": 0.3440766550522696,
+      "x": -19.0,
+      "y": 0.0,
       "inhalt": "<FORMAT>",
       "hoehe": 3.440766550522648,
       "winkel": 0.0,
@@ -1079,6 +1079,7 @@
           "linientyp": "Volllinie (schmal)",
           "eig_farbe": false,
           "staerke": null,
+          "text_versatz": {},
           "gespiegelt": false,
           "sp_dx": 0.0,
           "sp_dy": 0.0,
@@ -3843,6 +3844,8 @@
           "prompt": "Pin 1",
           "wert": "1",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": [
             90
           ],
@@ -3866,6 +3869,8 @@
           "prompt": "Pin 2",
           "wert": "N",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": [
             90
           ],
@@ -3889,6 +3894,8 @@
           "prompt": "Pin 3",
           "wert": "2",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": [
             270
           ],
@@ -3912,6 +3919,8 @@
           "prompt": "Pin 4",
           "wert": "N",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": [
             270
           ],
@@ -3926,6 +3935,7 @@
           "staerke": null,
           "x": -27.0,
           "y": -16.0,
+          "versatz": {},
           "werte": {
             "IND": "IND",
             "TYP": "TYP",
@@ -5590,6 +5600,8 @@
           "prompt": "Pin 1",
           "wert": "1",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": [
             90
           ],
@@ -5613,6 +5625,8 @@
           "prompt": "Pin 2",
           "wert": "3",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": [
             90
           ],
@@ -5636,6 +5650,8 @@
           "prompt": "Pin 3",
           "wert": "5",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": [
             90
           ],
@@ -5659,6 +5675,8 @@
           "prompt": "Pin 4",
           "wert": "N",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": [
             90
           ],
@@ -5682,6 +5700,8 @@
           "prompt": "Pin 5",
           "wert": "2",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": [
             270
           ],
@@ -5705,6 +5725,8 @@
           "prompt": "Pin 6",
           "wert": "4",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": [
             270
           ],
@@ -5728,6 +5750,8 @@
           "prompt": "Pin 7",
           "wert": "6",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": [
             270
           ],
@@ -5751,6 +5775,8 @@
           "prompt": "Pin 8",
           "wert": "N",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": [
             270
           ],
@@ -5765,6 +5791,7 @@
           "staerke": null,
           "x": -27.0,
           "y": -16.0,
+          "versatz": {},
           "werte": {
             "IND": "IND",
             "TYP": "TYP",
@@ -5880,6 +5907,8 @@
           "prompt": "Pin 1",
           "wert": "1",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": null,
           "radius": 0.5
         },
@@ -5901,6 +5930,8 @@
           "prompt": "Pin 2",
           "wert": "2",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": null,
           "radius": 0.5
         },
@@ -5913,6 +5944,7 @@
           "staerke": null,
           "x": -4.0,
           "y": -5.0,
+          "versatz": {},
           "werte": {
             "IND": "IND",
             "TYP": "TYP",
@@ -6012,6 +6044,8 @@
           "prompt": "Pin 1",
           "wert": "11",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": null,
           "radius": 0.5
         },
@@ -6033,6 +6067,8 @@
           "prompt": "Pin 2",
           "wert": "12",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": null,
           "radius": 0.5
         },
@@ -6054,6 +6090,8 @@
           "prompt": "Pin 3",
           "wert": "14",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": null,
           "radius": 0.5
         },
@@ -6066,6 +6104,7 @@
           "staerke": null,
           "x": -4.0,
           "y": -5.0,
+          "versatz": {},
           "werte": {
             "IND": "IND",
             "TYP": "TYP",
@@ -6077,6 +6116,634 @@
           "spiegel": "liste",
           "sp_dx": 0.0,
           "sp_dy": 0.0
+        }
+      ]
+    },
+    {
+      "name": "Coil",
+      "basispunkt": [
+        0.0,
+        0.0
+      ],
+      "elemente": [
+        {
+          "typ": "bogen",
+          "layer": "0",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (breit)",
+          "eig_farbe": true,
+          "staerke": 0.35,
+          "cx": -10.262397683070105,
+          "cy": -3.7499999999998295,
+          "r": 1.2772441207854688,
+          "start": 78.14471272830144,
+          "ende": 281.85528727169867
+        },
+        {
+          "typ": "bogen",
+          "layer": "0",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (breit)",
+          "eig_farbe": true,
+          "staerke": 0.35,
+          "cx": -10.262397683070262,
+          "cy": -1.250000000000142,
+          "r": 1.2772441207854688,
+          "start": 78.14471272830144,
+          "ende": 281.85528727169867
+        },
+        {
+          "typ": "bogen",
+          "layer": "0",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (breit)",
+          "eig_farbe": true,
+          "staerke": 0.35,
+          "cx": -10.26239768307012,
+          "cy": -6.250000000000142,
+          "r": 1.2772441207854688,
+          "start": 78.14471272830144,
+          "ende": 281.85528727169867
+        },
+        {
+          "typ": "bogen",
+          "layer": "0",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (breit)",
+          "eig_farbe": true,
+          "staerke": 0.35,
+          "cx": -10.262397683070105,
+          "cy": -8.750000000000455,
+          "r": 1.2772441207854688,
+          "start": 78.14471272830144,
+          "ende": 281.85528727169867
+        },
+        {
+          "typ": "vpunkt",
+          "layer": "E_DEVICES",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (breit)",
+          "eig_farbe": true,
+          "staerke": 0.25,
+          "x": 0.0,
+          "y": -10.0,
+          "inhalt": "2",
+          "hoehe": 2.0,
+          "winkel": 0.0,
+          "schriftart": "Arial",
+          "einfuegepunkt": "mitte_links",
+          "tag": "VP1",
+          "prompt": "Pin 1",
+          "wert": "2",
+          "sichtbar": true,
+          "text_dx": -2.5,
+          "text_dy": 2.0,
+          "richtungen": [
+            0
+          ],
+          "radius": 0.5
+        },
+        {
+          "typ": "linie",
+          "layer": "0",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (breit)",
+          "eig_farbe": true,
+          "staerke": 0.7,
+          "x1": -10.000000000000014,
+          "y1": 2.842170943040401e-14,
+          "x2": 0.0,
+          "y2": 0.0
+        },
+        {
+          "typ": "linie",
+          "layer": "0",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (breit)",
+          "eig_farbe": true,
+          "staerke": 0.7,
+          "x1": -9.999999999999858,
+          "y1": -10.000000000000625,
+          "x2": 0.0,
+          "y2": -10.0
+        },
+        {
+          "typ": "maske",
+          "layer": "E_DEVICES",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (breit)",
+          "eig_farbe": true,
+          "staerke": null,
+          "x": -13.0,
+          "y": -11.0,
+          "versatz": {},
+          "werte": {
+            "IND": "IND",
+            "TYP": "TYP",
+            "PER": "PER"
+          },
+          "ausgeblendet": [],
+          "platzhalter": true,
+          "rolle": "haupt",
+          "spiegel": "liste",
+          "sp_dx": 0.0,
+          "sp_dy": 0.0
+        },
+        {
+          "typ": "vpunkt",
+          "layer": "E_DEVICES",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (breit)",
+          "eig_farbe": true,
+          "staerke": 0.25,
+          "x": 0.0,
+          "y": 0.0,
+          "inhalt": "1",
+          "hoehe": 2.0,
+          "winkel": 0.0,
+          "schriftart": "Arial",
+          "einfuegepunkt": "mitte_links",
+          "tag": "VP2",
+          "prompt": "Pin 2",
+          "wert": "1",
+          "sichtbar": true,
+          "text_dx": -2.5,
+          "text_dy": 2.0,
+          "richtungen": [
+            0
+          ],
+          "radius": 0.5
+        }
+      ]
+    },
+    {
+      "name": "Coil_L1",
+      "basispunkt": [
+        0.0,
+        0.0
+      ],
+      "elemente": [
+        {
+          "typ": "bogen",
+          "layer": "0",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (breit)",
+          "eig_farbe": true,
+          "staerke": 0.35,
+          "cx": -16.2623976830701,
+          "cy": -3.749999999999858,
+          "r": 1.2772441207854688,
+          "start": 78.14471272830144,
+          "ende": 281.85528727169867
+        },
+        {
+          "typ": "bogen",
+          "layer": "0",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (breit)",
+          "eig_farbe": true,
+          "staerke": 0.35,
+          "cx": -16.262397683070255,
+          "cy": -1.2500000000001705,
+          "r": 1.2772441207854688,
+          "start": 78.14471272830144,
+          "ende": 281.85528727169867
+        },
+        {
+          "typ": "bogen",
+          "layer": "0",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (breit)",
+          "eig_farbe": true,
+          "staerke": 0.35,
+          "cx": -16.262397683070112,
+          "cy": -6.2500000000001705,
+          "r": 1.2772441207854688,
+          "start": 78.14471272830144,
+          "ende": 281.85528727169867
+        },
+        {
+          "typ": "bogen",
+          "layer": "0",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (breit)",
+          "eig_farbe": true,
+          "staerke": 0.35,
+          "cx": -16.2623976830701,
+          "cy": -8.750000000000483,
+          "r": 1.2772441207854688,
+          "start": 78.14471272830144,
+          "ende": 281.85528727169867
+        },
+        {
+          "typ": "vpunkt",
+          "layer": "E_DEVICES",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (breit)",
+          "eig_farbe": true,
+          "staerke": 0.25,
+          "x": 0.0,
+          "y": -10.0,
+          "inhalt": "2",
+          "hoehe": 2.0,
+          "winkel": 0.0,
+          "schriftart": "Arial",
+          "einfuegepunkt": "mitte_links",
+          "tag": "VP1",
+          "prompt": "Pin 1",
+          "wert": "2",
+          "sichtbar": true,
+          "text_dx": -2.5,
+          "text_dy": 2.0,
+          "richtungen": [
+            0
+          ],
+          "radius": 0.5
+        },
+        {
+          "typ": "linie",
+          "layer": "0",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (breit)",
+          "eig_farbe": true,
+          "staerke": 0.7,
+          "x1": -16.0,
+          "y1": 0.0,
+          "x2": 0.0,
+          "y2": 0.0
+        },
+        {
+          "typ": "linie",
+          "layer": "0",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (breit)",
+          "eig_farbe": true,
+          "staerke": 0.7,
+          "x1": -15.999999999999844,
+          "y1": -10.000000000000654,
+          "x2": 0.0,
+          "y2": -10.0
+        },
+        {
+          "typ": "maske",
+          "layer": "E_DEVICES",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (breit)",
+          "eig_farbe": true,
+          "staerke": null,
+          "x": -18.999999999999993,
+          "y": -11.000000000000028,
+          "versatz": {},
+          "werte": {
+            "IND": "IND",
+            "TYP": "TYP",
+            "PER": "PER"
+          },
+          "ausgeblendet": [],
+          "platzhalter": false,
+          "rolle": "haupt",
+          "spiegel": "liste",
+          "sp_dx": 0.0,
+          "sp_dy": 0.0
+        },
+        {
+          "typ": "vpunkt",
+          "layer": "E_DEVICES",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (breit)",
+          "eig_farbe": true,
+          "staerke": 0.25,
+          "x": 0.0,
+          "y": 0.0,
+          "inhalt": "1",
+          "hoehe": 2.0,
+          "winkel": 0.0,
+          "schriftart": "Arial",
+          "einfuegepunkt": "mitte_links",
+          "tag": "VP2",
+          "prompt": "Pin 2",
+          "wert": "1",
+          "sichtbar": true,
+          "text_dx": -2.5,
+          "text_dy": 2.0,
+          "richtungen": [
+            0
+          ],
+          "radius": 0.5
+        }
+      ]
+    },
+    {
+      "name": "Coil_L2",
+      "basispunkt": [
+        0.0,
+        0.0
+      ],
+      "elemente": [
+        {
+          "typ": "bogen",
+          "layer": "0",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (breit)",
+          "eig_farbe": true,
+          "staerke": 0.35,
+          "cx": -11.262397683070098,
+          "cy": -3.749999999999858,
+          "r": 1.2772441207854688,
+          "start": 78.14471272830144,
+          "ende": 281.85528727169867
+        },
+        {
+          "typ": "bogen",
+          "layer": "0",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (breit)",
+          "eig_farbe": true,
+          "staerke": 0.35,
+          "cx": -11.262397683070255,
+          "cy": -1.2500000000001705,
+          "r": 1.2772441207854688,
+          "start": 78.14471272830144,
+          "ende": 281.85528727169867
+        },
+        {
+          "typ": "bogen",
+          "layer": "0",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (breit)",
+          "eig_farbe": true,
+          "staerke": 0.35,
+          "cx": -11.262397683070112,
+          "cy": -6.2500000000001705,
+          "r": 1.2772441207854688,
+          "start": 78.14471272830144,
+          "ende": 281.85528727169867
+        },
+        {
+          "typ": "bogen",
+          "layer": "0",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (breit)",
+          "eig_farbe": true,
+          "staerke": 0.35,
+          "cx": -11.262397683070098,
+          "cy": -8.750000000000483,
+          "r": 1.2772441207854688,
+          "start": 78.14471272830144,
+          "ende": 281.85528727169867
+        },
+        {
+          "typ": "vpunkt",
+          "layer": "E_DEVICES",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (breit)",
+          "eig_farbe": true,
+          "staerke": 0.25,
+          "x": 0.0,
+          "y": -10.0,
+          "inhalt": "2",
+          "hoehe": 2.0,
+          "winkel": 0.0,
+          "schriftart": "Arial",
+          "einfuegepunkt": "mitte_links",
+          "tag": "VP1",
+          "prompt": "Pin 1",
+          "wert": "2",
+          "sichtbar": true,
+          "text_dx": -2.5,
+          "text_dy": 2.0,
+          "richtungen": [
+            0
+          ],
+          "radius": 0.5
+        },
+        {
+          "typ": "linie",
+          "layer": "0",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (breit)",
+          "eig_farbe": true,
+          "staerke": 0.7,
+          "x1": -11.0,
+          "y1": 0.0,
+          "x2": 0.0,
+          "y2": 0.0
+        },
+        {
+          "typ": "linie",
+          "layer": "0",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (breit)",
+          "eig_farbe": true,
+          "staerke": 0.7,
+          "x1": -10.999999999999844,
+          "y1": -10.000000000000654,
+          "x2": 0.0,
+          "y2": -10.0
+        },
+        {
+          "typ": "maske",
+          "layer": "E_DEVICES",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (breit)",
+          "eig_farbe": true,
+          "staerke": null,
+          "x": -19.0,
+          "y": -11.0,
+          "versatz": {},
+          "werte": {
+            "IND": "IND",
+            "TYP": "TYP",
+            "PER": "PER"
+          },
+          "ausgeblendet": [],
+          "platzhalter": true,
+          "rolle": "haupt",
+          "spiegel": "liste",
+          "sp_dx": 0.0,
+          "sp_dy": 0.0
+        },
+        {
+          "typ": "vpunkt",
+          "layer": "E_DEVICES",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (breit)",
+          "eig_farbe": true,
+          "staerke": 0.25,
+          "x": 0.0,
+          "y": 0.0,
+          "inhalt": "1",
+          "hoehe": 2.0,
+          "winkel": 0.0,
+          "schriftart": "Arial",
+          "einfuegepunkt": "mitte_links",
+          "tag": "VP2",
+          "prompt": "Pin 2",
+          "wert": "1",
+          "sichtbar": true,
+          "text_dx": -2.5,
+          "text_dy": 2.0,
+          "richtungen": [
+            0
+          ],
+          "radius": 0.5
+        }
+      ]
+    },
+    {
+      "name": "Coil_L3",
+      "basispunkt": [
+        0.0,
+        0.0
+      ],
+      "elemente": [
+        {
+          "typ": "bogen",
+          "layer": "0",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (breit)",
+          "eig_farbe": true,
+          "staerke": 0.35,
+          "cx": -6.262397683070098,
+          "cy": -3.749999999999858,
+          "r": 1.2772441207854688,
+          "start": 78.14471272830144,
+          "ende": 281.85528727169867
+        },
+        {
+          "typ": "bogen",
+          "layer": "0",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (breit)",
+          "eig_farbe": true,
+          "staerke": 0.35,
+          "cx": -6.262397683070255,
+          "cy": -1.2500000000001705,
+          "r": 1.2772441207854688,
+          "start": 78.14471272830144,
+          "ende": 281.85528727169867
+        },
+        {
+          "typ": "bogen",
+          "layer": "0",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (breit)",
+          "eig_farbe": true,
+          "staerke": 0.35,
+          "cx": -6.2623976830701125,
+          "cy": -6.2500000000001705,
+          "r": 1.2772441207854688,
+          "start": 78.14471272830144,
+          "ende": 281.85528727169867
+        },
+        {
+          "typ": "bogen",
+          "layer": "0",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (breit)",
+          "eig_farbe": true,
+          "staerke": 0.35,
+          "cx": -6.262397683070098,
+          "cy": -8.750000000000483,
+          "r": 1.2772441207854688,
+          "start": 78.14471272830144,
+          "ende": 281.85528727169867
+        },
+        {
+          "typ": "vpunkt",
+          "layer": "E_DEVICES",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (breit)",
+          "eig_farbe": true,
+          "staerke": 0.25,
+          "x": 0.0,
+          "y": -10.0,
+          "inhalt": "2",
+          "hoehe": 2.0,
+          "winkel": 0.0,
+          "schriftart": "Arial",
+          "einfuegepunkt": "mitte_links",
+          "tag": "VP1",
+          "prompt": "Pin 1",
+          "wert": "2",
+          "sichtbar": true,
+          "text_dx": -2.5,
+          "text_dy": 2.0,
+          "richtungen": [
+            0
+          ],
+          "radius": 0.5
+        },
+        {
+          "typ": "linie",
+          "layer": "0",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (breit)",
+          "eig_farbe": true,
+          "staerke": 0.7,
+          "x1": -6.0,
+          "y1": 0.0,
+          "x2": 0.0,
+          "y2": 0.0
+        },
+        {
+          "typ": "linie",
+          "layer": "0",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (breit)",
+          "eig_farbe": true,
+          "staerke": 0.7,
+          "x1": -5.999999999999844,
+          "y1": -10.000000000000654,
+          "x2": 0.0,
+          "y2": -10.0
+        },
+        {
+          "typ": "maske",
+          "layer": "E_DEVICES",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (breit)",
+          "eig_farbe": true,
+          "staerke": null,
+          "x": -19.0,
+          "y": -11.0,
+          "versatz": {},
+          "werte": {
+            "IND": "IND",
+            "TYP": "TYP",
+            "PER": "PER"
+          },
+          "ausgeblendet": [],
+          "platzhalter": true,
+          "rolle": "haupt",
+          "spiegel": "liste",
+          "sp_dx": 0.0,
+          "sp_dy": 0.0
+        },
+        {
+          "typ": "vpunkt",
+          "layer": "E_DEVICES",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (breit)",
+          "eig_farbe": true,
+          "staerke": 0.25,
+          "x": 0.0,
+          "y": 0.0,
+          "inhalt": "1",
+          "hoehe": 2.0,
+          "winkel": 0.0,
+          "schriftart": "Arial",
+          "einfuegepunkt": "mitte_links",
+          "tag": "VP2",
+          "prompt": "Pin 2",
+          "wert": "1",
+          "sichtbar": true,
+          "text_dx": -2.5,
+          "text_dy": 2.0,
+          "richtungen": [
+            0
+          ],
+          "radius": 0.5
         }
       ]
     },
@@ -7544,6 +8211,8 @@
           "prompt": "Pin 1",
           "wert": "1",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": [
             90
           ],
@@ -7567,6 +8236,8 @@
           "prompt": "Pin 2",
           "wert": "N",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": [
             90
           ],
@@ -7590,6 +8261,8 @@
           "prompt": "Pin 3",
           "wert": "2",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": [
             270
           ],
@@ -7613,6 +8286,8 @@
           "prompt": "Pin 4",
           "wert": "N",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": [
             270
           ],
@@ -7627,6 +8302,7 @@
           "staerke": null,
           "x": -27.0,
           "y": -16.0,
+          "versatz": {},
           "werte": {
             "IND": "IND",
             "TYP": "TYP",
@@ -9291,6 +9967,8 @@
           "prompt": "Pin 1",
           "wert": "1",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": [
             90
           ],
@@ -9314,6 +9992,8 @@
           "prompt": "Pin 2",
           "wert": "3",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": [
             90
           ],
@@ -9337,6 +10017,8 @@
           "prompt": "Pin 3",
           "wert": "5",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": [
             90
           ],
@@ -9360,6 +10042,8 @@
           "prompt": "Pin 4",
           "wert": "N",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": [
             90
           ],
@@ -9383,6 +10067,8 @@
           "prompt": "Pin 5",
           "wert": "2",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": [
             270
           ],
@@ -9406,6 +10092,8 @@
           "prompt": "Pin 6",
           "wert": "4",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": [
             270
           ],
@@ -9429,6 +10117,8 @@
           "prompt": "Pin 7",
           "wert": "6",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": [
             270
           ],
@@ -9452,6 +10142,8 @@
           "prompt": "Pin 8",
           "wert": "N",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": [
             270
           ],
@@ -9466,6 +10158,7 @@
           "staerke": null,
           "x": -27.0,
           "y": -16.0,
+          "versatz": {},
           "werte": {
             "IND": "IND",
             "TYP": "TYP",
@@ -9529,6 +10222,8 @@
           "prompt": "Pin 1",
           "wert": "1",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": null,
           "radius": 0.5
         },
@@ -9550,6 +10245,8 @@
           "prompt": "Pin 2",
           "wert": "2",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": null,
           "radius": 0.5
         },
@@ -9562,6 +10259,7 @@
           "staerke": null,
           "x": -2.0,
           "y": -6.5,
+          "versatz": {},
           "werte": {
             "IND": "IND",
             "TYP": "TYP",
@@ -9610,6 +10308,477 @@
       ]
     },
     {
+      "name": "L1",
+      "basispunkt": [
+        0.0,
+        0.0
+      ],
+      "elemente": [
+        {
+          "typ": "bogen",
+          "layer": "0",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (breit)",
+          "eig_farbe": true,
+          "staerke": 0.35,
+          "cx": -16.262397683070105,
+          "cy": -3.749999999999858,
+          "r": 1.2772441207854688,
+          "start": 78.14471272830144,
+          "ende": 281.85528727169867
+        },
+        {
+          "typ": "bogen",
+          "layer": "0",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (breit)",
+          "eig_farbe": true,
+          "staerke": 0.35,
+          "cx": -16.262397683070247,
+          "cy": -1.2500000000001705,
+          "r": 1.2772441207854688,
+          "start": 78.14471272830144,
+          "ende": 281.85528727169867
+        },
+        {
+          "typ": "bogen",
+          "layer": "0",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (breit)",
+          "eig_farbe": true,
+          "staerke": 0.35,
+          "cx": -16.262397683070105,
+          "cy": -6.2500000000001705,
+          "r": 1.2772441207854688,
+          "start": 78.14471272830144,
+          "ende": 281.85528727169867
+        },
+        {
+          "typ": "bogen",
+          "layer": "0",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (breit)",
+          "eig_farbe": true,
+          "staerke": 0.35,
+          "cx": -16.262397683070105,
+          "cy": -8.750000000000483,
+          "r": 1.2772441207854688,
+          "start": 78.14471272830144,
+          "ende": 281.85528727169867
+        },
+        {
+          "typ": "vpunkt",
+          "layer": "E_DEVICES",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (breit)",
+          "eig_farbe": true,
+          "staerke": 0.25,
+          "x": 0.0,
+          "y": -10.0,
+          "inhalt": "2",
+          "hoehe": 2.0,
+          "winkel": 0.0,
+          "schriftart": "Arial",
+          "einfuegepunkt": "mitte_links",
+          "tag": "VP1",
+          "prompt": "Pin 1",
+          "wert": "2",
+          "sichtbar": true,
+          "text_dx": -2.5,
+          "text_dy": 2.0,
+          "richtungen": [
+            0
+          ],
+          "radius": 0.5
+        },
+        {
+          "typ": "maske",
+          "layer": "E_DEVICES",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (breit)",
+          "eig_farbe": true,
+          "staerke": null,
+          "x": -19.0,
+          "y": -11.000000000000028,
+          "versatz": {},
+          "werte": {
+            "IND": "IND",
+            "TYP": "TYP",
+            "PER": "PER"
+          },
+          "ausgeblendet": [],
+          "platzhalter": false,
+          "rolle": "haupt",
+          "spiegel": "liste",
+          "sp_dx": 0.0,
+          "sp_dy": 0.0
+        },
+        {
+          "typ": "vpunkt",
+          "layer": "E_DEVICES",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (breit)",
+          "eig_farbe": true,
+          "staerke": 0.25,
+          "x": 0.0,
+          "y": 0.0,
+          "inhalt": "1",
+          "hoehe": 2.0,
+          "winkel": 0.0,
+          "schriftart": "Arial",
+          "einfuegepunkt": "mitte_links",
+          "tag": "VP2",
+          "prompt": "Pin 2",
+          "wert": "1",
+          "sichtbar": true,
+          "text_dx": -2.5,
+          "text_dy": 2.0,
+          "richtungen": [
+            0
+          ],
+          "radius": 0.5
+        },
+        {
+          "typ": "linie",
+          "layer": "0",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (schmal)",
+          "eig_farbe": true,
+          "staerke": 0.35,
+          "x1": -16.0,
+          "y1": 0.0,
+          "x2": 0.0,
+          "y2": 0.0
+        },
+        {
+          "typ": "linie",
+          "layer": "0",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (schmal)",
+          "eig_farbe": true,
+          "staerke": 0.35,
+          "x1": -15.999999999999858,
+          "y1": -10.000000000000654,
+          "x2": 0.0,
+          "y2": -10.0
+        }
+      ]
+    },
+    {
+      "name": "L2",
+      "basispunkt": [
+        0.0,
+        0.0
+      ],
+      "elemente": [
+        {
+          "typ": "bogen",
+          "layer": "0",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (breit)",
+          "eig_farbe": true,
+          "staerke": 0.35,
+          "cx": -11.262397683070105,
+          "cy": -3.749999999999858,
+          "r": 1.2772441207854688,
+          "start": 78.14471272830144,
+          "ende": 281.85528727169867
+        },
+        {
+          "typ": "bogen",
+          "layer": "0",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (breit)",
+          "eig_farbe": true,
+          "staerke": 0.35,
+          "cx": -11.262397683070247,
+          "cy": -1.2500000000001705,
+          "r": 1.2772441207854688,
+          "start": 78.14471272830144,
+          "ende": 281.85528727169867
+        },
+        {
+          "typ": "bogen",
+          "layer": "0",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (breit)",
+          "eig_farbe": true,
+          "staerke": 0.35,
+          "cx": -11.262397683070105,
+          "cy": -6.2500000000001705,
+          "r": 1.2772441207854688,
+          "start": 78.14471272830144,
+          "ende": 281.85528727169867
+        },
+        {
+          "typ": "bogen",
+          "layer": "0",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (breit)",
+          "eig_farbe": true,
+          "staerke": 0.35,
+          "cx": -11.262397683070105,
+          "cy": -8.750000000000483,
+          "r": 1.2772441207854688,
+          "start": 78.14471272830144,
+          "ende": 281.85528727169867
+        },
+        {
+          "typ": "vpunkt",
+          "layer": "E_DEVICES",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (breit)",
+          "eig_farbe": true,
+          "staerke": 0.25,
+          "x": 0.0,
+          "y": -10.0,
+          "inhalt": "2",
+          "hoehe": 2.0,
+          "winkel": 0.0,
+          "schriftart": "Arial",
+          "einfuegepunkt": "mitte_links",
+          "tag": "VP1",
+          "prompt": "Pin 1",
+          "wert": "2",
+          "sichtbar": true,
+          "text_dx": -2.5,
+          "text_dy": 2.0,
+          "richtungen": [
+            0
+          ],
+          "radius": 0.5
+        },
+        {
+          "typ": "maske",
+          "layer": "E_DEVICES",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (breit)",
+          "eig_farbe": true,
+          "staerke": null,
+          "x": -19.0,
+          "y": -11.0,
+          "versatz": {},
+          "werte": {
+            "IND": "IND",
+            "TYP": "TYP",
+            "PER": "PER"
+          },
+          "ausgeblendet": [],
+          "platzhalter": false,
+          "rolle": "haupt",
+          "spiegel": "liste",
+          "sp_dx": 0.0,
+          "sp_dy": 0.0
+        },
+        {
+          "typ": "vpunkt",
+          "layer": "E_DEVICES",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (breit)",
+          "eig_farbe": true,
+          "staerke": 0.25,
+          "x": 0.0,
+          "y": 0.0,
+          "inhalt": "1",
+          "hoehe": 2.0,
+          "winkel": 0.0,
+          "schriftart": "Arial",
+          "einfuegepunkt": "mitte_links",
+          "tag": "VP2",
+          "prompt": "Pin 2",
+          "wert": "1",
+          "sichtbar": true,
+          "text_dx": -2.5,
+          "text_dy": 2.0,
+          "richtungen": [
+            0
+          ],
+          "radius": 0.5
+        },
+        {
+          "typ": "linie",
+          "layer": "0",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (schmal)",
+          "eig_farbe": true,
+          "staerke": 0.35,
+          "x1": -11.0,
+          "y1": 0.0,
+          "x2": 0.0,
+          "y2": 0.0
+        },
+        {
+          "typ": "linie",
+          "layer": "0",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (schmal)",
+          "eig_farbe": true,
+          "staerke": 0.35,
+          "x1": -10.999999999999858,
+          "y1": -10.000000000000654,
+          "x2": 0.0,
+          "y2": -10.0
+        }
+      ]
+    },
+    {
+      "name": "L3",
+      "basispunkt": [
+        0.0,
+        0.0
+      ],
+      "elemente": [
+        {
+          "typ": "bogen",
+          "layer": "0",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (breit)",
+          "eig_farbe": true,
+          "staerke": 0.35,
+          "cx": -6.262397683070105,
+          "cy": -3.749999999999858,
+          "r": 1.2772441207854688,
+          "start": 78.14471272830144,
+          "ende": 281.85528727169867
+        },
+        {
+          "typ": "bogen",
+          "layer": "0",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (breit)",
+          "eig_farbe": true,
+          "staerke": 0.35,
+          "cx": -6.2623976830702475,
+          "cy": -1.2500000000001705,
+          "r": 1.2772441207854688,
+          "start": 78.14471272830144,
+          "ende": 281.85528727169867
+        },
+        {
+          "typ": "bogen",
+          "layer": "0",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (breit)",
+          "eig_farbe": true,
+          "staerke": 0.35,
+          "cx": -6.262397683070105,
+          "cy": -6.2500000000001705,
+          "r": 1.2772441207854688,
+          "start": 78.14471272830144,
+          "ende": 281.85528727169867
+        },
+        {
+          "typ": "bogen",
+          "layer": "0",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (breit)",
+          "eig_farbe": true,
+          "staerke": 0.35,
+          "cx": -6.262397683070105,
+          "cy": -8.750000000000483,
+          "r": 1.2772441207854688,
+          "start": 78.14471272830144,
+          "ende": 281.85528727169867
+        },
+        {
+          "typ": "vpunkt",
+          "layer": "E_DEVICES",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (breit)",
+          "eig_farbe": true,
+          "staerke": 0.25,
+          "x": 0.0,
+          "y": -10.0,
+          "inhalt": "2",
+          "hoehe": 2.0,
+          "winkel": 0.0,
+          "schriftart": "Arial",
+          "einfuegepunkt": "mitte_links",
+          "tag": "VP1",
+          "prompt": "Pin 1",
+          "wert": "2",
+          "sichtbar": true,
+          "text_dx": -2.5,
+          "text_dy": 2.0,
+          "richtungen": [
+            0
+          ],
+          "radius": 0.5
+        },
+        {
+          "typ": "maske",
+          "layer": "E_DEVICES",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (breit)",
+          "eig_farbe": true,
+          "staerke": null,
+          "x": -19.0,
+          "y": -11.0,
+          "versatz": {},
+          "werte": {
+            "IND": "IND",
+            "TYP": "TYP",
+            "PER": "PER"
+          },
+          "ausgeblendet": [],
+          "platzhalter": false,
+          "rolle": "haupt",
+          "spiegel": "liste",
+          "sp_dx": 0.0,
+          "sp_dy": 0.0
+        },
+        {
+          "typ": "vpunkt",
+          "layer": "E_DEVICES",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (breit)",
+          "eig_farbe": true,
+          "staerke": 0.25,
+          "x": 0.0,
+          "y": 0.0,
+          "inhalt": "1",
+          "hoehe": 2.0,
+          "winkel": 0.0,
+          "schriftart": "Arial",
+          "einfuegepunkt": "mitte_links",
+          "tag": "VP2",
+          "prompt": "Pin 2",
+          "wert": "1",
+          "sichtbar": true,
+          "text_dx": -2.5,
+          "text_dy": 2.0,
+          "richtungen": [
+            0
+          ],
+          "radius": 0.5
+        },
+        {
+          "typ": "linie",
+          "layer": "0",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (schmal)",
+          "eig_farbe": true,
+          "staerke": 0.35,
+          "x1": -6.0,
+          "y1": 0.0,
+          "x2": 0.0,
+          "y2": 0.0
+        },
+        {
+          "typ": "linie",
+          "layer": "0",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (schmal)",
+          "eig_farbe": true,
+          "staerke": 0.35,
+          "x1": -5.999999999999858,
+          "y1": -10.000000000000654,
+          "x2": 0.0,
+          "y2": -10.0
+        }
+      ]
+    },
+    {
       "name": "Leistungsschalter",
       "basispunkt": [
         0.0,
@@ -9634,6 +10803,8 @@
           "prompt": "Pin 1",
           "wert": "1",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": [
             90
           ],
@@ -9657,6 +10828,8 @@
           "prompt": "Pin 2",
           "wert": "3",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": [
             90
           ],
@@ -9680,6 +10853,8 @@
           "prompt": "Pin 3",
           "wert": "5",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": [
             90
           ],
@@ -9703,6 +10878,8 @@
           "prompt": "Pin 4",
           "wert": "2",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": [
             270
           ],
@@ -9726,6 +10903,8 @@
           "prompt": "Pin 5",
           "wert": "4",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": [
             270
           ],
@@ -9749,6 +10928,8 @@
           "prompt": "Pin 6",
           "wert": "6",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": [
             270
           ],
@@ -10534,6 +11715,7 @@
           "staerke": null,
           "x": -11.0,
           "y": -16.0,
+          "versatz": {},
           "werte": {
             "IND": "IND",
             "TYP": "TYP",
@@ -10621,6 +11803,8 @@
           "prompt": "Pin 1",
           "wert": "21",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": null,
           "radius": 0.5
         },
@@ -10642,6 +11826,8 @@
           "prompt": "Pin 2",
           "wert": "22",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": null,
           "radius": 0.5
         },
@@ -10654,6 +11840,7 @@
           "staerke": null,
           "x": -4.0,
           "y": -5.0,
+          "versatz": {},
           "werte": {
             "IND": "IND",
             "TYP": "TYP",
@@ -10693,6 +11880,8 @@
           "prompt": "Pin 1",
           "wert": "1",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": [
             90
           ],
@@ -10716,6 +11905,8 @@
           "prompt": "Pin 2",
           "wert": "2",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": [
             270
           ],
@@ -10867,6 +12058,7 @@
           "staerke": null,
           "x": -4.0,
           "y": -12.5,
+          "versatz": {},
           "werte": {
             "IND": "IND",
             "TYP": "TYP",
@@ -10906,6 +12098,8 @@
           "prompt": "Pin 1",
           "wert": "1",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": [
             90
           ],
@@ -10929,6 +12123,8 @@
           "prompt": "Pin 2",
           "wert": "2",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": [
             270
           ],
@@ -11080,6 +12276,7 @@
           "staerke": null,
           "x": -4.0,
           "y": -12.5,
+          "versatz": {},
           "werte": {
             "IND": "IND",
             "TYP": "TYP",
@@ -11110,6 +12307,8 @@
           "prompt": "Pin 3",
           "wert": "3",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": [
             90
           ],
@@ -11133,6 +12332,8 @@
           "prompt": "Pin 4",
           "wert": "4",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": [
             270
           ],
@@ -11293,6 +12494,8 @@
           "prompt": "Pin 5",
           "wert": "5",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": [
             90
           ],
@@ -11316,6 +12519,8 @@
           "prompt": "Pin 6",
           "wert": "6",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": [
             270
           ],
@@ -11545,6 +12750,8 @@
           "prompt": "Pin 1",
           "wert": "13",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": null,
           "radius": 0.5
         },
@@ -11566,6 +12773,8 @@
           "prompt": "Pin 2",
           "wert": "14",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": null,
           "radius": 0.5
         },
@@ -11578,6 +12787,7 @@
           "staerke": null,
           "x": -4.0,
           "y": -5.0,
+          "versatz": {},
           "werte": {
             "IND": "IND",
             "TYP": "TYP",
@@ -11653,6 +12863,8 @@
           "prompt": "Pin 1",
           "wert": "1",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": null,
           "radius": 0.5
         },
@@ -11674,6 +12886,8 @@
           "prompt": "Pin 2",
           "wert": "2",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": null,
           "radius": 0.5
         },
@@ -11731,6 +12945,8 @@
           "prompt": "Pin 3",
           "wert": "3",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": null,
           "radius": 0.5
         },
@@ -11752,6 +12968,8 @@
           "prompt": "Pin 4",
           "wert": "4",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": null,
           "radius": 0.5
         },
@@ -11809,6 +13027,8 @@
           "prompt": "Pin 5",
           "wert": "5",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": null,
           "radius": 0.5
         },
@@ -11830,6 +13050,8 @@
           "prompt": "Pin 6",
           "wert": "6",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": null,
           "radius": 0.5
         },
@@ -11854,6 +13076,7 @@
           "staerke": null,
           "x": -4.0,
           "y": -5.0,
+          "versatz": {},
           "werte": {
             "IND": "IND",
             "TYP": "TYP",
@@ -11929,6 +13152,8 @@
           "prompt": "Pin 1",
           "wert": "1",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": null,
           "radius": 0.5
         },
@@ -11950,6 +13175,8 @@
           "prompt": "Pin 2",
           "wert": "2",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": null,
           "radius": 0.5
         },
@@ -12007,6 +13234,8 @@
           "prompt": "Pin 3",
           "wert": "3",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": null,
           "radius": 0.5
         },
@@ -12028,6 +13257,8 @@
           "prompt": "Pin 4",
           "wert": "4",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": null,
           "radius": 0.5
         },
@@ -12085,6 +13316,8 @@
           "prompt": "Pin 5",
           "wert": "5",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": null,
           "radius": 0.5
         },
@@ -12106,6 +13339,8 @@
           "prompt": "Pin 6",
           "wert": "6",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": null,
           "radius": 0.5
         },
@@ -12163,6 +13398,8 @@
           "prompt": "Pin 7",
           "wert": "7",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": null,
           "radius": 0.5
         },
@@ -12184,6 +13421,8 @@
           "prompt": "Pin 8",
           "wert": "8",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": null,
           "radius": 0.5
         },
@@ -12208,6 +13447,7 @@
           "staerke": null,
           "x": -4.0,
           "y": -5.0,
+          "versatz": {},
           "werte": {
             "IND": "IND",
             "TYP": "TYP",
@@ -12461,6 +13701,7 @@
           "linientyp": "Volllinie (schmal)",
           "eig_farbe": true,
           "staerke": 0.35,
+          "text_versatz": {},
           "gespiegelt": false,
           "sp_dx": 0.0,
           "sp_dy": 0.0,
@@ -13338,6 +14579,8 @@
           "prompt": "Pin 1",
           "wert": "A1",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": [
             90
           ],
@@ -13385,6 +14628,8 @@
           "prompt": "Pin 2",
           "wert": "A2",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": [
             270
           ],
@@ -13399,6 +14644,7 @@
           "staerke": null,
           "x": -6.0,
           "y": -7.5,
+          "versatz": {},
           "werte": {
             "IND": "K1",
             "TYP": "",
@@ -13625,6 +14871,8 @@
           "prompt": "Verbindungspunkt 1",
           "wert": "1",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": null,
           "radius": 0.5
         },
@@ -13646,6 +14894,8 @@
           "prompt": "Verbindungspunkt 2",
           "wert": "2",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": null,
           "radius": 0.5
         },
@@ -13764,6 +15014,8 @@
           "prompt": "Pin 1",
           "wert": "1",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": null,
           "radius": 0.5
         },
@@ -13785,6 +15037,8 @@
           "prompt": "Pin 2",
           "wert": "2",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": null,
           "radius": 0.5
         },
@@ -13797,6 +15051,7 @@
           "staerke": null,
           "x": -2.0,
           "y": -6.5,
+          "versatz": {},
           "werte": {
             "IND": "IND",
             "TYP": "TYP",
@@ -13867,6 +15122,8 @@
           "prompt": "Pin 1",
           "wert": "1",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": null,
           "radius": 0.5
         },
@@ -13888,6 +15145,8 @@
           "prompt": "Pin 2",
           "wert": "2",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": null,
           "radius": 0.5
         },
@@ -13900,6 +15159,7 @@
           "staerke": null,
           "x": -2.0,
           "y": -6.5,
+          "versatz": {},
           "werte": {
             "IND": "IND",
             "TYP": "TYP",
@@ -13961,6 +15221,8 @@
           "prompt": "Pin 3",
           "wert": "3",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": null,
           "radius": 0.5
         },
@@ -13982,6 +15244,8 @@
           "prompt": "Pin 4",
           "wert": "4",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": null,
           "radius": 0.5
         }
@@ -14058,6 +15322,8 @@
           "prompt": "Pin 1",
           "wert": "2",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": null,
           "radius": 0.5
         },
@@ -14125,6 +15391,8 @@
           "prompt": "Pin 2",
           "wert": "3",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": null,
           "radius": 0.5
         },
@@ -14146,6 +15414,8 @@
           "prompt": "Pin 3",
           "wert": "4",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": null,
           "radius": 0.5
         },
@@ -14213,6 +15483,8 @@
           "prompt": "Pin 4",
           "wert": "5",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": null,
           "radius": 0.5
         },
@@ -14234,6 +15506,8 @@
           "prompt": "Pin 5",
           "wert": "6",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": null,
           "radius": 0.5
         },
@@ -14255,6 +15529,8 @@
           "prompt": "Pin 6",
           "wert": "1",
           "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
           "richtungen": null,
           "radius": 0.5
         },
@@ -14267,6 +15543,7 @@
           "staerke": null,
           "x": -1.9791666666666572,
           "y": -6.599999999999994,
+          "versatz": {},
           "werte": {
             "IND": "IND",
             "TYP": "TYP",
@@ -14276,6 +15553,129 @@
           "platzhalter": true,
           "rolle": "haupt",
           "spiegel": "liste",
+          "sp_dx": 0.0,
+          "sp_dy": 0.0
+        }
+      ]
+    },
+    {
+      "name": "Spule",
+      "basispunkt": [
+        0.0,
+        0.0
+      ],
+      "elemente": [
+        {
+          "typ": "rechteck",
+          "layer": "0",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (schmal)",
+          "eig_farbe": true,
+          "staerke": 0.35,
+          "x1": -5.0,
+          "y1": -5.0,
+          "x2": 5.0,
+          "y2": -10.0
+        },
+        {
+          "typ": "vpunkt",
+          "layer": "E_DEVICES",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (schmal)",
+          "eig_farbe": true,
+          "staerke": 0.25,
+          "x": 0.0,
+          "y": 0.0,
+          "inhalt": "A1",
+          "hoehe": 2.0,
+          "winkel": 0.0,
+          "schriftart": "Arial",
+          "einfuegepunkt": "mitte_links",
+          "tag": "VP1",
+          "prompt": "Pin 1",
+          "wert": "A1",
+          "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
+          "richtungen": [
+            90,
+            180
+          ],
+          "radius": 0.5
+        },
+        {
+          "typ": "vpunkt",
+          "layer": "E_DEVICES",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (schmal)",
+          "eig_farbe": true,
+          "staerke": 0.25,
+          "x": 0.0,
+          "y": -15.0,
+          "inhalt": "A2",
+          "hoehe": 2.0,
+          "winkel": 0.0,
+          "schriftart": "Arial",
+          "einfuegepunkt": "mitte_links",
+          "tag": "VP2",
+          "prompt": "Pin 2",
+          "wert": "A2",
+          "sichtbar": true,
+          "text_dx": 0.0,
+          "text_dy": 0.0,
+          "richtungen": [
+            270
+          ],
+          "radius": 0.5
+        },
+        {
+          "typ": "linie",
+          "layer": "0",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (schmal)",
+          "eig_farbe": true,
+          "staerke": 0.35,
+          "x1": 0.0,
+          "y1": 0.0,
+          "x2": 0.0,
+          "y2": -5.0
+        },
+        {
+          "typ": "linie",
+          "layer": "0",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (schmal)",
+          "eig_farbe": true,
+          "staerke": 0.35,
+          "x1": 0.0,
+          "y1": -10.0,
+          "x2": 0.0,
+          "y2": -15.0
+        },
+        {
+          "typ": "maske",
+          "layer": "E_DEVICES",
+          "farbe": "#c29bff",
+          "linientyp": "Volllinie (schmal)",
+          "eig_farbe": true,
+          "staerke": null,
+          "x": -6.0,
+          "y": -16.0,
+          "versatz": {
+            "IND": [
+              0.0,
+              0.3500000000000085
+            ]
+          },
+          "werte": {
+            "IND": "IND",
+            "TYP": "TYP",
+            "PER": "PER"
+          },
+          "ausgeblendet": [],
+          "platzhalter": true,
+          "rolle": "haupt",
+          "spiegel": "unten",
           "sp_dx": 0.0,
           "sp_dy": 0.0
         }
