@@ -1,9 +1,9 @@
 # Änderungen
 
 ## 1.0.4
-- Suchen und Ersetzen über das ganze Projekt (alle Blätter)
+- Suchen und Ersetzen über das ganze Projekt (alle Blätter); Doppelklick auf einen Treffer springt zum Objekt
 - Eigenschaften übertragen (Layer, Farbe, Linientyp, Stärke, Texthöhe) von einem Objekt auf andere
-- Layerfenster: „Bereinigen“ löscht alle nicht verwendeten Layer
+- Layerfenster: „Bereinigen“ löscht alle nicht verwendeten Layer (im Projekt über alle Blätter)
 
 ## 1.0.3
 - Info-Fenster: Maskottchen links neben den Texten (Datei `KatieCAD_Maskottchen.png`)
@@ -62,3 +62,4 @@
 ## 1.0.0
 - Erstes Release: 2D-CAD, Blöcke, Projekte mit Blättern, Schaltpläne, Querverweise, Klemmen, Kabel,
   Reports, Schriftfeld-Automatik, DXF/DWG-Import und -Export, Installer für Windows, Linux und macOS
+
