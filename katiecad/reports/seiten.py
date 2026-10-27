@@ -28,6 +28,17 @@ from katiecad.reports.tabelle import (Spalte, tabellen_seiten,
                                       zeilen_vorbereiten, TEXT, LINIE)
 
 FORMAT = "A4 (297x210)"
+FORMATE = {"a4": "A4 (297x210)", "a3": "A3 (420x297)"}
+
+
+def format_name(schluessel):
+    """'a4' / 'a3' -> drawing format name (unknown -> A4)."""
+    return FORMATE.get(str(schluessel or "").lower(), FORMAT)
+
+
+def skala_fuer(fmt):
+    """Scale factor of a format compared to A4 (A3 = 1.414)."""
+    return ZEICHNUNGSFORMATE[fmt][0] / ZEICHNUNGSFORMATE[FORMAT][0]
 TYPEN = ("deckblatt", "inhalt", "geraete", "klemmen", "kabel")
 LISTEN = ("geraete", "klemmen", "kabel")
 
@@ -48,8 +59,9 @@ class BlattInfo:
 
 
 class BerichtSeite:
-    def __init__(self, typ, name, elemente):
+    def __init__(self, typ, name, elemente, format=FORMAT):
         self.typ, self.name, self.elemente = typ, name, elemente
+        self.format = format
 
 
 class Vorlage:
@@ -140,8 +152,8 @@ def spalten_ordner(programm_ordner, projekt_ordner=None):
 # ------------------------------------------------------------------
 # Frame, title block, area
 # ------------------------------------------------------------------
-def _rahmen():
-    b, h = ZEICHNUNGSFORMATE[FORMAT]
+def _rahmen(fmt=FORMAT):
+    b, h = ZEICHNUNGSFORMATE[fmt]
     aussen, innen = TB.frame_rects(b, h)
     dick = {"layer": "0", "farbe": FARBEN["cyan"], "linientyp": "Volllinie (breit)",
             "eig_farbe": True, "staerke": 0.7}
@@ -150,9 +162,9 @@ def _rahmen():
     return aussen, innen, [Rechteck(*aussen, **dick), Rechteck(*innen, **duenn)]
 
 
-def inhaltsflaeche(vorlage):
+def inhaltsflaeche(vorlage, fmt=FORMAT):
     """(x1, y1, x2, y2) for tables: sheet frame minus title block."""
-    _a, innen, _el = _rahmen()
+    _a, innen, _el = _rahmen(fmt)
     tb = vorlage.hoehe if vorlage is not None else 0.0
     return (innen[0] + 2.0, innen[1] + tb + 3.0, innen[2] - 2.0, innen[3] - 3.0)
 
@@ -170,36 +182,38 @@ def titel_werte(daten, titel1, projektname, heute, sprache):
 
 def _seite(typ, name, titel1, inhalt, ctx, nr, gesamt):
     """Frame + content + title block of a report page."""
-    _a, _i, rahmen = _rahmen()
+    fmt = ctx.get("format", FORMAT)
+    _a, _i, rahmen = _rahmen(fmt)
     el = list(rahmen) + list(inhalt)
     v = ctx["vorlage"]
     if v is not None:
-        b, h = ZEICHNUNGSFORMATE[FORMAT]
+        b, h = ZEICHNUNGSFORMATE[fmt]
         ref = TB.make_block(v.name, v.elemente, b, h, layer="0")
         ref.setze_attribute(titel_werte(ctx["daten"], titel1, ctx["projekt"],
                                         ctx["heute"], ctx["sprache"]))
         info = TB.info_values(nr, gesamt, name, ctx["projekt"], ctx["sprache"],
-                              FORMAT, ctx["heute"], ctx["daten"], "")
+                              fmt, ctx["heute"], ctx["daten"], "")
         TB.refresh_fields([ref], info, "")
         el.append(ref)
-    return BerichtSeite(typ, name, el)
+    return BerichtSeite(typ, name, el, fmt)
 
 
 # ------------------------------------------------------------------
 # Cover sheet
 # ------------------------------------------------------------------
-def deckblatt_inhalt(daten, projektname, flaeche, heute, sprache):
+def deckblatt_inhalt(daten, projektname, flaeche, heute, sprache, skala=1.0):
+    f = skala
     x1, y1, x2, y2 = flaeche
     cx = (x1 + x2) / 2.0
     hoehe = y2 - y1
     el = []
     anlage = daten.get("anlage") or projektname
-    el.append(Text(cx, y2 - 0.26 * hoehe, anlage, 10.0, 0.0, "Arial",
+    el.append(Text(cx, y2 - 0.26 * hoehe, anlage, 10.0 * f, 0.0, "Arial",
                    einfuegepunkt="mitte_zentriert", **TEXT))
-    el.append(Text(cx, y2 - 0.38 * hoehe, tr("rep.deck.untertitel"), 5.0, 0.0,
+    el.append(Text(cx, y2 - 0.38 * hoehe, tr("rep.deck.untertitel"), 5.0 * f, 0.0,
                    "Arial", einfuegepunkt="mitte_zentriert", **TEXT))
     ly = y2 - 0.45 * hoehe
-    el.append(Linie(cx - 70, ly, cx + 70, ly, staerke=0.5, **LINIE))
+    el.append(Linie(cx - 70 * f, ly, cx + 70 * f, ly, staerke=0.5, **LINIE))
     datum = daten.get("datum") or (heute.strftime("%d.%m.%Y") if sprache == "de"
                                    else heute.strftime("%Y-%m-%d"))
     zeilen = [(tr("rep.deck.kunde"), daten.get("kunde", "")),
@@ -211,13 +225,13 @@ def deckblatt_inhalt(daten, projektname, flaeche, heute, sprache):
               (tr("rep.deck.revision"), daten.get("revision", "")),
               (tr("rep.deck.datum"), datum)]
     zeilen = [(k, v) for k, v in zeilen if v]
-    start = ly - 10.0
-    schritt = min(8.0, max(4.5, (start - y1 - 2.0) / max(1, len(zeilen))))
+    start = ly - 10.0 * f
+    schritt = min(8.0 * f, max(4.5 * f, (start - y1 - 2.0) / max(1, len(zeilen))))
     for i, (k, v) in enumerate(zeilen):
         y = start - i * schritt
-        el.append(Text(cx - 4.0, y, k, 3.5, 0.0, "Arial",
+        el.append(Text(cx - 4.0 * f, y, k, 3.5 * f, 0.0, "Arial",
                        einfuegepunkt="mitte_rechts", **TEXT))
-        el.append(Text(cx + 4.0, y, v, 3.5, 0.0, "Arial",
+        el.append(Text(cx + 4.0 * f, y, v, 3.5 * f, 0.0, "Arial",
                        einfuegepunkt="mitte_links", **TEXT))
     return el
 
@@ -268,16 +282,16 @@ _GRUPPE = {"klemmen": ("_gk", ("leiste", "einbauort")),
            "kabel": ("_gk", ("cab", "einbauort", "typ"))}
 
 
-def _liste_tabelle(typ, zeilen, ordner, flaeche, titel):
+def _liste_tabelle(typ, zeilen, ordner, flaeche, titel, skala=1.0):
     spalten, opt = lade_spalten(typ, ordner)
     spalten = _ohne_leere_einbauorte(spalten, zeilen)
     gruppe, leer = _GRUPPE.get(typ, (None, ()))
     if gruppe:
         zeilen = zeilen_vorbereiten(zeilen, gruppe, leer)
     return tabellen_seiten(spalten, zeilen, flaeche, titel,
-                           opt["textgroesse"], opt["zeilenhoehe"],
+                           opt["textgroesse"] * skala, opt["zeilenhoehe"] * skala,
                            tr("rep.leer"),
-                           seite_pro_gruppe=(typ == "klemmen"))
+                           seite_pro_gruppe=(typ == "klemmen"), skala=skala)
 
 
 def seitennamen(typ, basis, seiten):
@@ -311,8 +325,10 @@ def _name(basis, k, n):
 # Main function
 # ------------------------------------------------------------------
 def berichte_erzeugen(blaetter, projektname, daten, aktiv, vorlage, sprache,
-                      ordner=(), heute=None, klemmen_in_geraeteliste=True):
-    """Creates the requested report sheets.
+                      ordner=(), heute=None, klemmen_in_geraeteliste=True,
+                      format=FORMAT):
+    """Creates the requested report sheets (format: drawing format name, A4 or A3;
+    texts and row heights are scaled with the sheet).
 
     blaetter: [BlattInfo] of the drawing sheets in project order
     aktiv:    set of requested types from TYPEN
@@ -321,8 +337,9 @@ def berichte_erzeugen(blaetter, projektname, daten, aktiv, vorlage, sprache,
     heute = heute or datetime.date.today()
     aktiv = set(aktiv)
     ctx = {"vorlage": vorlage, "daten": dict(daten), "projekt": projektname,
-           "heute": heute, "sprache": sprache}
-    flaeche = inhaltsflaeche(vorlage)
+           "heute": heute, "sprache": sprache, "format": format}
+    flaeche = inhaltsflaeche(vorlage, format)
+    skala = skala_fuer(format)
     basis = [(i, b.elemente) for i, b in enumerate(blaetter)]
     einbauorte = {i: getattr(b, "einbauort", "") for i, b in enumerate(blaetter)}
     brauchen_netz = bool(aktiv & {"klemmen", "kabel"}) or (
@@ -344,7 +361,7 @@ def berichte_erzeugen(blaetter, projektname, daten, aktiv, vorlage, sprache,
                 zeilen = listen_zeilen(typ, basis, nummer, netz,
                                        klemmen_in_geraeteliste, einbauorte)
                 listen[typ] = _liste_tabelle(typ, zeilen, ordner, flaeche,
-                                             namen[typ])
+                                             namen[typ], skala)
         hinten_n = sum(len(p) for p in listen.values())
         gesamt = vorn + len(blaetter) + hinten_n
         if "inhalt" not in aktiv:
@@ -368,8 +385,9 @@ def berichte_erzeugen(blaetter, projektname, daten, aktiv, vorlage, sprache,
              for i, (n, b, t) in enumerate(eintraege)])
         spalten, opt = lade_spalten("inhalt", ordner)
         inh_seiten = tabellen_seiten(spalten, zeilen, flaeche, namen["inhalt"],
-                                     opt["textgroesse"], opt["zeilenhoehe"],
-                                     tr("rep.leer"))
+                                     opt["textgroesse"] * skala,
+                                     opt["zeilenhoehe"] * skala,
+                                     tr("rep.leer"), skala=skala)
         if len(inh_seiten) == n_inh:
             break
         n_inh = len(inh_seiten)
@@ -379,7 +397,7 @@ def berichte_erzeugen(blaetter, projektname, daten, aktiv, vorlage, sprache,
         nr += 1
         vorne.append(_seite("deckblatt", namen["deckblatt"], namen["deckblatt"],
                             deckblatt_inhalt(ctx["daten"], projektname, flaeche,
-                                             heute, sprache), ctx, nr, gesamt))
+                                             heute, sprache, skala), ctx, nr, gesamt))
     if "inhalt" in aktiv:
         n = len(inh_seiten)
         for k, el in enumerate(inh_seiten):
