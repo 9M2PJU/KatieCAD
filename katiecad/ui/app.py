@@ -60,7 +60,7 @@ from katiecad.model.core import (
     BEFEHLE, PdfSeite, ist_dunkel,
     E_DEVICES, E_LINES, E_CABLE, E_CLAMPS, E_PIN, ELEKTRO_LAYER,
     Layer, Layout, Element, Linie, Kreis, Bogen, Rechteck, Polylinie, Text,
-    Bemassung, Viewport, Schraffur, Bild, konturen_aus_elementen,
+    Bemassung, Viewport, Schraffur, Bild, konturen_aus_elementen, bereich_an_punkt,
     AttributDefinition, Leitung, Verbindungspunkt, Querverweis,
     Verbindung, ElektroMaske, Klemme, Kabel, Koordinatenfeld, ZUSAMMENGESETZT,
     vp_tags_eindeutig, LEITUNG_FARBE, UI_SCHRIFT,
@@ -395,6 +395,8 @@ class CadApp:
         self._stretch_rechteck_id = None
 
         self._warte_auf_basispunkt = False
+        self._hatch_pick = None
+        self._letztes_fenster = None
 
         self._trim_status = "none"
         self._trim_grenzen = []
@@ -2185,6 +2187,7 @@ class CadApp:
         if self._griff_drag_el is not None:
             self._griff_drag_el = None
             self._griff_drag_id = None
+        self._schraffur_pick_ende()
         self._bem_abbrechen()
         self._bogen_abbrechen()
         self._trim_abbrechen()
@@ -2499,6 +2502,9 @@ class CadApp:
         if self.aktives_werkzeug.get() == "brechen":
             self._break_abbrechen()
             self._werkzeug_gewechselt()
+            return
+        if getattr(self, "_hatch_pick", None):
+            self._schraffur_pick_ende()
             return
         if self._op is not None:
             self._op_rechtsklick()
@@ -3308,6 +3314,9 @@ class CadApp:
             x, y = self._eingabepunkt(event)
             self._block_einfuegen_an(x, y)
             return
+        if getattr(self, "_hatch_pick", None):
+            self._schraffur_klick(event)
+            return
         if self._block_erzeuge_auswahl is not None:
             x, y = self._eingabepunkt(event)
             self._block_erzeugen_fertig((x, y))
@@ -4020,7 +4029,9 @@ class CadApp:
                 self.canvas.delete(self._auswahl_rechteck_id)
                 self._auswahl_rechteck_id = None
             self.canvas.delete("auswahlvorschau")
-            self.auswahl = self._elemente_im_auswahlrechteck(bbox, "rechts")
+            treffer = self._elemente_im_auswahlrechteck(bbox, "rechts")
+            nur = {id(e) for e in self._op.get("objekte") or []}
+            self.auswahl = [e for e in treffer if not nur or id(e) in nur]
             self.redraw()
             self._op_hinweis()
             return
@@ -4033,6 +4044,8 @@ class CadApp:
                     max(x0_mm, x1_mm), max(y0_mm, y1_mm))
             richtung = "links" if x1_px >= x0_px else "rechts"
             treffer = self._elemente_im_auswahlrechteck(bbox, richtung)
+            self._letztes_fenster = ((bbox, [id(t) for t in treffer])
+                                     if richtung == "rechts" else None)
             for t in treffer:
                 if t not in self.auswahl:
                     self.auswahl.append(t)
@@ -6137,14 +6150,27 @@ class CadApp:
                              else "Please leave the viewport first (ESC)."))
             return
         if typ == "stretch":
+            vorher = list(self.auswahl)
             self.aktives_werkzeug.set("auswahl")
             self._pts = []
             self.letzter_punkt = None
             self._clear_temp()
-            self.auswahl = []
-            self._op = {"typ": "stretch", "stufe": "fenster", "basis": None,
-                        "objekte": [], "fenster": None}
             self._drag_modus = None
+            # Objects already picked with a crossing window: no second drag
+            fw = getattr(self, "_letztes_fenster", None)
+            ids = {id(e) for e in vorher}
+            if vorher and fw and fw[1] and set(fw[1]) <= ids:
+                self.auswahl = vorher
+                self._op = {"typ": "stretch", "stufe": "basis", "basis": None,
+                            "objekte": vorher, "fenster": fw[0]}
+                self.redraw()
+                self._op_hinweis()
+                self.status.set(("STRECKEN: Basispunkt angeben." if de
+                                 else "STRETCH: specify base point."))
+                return
+            self.auswahl = vorher       # kept: only these get stretched
+            self._op = {"typ": "stretch", "stufe": "fenster", "basis": None,
+                        "objekte": vorher, "fenster": None}
             self.redraw()
             self._op_hinweis()
             self.status.set(("STRECKEN: Fenster überkreuzend aufziehen." if de
@@ -6409,9 +6435,12 @@ class CadApp:
         def innen(x, y):
             return xmin <= x <= xmax and ymin <= y <= ymax
 
+        nur = {id(e) for e in (self._op or {}).get("objekte") or []}
         for el in self._aktuelle_elemente_liste():
             l = self.layers.get(el.layer)
             if l and not l.sichtbar:
+                continue
+            if nur and id(el) not in nur:
                 continue
             self._stretch_element(el, innen, dx, dy)
 
@@ -6527,9 +6556,12 @@ class CadApp:
             def innen(x, y):
                 return xmin <= x <= xmax and ymin <= y <= ymax
 
+            nur = {id(e) for e in op.get("objekte") or []}
             for el in self._aktuelle_elemente_liste():
                 l = self.layers.get(el.layer)
                 if l and not l.sichtbar:
+                    continue
+                if nur and id(el) not in nur:
                     continue
                 klon = self._dict_zu_element(el.to_dict())
                 if klon is None:
@@ -9106,6 +9138,52 @@ class CadApp:
     # --------------------------------------------------------
     # Hatching
     # --------------------------------------------------------
+    def _schraffur_pick_start(self):
+        """Like AutoCAD: no selection needed - click into a closed area."""
+        de = SPRACHE["aktuell"] == "de"
+        dlg = SchraffurDialog(self.root)
+        if not dlg.result:
+            return
+        self._hatch_pick = dlg.result
+        self.status.set("SCHRAFFUR: In einen umschlossenen Bereich klicken "
+                        "(ESC / Rechtsklick = fertig)." if de else
+                        "HATCH: click inside a closed area "
+                        "(ESC / right-click = done).")
+
+    def _schraffur_pick_ende(self):
+        if getattr(self, "_hatch_pick", None):
+            self._hatch_pick = None
+            de = SPRACHE["aktuell"] == "de"
+            self.status.set("Schraffur beendet." if de else "Hatch finished.")
+
+    def _schraffur_klick(self, event):
+        de = SPRACHE["aktuell"] == "de"
+        x, y = self.px_to_mm(event.x, event.y)
+        liste = self._aktuelle_elemente_liste()
+        sichtbar = [e for e in liste
+                    if isinstance(e, (Polylinie, Rechteck, Kreis, Linie, Bogen))
+                    and not (self.layers.get(e.layer)
+                             and not self.layers[e.layer].sichtbar)]
+        r = bereich_an_punkt(sichtbar, (x, y), tol=0.05)
+        if r is None:
+            self.status.set("Kein geschlossener Bereich an dieser Stelle."
+                            if de else "No closed area at this point.")
+            return
+        pts, quelle = r
+        typ, abstand, winkel = self._hatch_pick
+        self._snapshot()
+        idx = min((liste.index(q) for q in [quelle] if q in liste),
+                  default=len(liste))
+        sch = Schraffur(pts, muster=typ, abstand=abstand, winkel=winkel,
+                        layer=quelle.layer, farbe=quelle.farbe,
+                        eig_farbe=quelle.eig_farbe)
+        liste.insert(idx, sch)
+        self.auswahl = [sch]
+        self.redraw()
+        self.status.set("Schraffur erstellt - weiteren Bereich anklicken "
+                        "oder ESC." if de else
+                        "Hatch created - click another area or ESC.")
+
     def schraffur_anwenden(self):
         """Hatch selection: circles, rectangles, closed polylines as well as
         closed contours formed from lines/arcs/open polylines (end points
@@ -9115,12 +9193,7 @@ class CadApp:
                       if isinstance(e, (Polylinie, Rechteck, Kreis, Linie, Bogen))]
         konturen = konturen_aus_elementen(kandidaten, tol=0.05)
         if not konturen:
-            self.status.set(
-                "Keine geschlossene Kontur gefunden. Bitte Kreis, Rechteck, "
-                "geschlossene Polylinie oder einen lückenlosen Linienzug "
-                "markieren." if de else
-                "No closed boundary found. Select a circle, rectangle, closed "
-                "polyline or a gap-free chain of lines.")
+            self._schraffur_pick_start()
             return
 
         dlg = SchraffurDialog(self.root)
@@ -9208,4 +9281,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
