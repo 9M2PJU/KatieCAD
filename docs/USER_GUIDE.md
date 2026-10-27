@@ -215,7 +215,9 @@ current path across such pairs when there is exactly one outgoing and at least o
 incoming arrow with the same text. A potential such as `L1` that occurs in many
 places stays an end point.
 
-**Cross-reference texts:** the identifier (e.g. `L1`) and the target note (e.g. "(Sheet 6/1/D)") have default heights of 2.5 mm and 1.5 mm. In the cross-reference dialog (double-click) you set both heights separately. Both texts can also be moved with their yellow grips. **Reset text positions** in the dialog puts them back to the default position.
+**Cross-reference texts:** the identifier (e.g. `L1`) and the target note (e.g. "(Sheet 6/1/D)") stand side by side on one line by default and have default heights of 2.5 mm and 1.5 mm. In the cross-reference dialog (double-click) you set both heights separately. Both texts can also be moved with their yellow grips. **Reset text positions** in the dialog puts them back to the default position.
+
+**Moving texts freely:** The labels of terminals, masks (IND/TYP/PER/REF), cables, pins and device blocks can be moved as well. Select the object and drag the yellow grip at the text. For an inserted device the move applies to that one instance only. **Reset text positions** in the right-click menu puts the texts back to their default position. Since 1.0.3 the terminal number (NUM) is more readable at 1.75 mm.
 
 ### Terminals and cables
 
