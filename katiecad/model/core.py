@@ -3355,7 +3355,8 @@ class Koordinatenfeld(Element):
                    eig_farbe=self.eig_farbe)
         # The labels must stay inside the label strip (width `rand`): at most
         # 60 % of the strip height, so that nothing touches the lines in print.
-        th = min(self.text_hoehe, 0.6 * min(self.rand, (y2 - cy2)))
+        # (minus 0.1 mm: the PDF output renders the strokes slightly bolder)
+        th = max(0.5, min(self.text_hoehe, 0.6 * min(self.rand, (y2 - cy2))) - 0.1)
         for i in range(self.spalten):
             out.append(Text(cx1 + (i + 0.5) * bw, (cy2 + y2) / 2.0,
                             self.spalten_name(i), th, 0.0, "Arial",
