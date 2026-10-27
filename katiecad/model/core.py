@@ -2449,6 +2449,9 @@ class Querverweis(Element):
             wz = pdf_textbreite(ziel, self.hoehe_ziel() / CAD_VERSALHOEHE)
             if links:                          # text runs away from the arrow
                 zx, zy = qx + ex * (wi + self.GAP), qy + ey * (wi + self.GAP)
+            elif a == 90.0:                    # upright text below the arrow:
+                # identifier next to the arrow, target note below it
+                zx, zy = qx - ex * (wi + self.GAP), qy - ey * (wi + self.GAP)
             else:                              # text ends at the arrow
                 tx, ty = qx - ex * (wz + self.GAP), qy - ey * (wz + self.GAP)
         return (a, "mitte_" + ("links" if links else "rechts"),
