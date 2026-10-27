@@ -7321,32 +7321,77 @@ class CadApp:
 
         self._menues_schliessen = schliessen
 
-        def menue_offen():
+        zustand = {"seit": None, "taste": 0.0}
+
+        def dropdowns():
+            """Currently open drop-down / popup menus (not the menu bar)."""
+            leiste = str(self.root.cget("menu") or "")
+            out = []
             for m in alle_menues(self.root):
                 try:
-                    if m.winfo_ismapped():
-                        return True
+                    if str(m) != leiste and m.winfo_ismapped():
+                        out.append(m)
                 except tk.TclError:
                     pass
-            return False
+            return out
+
+        def taste(event=None):
+            zustand["taste"] = time.monotonic()
+
+        def pointer_woanders():
+            """True if the mouse is not over any menu / the menu bar / the
+            window frame - under XWayland the click into a foreign window
+            never reaches Tk, the pointer simply stays where it left."""
+            px, py = self.root.winfo_pointerxy()
+            w = self.root.winfo_containing(px, py)
+            if isinstance(w, tk.Menu):
+                return False
+            ry = self.root.winfo_rooty()
+            if py < ry:                          # menu bar / title bar
+                return py < ry - 80
+            return True
 
         def wache():
-            """X11: when another application gets the focus the open menu
-            of the menu bar stays on screen - no focus event arrives (the
-            menu holds a grab). Poll and close it."""
+            """Closes an open menu that is still on screen although the user
+            has switched to another application (X11/XWayland)."""
             try:
-                if self.root.focus_displayof() is None and menue_offen():
-                    schliessen()
-                    try:
-                        mb = str(self.root.cget("menu"))
-                        self.root.tk.eval(
-                            "catch {tk::MenuUnpost {%s}};"
-                            "catch {grab release [grab current]}" % mb)
-                    except tk.TclError:
-                        pass
+                offen = dropdowns()
+                if not offen:
+                    zustand["seit"] = None
+                else:
+                    fremd = self.root.focus_displayof() is None
+                    if not fremd:
+                        fremd = (pointer_woanders()
+                                 and time.monotonic() - zustand["taste"] > 5.0)
+                    if not fremd:
+                        zustand["seit"] = None
+                    elif zustand["seit"] is None:
+                        zustand["seit"] = time.monotonic()
+                    elif time.monotonic() - zustand["seit"] >= 0.8:
+                        zustand["seit"] = None
+                        schliessen()
+                        try:
+                            self.root.tk.eval(
+                                "catch {tk::MenuUnpost {%s}}"
+                                % str(self.root.cget("menu")))
+                        except tk.TclError:
+                            pass
+                        try:
+                            g = self.root.grab_current()
+                            if isinstance(g, tk.Menu):
+                                g.grab_release()
+                        except tk.TclError:
+                            pass
             except Exception:
                 pass
-            self.root.after(250, wache)
+            self.root.after(300, wache)
+
+        self.root.bind_all("<KeyPress>", taste, add="+")
+        self.root.bind_all("<FocusOut>", lambda e: self.root.after(
+            100, lambda: schliessen() if (dropdowns() and
+                                         self.root.focus_displayof() is None) else None),
+            add="+")
+        self.root.after(300, wache)
 
         self.root.after(250, wache)
         self.root.bind("<FocusOut>", fokus_weg, add="+")
@@ -9307,4 +9352,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
