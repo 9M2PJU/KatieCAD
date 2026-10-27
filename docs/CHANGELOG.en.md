@@ -17,6 +17,7 @@
 - Image import (File > Import image...): images are stored inside the drawing, written to PDF output, and saved as a file next to the DXF on DXF export
 - PDF export writes KatieCAD layers as PDF layers (toggle them in Acrobat, Bluebeam, etc.; re-importable)
 - Hatch: selection box (lines/solid fill) with spacing and angle in one dialog instead of typing
+- Coordinate grid: choose DIN A4 (6 x 4), DIN A3 (8 x 5, 395 x 252.59 mm) or custom values
 - More compact Info window that fits its content
 - Info window: Log button opens the log file in the editor (no tabs)
 

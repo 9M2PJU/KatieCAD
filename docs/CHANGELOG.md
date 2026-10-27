@@ -17,6 +17,7 @@
 - Bildimport (Datei > Bild importieren…): Bilder werden in der Zeichnung gespeichert, im PDF ausgegeben und beim DXF-Export als Datei neben die DXF geschrieben
 - PDF-Export schreibt die KatieCAD-Layer als PDF-Layer (in Acrobat, Bluebeam, Browser-Viewern ein-/ausblendbar; wieder importierbar)
 - Schraffur: Auswahlfeld (Linien/Vollfläche) mit Abstand und Winkel in einem Dialog statt Texteingabe
+- Koordinatenfeld: Auswahl DIN A4 (6 × 4) oder DIN A3 (8 × 5, 395 × 252,59 mm) oder eigene Werte
 - Info-Fenster kompakter, passt sich dem Inhalt an
 - Info-Fenster: Log-Button öffnet die Log-Datei im Editor (keine Reiter mehr)
 
