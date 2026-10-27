@@ -2533,6 +2533,15 @@ class BlockSpeichernDialog(tk.Toplevel):
 
 
 
+def _zahl_text(x):
+    """Number for an entry field without needless decimals (287.0 -> 287)."""
+    try:
+        x = float(x)
+    except (TypeError, ValueError):
+        return str(x)
+    return ("%.2f" % x).rstrip("0").rstrip(".")
+
+
 class KoordinatenfeldDialog(tk.Toplevel):
     """Columns, rows, size and grid lines of the coordinate field.
     result: {'spalten', 'zeilen', 'breite', 'hoehe', 'raster'} or None."""
@@ -2549,28 +2558,64 @@ class KoordinatenfeldDialog(tk.Toplevel):
         f = ttk.Frame(self, padding=14)
         f.pack(fill=tk.BOTH, expand=True)
         self._vars = {}
+        # Presets: DIN A4 (default) and DIN A3, each without title block
+        self._voreinst = {"a4": {"spalten": 6, "zeilen": 4, "breite": 287, "hoehe": 164},
+                          "a3": {"spalten": 8, "zeilen": 5, "breite": 395, "hoehe": 252.59}}
         felder = (("spalten", "dlg.kf.spalten", 6), ("zeilen", "dlg.kf.zeilen", 4),
                   ("breite", "dlg.kf.breite", 287), ("hoehe", "dlg.kf.hoehe", 164))
+        self.v_preset = tk.StringVar(value="own")
+        pf = ttk.Frame(f)
+        pf.grid(row=0, column=0, columnspan=2, sticky=tk.W, pady=(0, 6))
+        for key, text in (("a4", "DIN A4"), ("a3", "DIN A3"),
+                          ("own", "Eigene" if SPRACHE["aktuell"] == "de" else "Custom")):
+            ttk.Radiobutton(pf, text=text, value=key, variable=self.v_preset,
+                            command=self._preset_gewaehlt).pack(side=tk.LEFT, padx=(0, 14))
         for i, (key, label, std) in enumerate(felder):
-            self._vars[key] = tk.StringVar(value=str(v.get(key, std)))
-            ttk.Label(f, text=tr(label)).grid(row=i, column=0, sticky=tk.W,
+            self._vars[key] = tk.StringVar(value=_zahl_text(v.get(key, std)))
+            ttk.Label(f, text=tr(label)).grid(row=i + 1, column=0, sticky=tk.W,
                                               pady=3, padx=(0, 10))
             ttk.Entry(f, textvariable=self._vars[key], width=10).grid(
-                row=i, column=1, sticky=tk.W, pady=3)
+                row=i + 1, column=1, sticky=tk.W, pady=3)
         self.v_raster = tk.BooleanVar(value=bool(v.get("raster", False)))
         ttk.Checkbutton(f, text=tr("dlg.kf.raster"), variable=self.v_raster).grid(
-            row=4, column=0, columnspan=2, sticky=tk.W, pady=3)
+            row=5, column=0, columnspan=2, sticky=tk.W, pady=3)
         ttk.Label(f, text=tr("dlg.kf.hinweis"), style="Hint.TLabel",
                   wraplength=380, justify=tk.LEFT).grid(
-            row=5, column=0, columnspan=2, sticky=tk.W, pady=(6, 4))
+            row=6, column=0, columnspan=2, sticky=tk.W, pady=(6, 4))
+        self._preset_erkennen()
+        for var in self._vars.values():
+            var.trace_add("write", lambda *_: self._preset_erkennen())
         bf = ttk.Frame(f)
-        bf.grid(row=6, column=0, columnspan=2, pady=(8, 0))
+        bf.grid(row=7, column=0, columnspan=2, pady=(8, 0))
         ttk.Button(bf, text=tr("dlg.ok"), command=self._ok).pack(side=tk.LEFT, padx=4)
         ttk.Button(bf, text=tr("dlg.abbrechen"), command=self.destroy).pack(side=tk.LEFT, padx=4)
         self.bind("<Return>", lambda e: self._ok())
         self.bind("<Escape>", lambda e: self.destroy())
         _zentrieren(self, parent)
         self.wait_window(self)
+
+    def _werte(self):
+        try:
+            return {k: float(self._vars[k].get().replace(",", "."))
+                    for k in ("spalten", "zeilen", "breite", "hoehe")}
+        except ValueError:
+            return None
+
+    def _preset_erkennen(self):
+        """Selects A4/A3 if the values match, otherwise 'Custom'."""
+        w = self._werte()
+        wahl = "own"
+        if w is not None:
+            for k, vorg in self._voreinst.items():
+                if all(abs(w[n] - vorg[n]) < 0.005 for n in vorg):
+                    wahl = k
+        self.v_preset.set(wahl)
+
+    def _preset_gewaehlt(self):
+        vorg = self._voreinst.get(self.v_preset.get())
+        if vorg:
+            for k, val in vorg.items():
+                self._vars[k].set(_zahl_text(val))
 
     def _ok(self):
         try:
