@@ -662,22 +662,28 @@ class LayerDialog(tk.Toplevel):
         self.wait_window(self)
 
     def bereinigen(self):
-        """Deletes all layers no object uses (layer 0 and the active layer stay)."""
-        ungenutzt = self.app.ungenutzte_layer()
+        """Deletes all layers no object uses (layer 0 and the active layer
+        stay); with a project this looks at ALL sheets."""
+        app = self.app
+        projektweit = app.projekt is not None
+        bereich = tr("msg.layer.bereich.projekt" if projektweit
+                     else "msg.layer.bereich.blatt")
+        ungenutzt = app.ungenutzte_layer(projektweit)
         if not ungenutzt:
-            messagebox.showinfo("Layer", tr("msg.layer.bereinigt_nichts"), parent=self)
+            messagebox.showinfo("Layer", tr("msg.layer.bereinigt_nichts",
+                                            bereich=bereich), parent=self)
             return
         if not messagebox.askyesno(
                 "Layer", tr("msg.layer.bereinigt_frage", n=len(ungenutzt),
-                            namen=", ".join(ungenutzt)), parent=self):
+                            bereich=bereich, namen=", ".join(ungenutzt)),
+                parent=self):
             return
-        self.app._snapshot()
-        for name in ungenutzt:
-            self.app.layers.pop(name, None)
-        self.app.layer_cb.config(values=list(self.app.layers.keys()))
+        app._snapshot()
+        app.layer_bereinigen_anwenden(ungenutzt, projektweit)
+        app.layer_cb.config(values=list(app.layers.keys()))
         self._aktualisiere()
-        self.app.redraw()
-        self.app.status.set(tr("msg.layer.bereinigt", n=len(ungenutzt)))
+        app.redraw()
+        app.status.set(tr("msg.layer.bereinigt", n=len(ungenutzt), bereich=bereich))
 
     def _aktualisiere(self):
         for item in self.tree.get_children():
@@ -2906,7 +2912,7 @@ class SuchenErsetzenDialog(tk.Toplevel):
         self.title(tr("dlg.sr.titel"))
         self.transient(parent)
         self.configure(bg=FARBEN["bg_mittel"])
-        _modal(self)
+        self._stand = None
         f = ttk.Frame(self, padding=10)
         f.pack(fill=tk.BOTH, expand=True)
         self.v_such = tk.StringVar()
@@ -2962,8 +2968,58 @@ class SuchenErsetzenDialog(tk.Toplevel):
         f.rowconfigure(4, weight=1)
         self.bind("<Return>", lambda e: self.suchen())
         self.bind("<Escape>", lambda e: self.destroy())
+        self.tree.bind("<Double-Button-1>", self.springen)
         e1.focus_set()
         self.wait_window(self)
+
+    def springen(self, event=None):
+        """Double click on a hit: show the object (switches the sheet if
+        necessary), select it and move the dialog out of the way."""
+        iid = self.tree.identify_row(event.y) if event is not None else ""
+        if not iid:
+            sel = self.tree.selection()
+            iid = sel[0] if sel else ""
+        if not iid or int(iid) >= len(self._treffer):
+            return
+        t = self._treffer[int(iid)]
+        app = self.app
+        aktiv = app.projekt.aktiv if app.projekt is not None else 0
+        el = t.element
+        neu_suchen = False
+        if t.blatt != aktiv:
+            liste = self._daten.get(t.blatt, {}).get("elemente", [])
+            idx = next((k for k, d in enumerate(liste) if d is t.element), None)
+            if idx is None or not app.blatt_wechseln(t.blatt):
+                return
+            if app._ist_layout():
+                app.ansicht.set("modell")
+                app.ansicht_wechseln()
+            if idx >= len(app.elemente):
+                return
+            el = app.elemente[idx]
+            neu_suchen = True          # open / stored sheets swapped roles
+        app.zu_element_springen(el)
+        if neu_suchen:
+            self.suchen()
+        self._wegruecken(el)
+
+    def _wegruecken(self, el):
+        """Moves the dialog to the side so that it does not cover `el`."""
+        try:
+            app = self.app
+            b = el.bbox()
+            px, py = app.mm_to_px((b[0] + b[2]) / 2, (b[1] + b[3]) / 2)
+            sx = app.canvas.winfo_rootx() + px
+            sy = app.canvas.winfo_rooty() + py
+            self.update_idletasks()
+            x0, y0 = self.winfo_rootx(), self.winfo_rooty()
+            w, h = self.winfo_width(), self.winfo_height()
+            if x0 - 60 <= sx <= x0 + w + 60 and y0 - 60 <= sy <= y0 + h + 60:
+                sw = self.winfo_screenwidth()
+                x = 10 if sx > sw / 2 else max(10, sw - w - 10)
+                self.geometry("+%d+%d" % (x, y0))
+        except tk.TclError:
+            pass
 
     def _lade(self, pfad):
         try:
@@ -2987,6 +3043,7 @@ class SuchenErsetzenDialog(tk.Toplevel):
             return
         app = self.app
         app._blatt_sichern()
+        self._stand = app.projekt.aktiv if app.projekt is not None else 0
         self._treffer, self._daten = SU.suche_projekt(
             app.projekt, app.elemente, such, self.v_gross.get(),
             self.v_wort.get(), self.v_bereich.get() == "projekt", self._lade)
@@ -3020,6 +3077,10 @@ class SuchenErsetzenDialog(tk.Toplevel):
             return
         app = self.app
         aktiv = app.projekt.aktiv if app.projekt is not None else 0
+        if aktiv != self._stand:            # another sheet was opened meanwhile
+            self.suchen()
+            self.v_status.set(tr("dlg.sr.aktualisiert"))
+            return
         fremd = [t for t in hits if t.blatt != aktiv]
         if fremd and not messagebox.askyesno(
                 tr("dlg.sr.titel"), tr("dlg.sr.frage_anderes", n=len(hits),
@@ -3046,4 +3107,5 @@ class SuchenErsetzenDialog(tk.Toplevel):
         app.redraw()
         self.suchen()
         self.v_status.set(tr("dlg.sr.fertig", n=n))
+
 
