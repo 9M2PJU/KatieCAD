@@ -1645,8 +1645,14 @@ class BlockReferenz(Element):
 
     def __init__(self, x, y, block_name, elemente,
                  skalierung=1.0, winkel=0.0, attribute=None,
-                 ausgeblendet=None, sp_dx=0.0, sp_dy=0.0, gespiegelt=False, **kw):
+                 ausgeblendet=None, sp_dx=0.0, sp_dy=0.0, gespiegelt=False,
+                 text_versatz=None, **kw):
         super().__init__("block", **kw)
+        # Free text positions of THIS instance: {"M:IND": [dx, dy], "V:VP1": ...,
+        # "A:TAG": ...}; M = mask/terminal field, V = pin label, A = attribute
+        self.text_versatz = {str(k): [float(v[0]), float(v[1])]
+                             for k, v in (text_versatz or {}).items()}
+        self._anker = {}          # automatic text positions (computed)
         self.gespiegelt = bool(gespiegelt)     # mirrored about the local y axis
         self.sp_dx, self.sp_dy = float(sp_dx), float(sp_dy)   # contact mirror offset
         self.x, self.y = x, y
@@ -1782,10 +1788,13 @@ class BlockReferenz(Element):
                tuple(sorted(self.ausgeblendet)), tuple(self.refs),
                tuple((a, tuple(p), tuple(o) if isinstance(o, (tuple, list)) else o)
                      for a, p, o in self.kontakte),
-               self.sp_dx, self.sp_dy, self.gespiegelt)
+               self.sp_dx, self.sp_dy, self.gespiegelt,
+               tuple(sorted((k, tuple(v)) for k, v in self.text_versatz.items())))
         if self._cache is not None and self._cache[0] == sig:
             return self._cache[1]
         out = []
+        self._anker = {}
+        tv = self.text_versatz
         for el in self.elemente:
             k = deepcopy(el)
             if self.gespiegelt:
@@ -1799,6 +1808,10 @@ class BlockReferenz(Element):
                 k.refs = list(self.refs)
                 k.kontakte = list(self.kontakte)
                 k.platzhalter = False
+                k.versatz = {t[2:]: v for t, v in tv.items() if t.startswith("M:")}
+                k.aufgeloest(False)               # fills the automatic positions
+                for t, (ax, ay) in k._anker.items():
+                    self._anker["M:" + t] = (ax, ay)
                 out.append(k)
                 continue
             if isinstance(k, Verbindungspunkt):
@@ -1808,14 +1821,23 @@ class BlockReferenz(Element):
                 k.inhalt = k.wert
                 if k.tag in self.ausgeblendet:
                     k.sichtbar = False
+                if k.sichtbar and k.wert != "":
+                    self._anker["V:" + k.tag] = k.text_anker()
+                if "V:" + k.tag in tv:
+                    k.text_dx, k.text_dy = tv["V:" + k.tag]
                 out.append(k)
                 continue
             if isinstance(k, AttributDefinition):
                 if k.tag in self.ausgeblendet:
                     continue
+                tag = k.tag
                 k = k.als_text(self.attribute.get(k.tag, k.wert))
                 if k is None:
                     continue
+                self._anker["A:" + tag] = (k.x, k.y)
+                if "A:" + tag in tv:
+                    k.x += tv["A:" + tag][0]
+                    k.y += tv["A:" + tag][1]
             out.append(k)
         # Symbol bbox + mirror offset for the device masks of this instance
         geo = [e.bbox() for e in out
@@ -1863,9 +1885,22 @@ class BlockReferenz(Element):
         if m is not None:
             ox, oy = m.spiegel_ursprung()
             g.append(("sp", ox, oy))
+        self.aufgeloest()                  # fills the automatic text positions
+        for key, (ax, ay) in self._anker.items():
+            dx, dy = self.text_versatz.get(key, (0.0, 0.0))
+            g.append(("t:" + key, ax + dx, ay + dy))
         return g
 
+    def texte_zuruecksetzen(self):
+        self.text_versatz = {}
+
     def griff_bewegen(self, griff_id, x, y):
+        if griff_id.startswith("t:"):
+            self.aufgeloest()
+            a = self._anker.get(griff_id[2:])
+            if a is not None:
+                self.text_versatz[griff_id[2:]] = [x - a[0], y - a[1]]
+            return
         if griff_id == "sp":
             m = self._maske_welt()
             if m is not None:
@@ -1879,6 +1914,8 @@ class BlockReferenz(Element):
         d.pop("_cache", None)
         d.pop("refs", None)
         d.pop("kontakte", None)
+        d.pop("_anker", None)
+        d["text_versatz"] = {k: list(v) for k, v in self.text_versatz.items()}
         d["ausgeblendet"] = sorted(self.ausgeblendet)
         # Store children as dicts (not the objects themselves)
         d["elemente"] = [e.to_dict() for e in self.elemente]
@@ -2216,11 +2253,12 @@ class Verbindungspunkt(AttributDefinition):
     def __init__(self, x, y, inhalt=None, hoehe=2.0, winkel=0.0,
                  schriftart="Arial", einfuegepunkt=None, tag="VP",
                  prompt="", wert="", sichtbar=True, radius=0.5,
-                 richtungen=None, **kw):
+                 richtungen=None, text_dx=0.0, text_dy=0.0, **kw):
         super().__init__(x, y, inhalt, hoehe, winkel, schriftart,
                          "mitte_links", tag=tag, prompt=prompt, wert=wert,
                          sichtbar=sichtbar, **kw)
         self.typ = "vpunkt"
+        self.text_dx, self.text_dy = float(text_dx), float(text_dy)  # label offset
         # Active connection directions (0 east, 90 north, 180 west, 270 south).
         # None = not set (older files): free -> all, in the device
         # -> nearest outer edge of the symbol.
@@ -2237,13 +2275,35 @@ class Verbindungspunkt(AttributDefinition):
             self.richtungen = sorted({int(round((r - winkel_deg) / 90.0)) * 90 % 360
                                       for r in self.richtungen})
 
+    def text_anker(self):
+        """Automatic position of the label (without the user offset)."""
+        a = math.radians(self.winkel)
+        d = self.radius + self.TEXT_ABSTAND
+        return (self.x + d * math.cos(a), self.y + d * math.sin(a))
+
+    def griffe(self):
+        g = super().griffe()
+        if self.sichtbar and self.wert != "":
+            ax, ay = self.text_anker()
+            g.append(("t", ax + self.text_dx, ay + self.text_dy))
+        return g
+
+    def griff_bewegen(self, griff_id, x, y):
+        if griff_id == "t":
+            ax, ay = self.text_anker()
+            self.text_dx, self.text_dy = x - ax, y - ay
+        else:
+            super().griff_bewegen(griff_id, x, y)
+
+    def texte_zuruecksetzen(self):
+        self.text_dx = self.text_dy = 0.0
+
     def text_element(self):
         """Label as a normal text element (or None)."""
         if not self.sichtbar or self.wert == "":
             return None
-        a = math.radians(self.winkel)
-        d = self.radius + self.TEXT_ABSTAND
-        return Text(self.x + d * math.cos(a), self.y + d * math.sin(a),
+        ax, ay = self.text_anker()
+        return Text(ax + self.text_dx, ay + self.text_dy,
                     self.wert, self.hoehe, self.winkel, self.schriftart,
                     einfuegepunkt="mitte_links", layer=self.layer,
                     farbe=self.farbe, linientyp=self.linientyp,
@@ -2341,27 +2401,6 @@ class Querverweis(Element):
     def texte_zuruecksetzen(self):
         self.text_dx = self.text_dy = self.ziel_dx = self.ziel_dy = 0.0
 
-    def _text_lage(self):
-        """-> (angle, anchor key, (tx, ty), (zx, zy)): automatic positions of
-        identifier and target text (without the user offsets)."""
-        dx, dy = self._VEKTOR[self.richtung]
-        a = 0.0 if self.richtung in (0, 180) else 90.0
-        ex, ey = math.cos(math.radians(a)), math.sin(math.radians(a))
-        nx, ny = -ey, ex                       # "up" in the text system
-        if self.art == "abgehend":
-            sx, sy = dx, dy
-            qx = self.x + dx * (self.LAENGE + self.ABSTAND)
-            qy = self.y + dy * (self.LAENGE + self.ABSTAND)
-        else:
-            sx, sy = -dx, -dy
-            qx = self.x - dx * self.ABSTAND
-            qy = self.y - dy * self.ABSTAND
-        horiz = "links" if (ex * sx + ey * sy) > 0 else "rechts"
-        vt = (self.hoehe_text() / 2.0 + 0.3) if self.ziel_text() else 0.0
-        vz = -(0.6 + self.hoehe_ziel() / 2.0)
-        return (a, "mitte_" + horiz,
-                (qx + nx * vt, qy + ny * vt), (qx + nx * vz, qy + ny * vz))
-
     def ziel_text(self):
         if not self.ziel or not self.text.strip():
             return ""
@@ -2383,6 +2422,37 @@ class Querverweis(Element):
         return [(self.x + nx * h, self.y + ny * h),
                 (self.x - nx * h, self.y - ny * h),
                 (self.x + dx * self.LAENGE, self.y + dy * self.LAENGE)]
+
+    GAP = 1.0                   # Distance identifier <-> target note (same line)
+
+    def _text_lage(self):
+        """-> (angle, anchor key, (tx, ty), (zx, zy)): automatic positions of
+        identifier and target text (without the user offsets). Both texts
+        stand on ONE line: 'L1 (Sheet 6/1/D)'; the target note follows the
+        identifier in reading direction."""
+        dx, dy = self._VEKTOR[self.richtung]
+        a = 0.0 if self.richtung in (0, 180) else 90.0
+        ex, ey = math.cos(math.radians(a)), math.sin(math.radians(a))
+        if self.art == "abgehend":
+            sx, sy = dx, dy
+            qx = self.x + dx * (self.LAENGE + self.ABSTAND)
+            qy = self.y + dy * (self.LAENGE + self.ABSTAND)
+        else:
+            sx, sy = -dx, -dy
+            qx = self.x - dx * self.ABSTAND
+            qy = self.y - dy * self.ABSTAND
+        links = (ex * sx + ey * sy) > 0
+        ziel = self.ziel_text()
+        tx, ty, zx, zy = qx, qy, qx, qy
+        if ziel and self.text.strip():
+            wi = pdf_textbreite(self.text, self.hoehe_text() / CAD_VERSALHOEHE)
+            wz = pdf_textbreite(ziel, self.hoehe_ziel() / CAD_VERSALHOEHE)
+            if links:                          # text runs away from the arrow
+                zx, zy = qx + ex * (wi + self.GAP), qy + ey * (wi + self.GAP)
+            else:                              # text ends at the arrow
+                tx, ty = qx - ex * (wz + self.GAP), qy - ey * (wz + self.GAP)
+        return (a, "mitte_" + ("links" if links else "rechts"),
+                (tx, ty), (zx, zy))
 
     def aufgeloest(self):
         """Arrow (solid hatching) + text(s) as simple elements."""
@@ -2596,9 +2666,13 @@ class _FestMaske(Element):
     ZEILEN = ()            # (tag, dx, dy, height, anchor)
 
     def __init__(self, typ, x, y, werte=None, ausgeblendet=None,
-                 platzhalter=True, **kw):
+                 platzhalter=True, versatz=None, **kw):
         super().__init__(typ, **kw)
         self.x, self.y = float(x), float(y)
+        # Free text positions: {TAG: [dx, dy]} relative to the automatic position
+        self.versatz = {str(k): [float(v[0]), float(v[1])]
+                        for k, v in (versatz or {}).items()}
+        self._anker = {}              # automatic text positions (computed)
         self.werte = {t: "" for t in self.FELDER}
         for t, v in (werte or {}).items():
             if t in self.FELDER:
@@ -2612,9 +2686,35 @@ class _FestMaske(Element):
         d.pop("refs", None)
         d.pop("kontakte", None)         # computed, never saved
         d.pop("sym_bbox", None)
+        d.pop("_anker", None)
         d["werte"] = dict(self.werte)
         d["ausgeblendet"] = sorted(self.ausgeblendet)
+        d["versatz"] = {k: list(v) for k, v in self.versatz.items()}
         return d
+
+    def _t(self, tag, x, y, inhalt, hoehe, anker, st):
+        """Text of the field `tag` at its automatic position (x, y) plus the
+        user offset; the automatic position is remembered for the grip."""
+        self._anker[tag] = (x, y)
+        dx, dy = self.versatz.get(tag, (0.0, 0.0))
+        return Text(x + dx, y + dy, inhalt, hoehe, 0.0, "Arial",
+                    einfuegepunkt=anker, **st)
+
+    def text_griffe(self, praefix="t:"):
+        """Grips of the movable texts: [(id, x, y)] (after aufgeloest())."""
+        out = []
+        for tag, (ax, ay) in self._anker.items():
+            dx, dy = self.versatz.get(tag, (0.0, 0.0))
+            out.append((praefix + tag, ax + dx, ay + dy))
+        return out
+
+    def text_bewegen(self, tag, x, y):
+        a = self._anker.get(tag)
+        if a is not None:
+            self.versatz[tag] = [x - a[0], y - a[1]]
+
+    def texte_zuruecksetzen(self):
+        self.versatz = {}
 
     def setze_werte(self, werte):
         for t, v in werte.items():
@@ -2631,6 +2731,7 @@ class _FestMaske(Element):
     def aufgeloest(self, platzhalter=None):
         ph = self.platzhalter if platzhalter is None else platzhalter
         st = self._stil()
+        self._anker = {}
         out = []
         for tag, dx, dy, h, anker in self.ZEILEN:
             if tag in self.ausgeblendet:
@@ -2640,8 +2741,7 @@ class _FestMaske(Element):
                 if not ph:
                     continue
                 w = "<" + tag + ">"
-            out.append(Text(self.x + dx, self.y + dy, w, h, 0.0, "Arial",
-                            einfuegepunkt=anker, **st))
+            out.append(self._t(tag, self.x + dx, self.y + dy, w, h, anker, st))
         out.extend(self._zusatz(ph, st))
         return out
 
@@ -2661,11 +2761,15 @@ class _FestMaske(Element):
         self.x, self.y = punkte_drehen(self.x, self.y, cx, cy, winkel_deg)
 
     def griffe(self):
-        return [("p", self.x, self.y)]
+        self.aufgeloest(True)             # fills the text positions
+        return [("p", self.x, self.y)] + self.text_griffe()
 
     def griff_bewegen(self, griff_id, x, y):
         if griff_id == "p":
             self.x, self.y = x, y
+        elif griff_id.startswith("t:"):
+            self.aufgeloest(True)
+            self.text_bewegen(griff_id[2:], x, y)
 
 
 class ElektroMaske(_FestMaske):
@@ -2819,7 +2923,7 @@ class ElektroMaske(_FestMaske):
         return out
 
     def griffe(self):
-        g = [("p", self.x, self.y)]
+        g = _FestMaske.griffe(self)
         if self._spiegel_aktiv():
             ox, oy = self.spiegel_ursprung()
             g.append(("sp", ox, oy))
@@ -2830,7 +2934,7 @@ class ElektroMaske(_FestMaske):
             bx, by = self.spiegel_ursprung(False)
             self.sp_dx, self.sp_dy = x - bx, y - by
         else:
-            self.x, self.y = x, y
+            _FestMaske.griff_bewegen(self, griff_id, x, y)
 
     def aufgeloest(self, platzhalter=None):
         """Empty fields stay empty. Only on screen (platzhalter) a small cross
@@ -2838,12 +2942,16 @@ class ElektroMaske(_FestMaske):
         findable and selectable. REF appears only if there are references."""
         ph = self.platzhalter if platzhalter is None else platzhalter
         st = self._stil()
+        self._anker = {}
         refs = ["(%s %s)" % (tr("qv.blatt"), ort_text(o)) for o in self.refs]
         ref = Text(self.x, self.y, "\n".join(refs) if refs else "REF",
                    self.REF_HOEHE, 0.0, "Arial",
                    einfuegepunkt="unten_rechts", **st)
         mirror = self._spiegel_aktiv()
-        out = [ref] if (refs and not mirror) else []
+        out = []
+        if refs and not mirror:
+            out.append(self._t("REF", self.x, self.y, ref.inhalt, self.REF_HOEHE,
+                               "unten_rechts", st))
         if mirror:
             out.extend(self._spiegel_elemente(st))
         y = ref.bbox()[3]                # Top edge of the (reserved) REF line
@@ -2852,8 +2960,8 @@ class ElektroMaske(_FestMaske):
             w = self.werte.get(tag, "")
             if tag in self.ausgeblendet or w == "":
                 continue
-            out.append(Text(self.x, y, w, self.HOEHEN[tag], 0.0, "Arial",
-                            einfuegepunkt="mitte_rechts", **st))
+            out.append(self._t(tag, self.x, y, w, self.HOEHEN[tag],
+                               "mitte_rechts", st))
         if not out and ph:
             r = 0.8
             out.append(Linie(self.x - r, self.y, self.x + r, self.y, staerke=0.25, **st))
@@ -2916,6 +3024,7 @@ class Kabel(_FestMaske):
     def aufgeloest(self, platzhalter=None):
         ph = self.platzhalter if platzhalter is None else platzhalter
         st = self._stil()
+        self._anker = {}
         out = [Linie(self.x, self.y, self.x + self.laenge, self.y, **st)]
         tx = self.x - self.TEXT_ABSTAND
         for tag, dy, anker in (("CAB", 0.6, "unten_rechts"),
@@ -2927,13 +3036,11 @@ class Kabel(_FestMaske):
                 if not ph:
                     continue
                 w = "<" + tag + ">"
-            out.append(Text(tx, self.y + dy, w, self.HOEHEN[tag], 0.0, "Arial",
-                            einfuegepunkt=anker, **st))
+            out.append(self._t(tag, tx, self.y + dy, w, self.HOEHEN[tag], anker, st))
         refs = ["(%s %s)" % (tr("qv.blatt"), ort_text(o)) for o in self.refs]
         if refs:                                  # REF only if there is something
-            out.append(Text(tx, self.y - 2.3, "\n".join(refs),
-                            self.REF_HOEHE, 0.0, "Arial",
-                            einfuegepunkt="oben_rechts", **st))
+            out.append(self._t("REF", tx, self.y - 2.3, "\n".join(refs),
+                               self.REF_HOEHE, "oben_rechts", st))
         h = self.STRICH
         for i, cx in enumerate(sorted(self.kreuzungen)):
             if not (self.x < cx <= self.x + self.laenge):
@@ -2953,18 +3060,23 @@ class Kabel(_FestMaske):
         return (min(xs), min(ys), max(xs), max(ys))
 
     def griffe(self):
-        return [("p", self.x, self.y), ("e", self.x + self.laenge, self.y)]
+        self.aufgeloest(True)
+        return ([("p", self.x, self.y), ("e", self.x + self.laenge, self.y)]
+                + self.text_griffe())
 
     def griff_bewegen(self, griff_id, x, y):
         if griff_id == "p":
             self.x, self.y = x, y
         elif griff_id == "e":
             self.laenge = max(1.0, x - self.x)
+        elif griff_id.startswith("t:"):
+            self.aufgeloest(True)
+            self.text_bewegen(griff_id[2:], x, y)
 
 
 class Klemme(_FestMaske):
     """Terminal: visible circle with two connections (top / bottom) and the
-    fixed fields <IND> (2.5), <TYP>, <PER> (1.5) and <NUM> (1.0)."""
+    fixed fields <IND> (2.5), <TYP>, <PER> (1.5) and <NUM> (1.75)."""
     FELDER = ("IND", "TYP", "PER", "NUM")
     DURCHMESSER = 2.0
     # Label: right-aligned directly left of the circle. IND is at the
@@ -2972,7 +3084,7 @@ class Klemme(_FestMaske):
     ZEILEN = (("IND", -3.0, 0.0, 2.5, "mitte_rechts"),
               ("TYP", -3.0, -3.0, 1.5, "mitte_rechts"),
               ("PER", -3.0, -5.5, 1.5, "mitte_rechts"),
-              ("NUM", 2.0, 0.0, 1.0, "mitte_links"))
+              ("NUM", 2.0, 0.0, 1.75, "mitte_links"))
 
     def __init__(self, x, y, werte=None, **kw):
         super().__init__("klemme", x, y, werte, **kw)
@@ -3080,13 +3192,16 @@ class Koordinatenfeld(Element):
             linie(x1, yy, x2 if self.raster else cx1, yy)
         tst = dict(layer=self.layer, farbe=self.farbe,
                    eig_farbe=self.eig_farbe)
+        # The labels must stay inside the label strip (width `rand`): at most
+        # 60 % of the strip height, so that nothing touches the lines in print.
+        th = min(self.text_hoehe, 0.6 * min(self.rand, (y2 - cy2)))
         for i in range(self.spalten):
             out.append(Text(cx1 + (i + 0.5) * bw, (cy2 + y2) / 2.0,
-                            self.spalten_name(i), self.text_hoehe, 0.0, "Arial",
+                            self.spalten_name(i), th, 0.0, "Arial",
                             einfuegepunkt="mitte_zentriert", **tst))
         for j in range(self.zeilen):
             out.append(Text((x1 + cx1) / 2.0, cy2 - (j + 0.5) * bh,
-                            self.zeilen_name(j), self.text_hoehe, 0.0, "Arial",
+                            self.zeilen_name(j), th, 0.0, "Arial",
                             einfuegepunkt="mitte_zentriert", **tst))
         if umriss:
             ust = dict(layer=self.layer, farbe=self.UMRISS_FARBE,
