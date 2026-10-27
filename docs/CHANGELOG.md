@@ -2,7 +2,7 @@
 
 ## 1.0.3
 - Schriftkopf „Standard (eingebaut)“ entfernt (identisch mit „Example A3“); es gibt nur noch die Vorlagen aus dem Ordner title_blocks
-- Linux: ein aufgeklapptes Menü der Menüleiste schließt sich jetzt, wenn eine andere Anwendung den Fokus bekommt
+- Linux: eigene Menüleiste ohne Grab statt der Tk-Menüleiste – aufgeklappte Menüs schließen sich bei Fokuswechsel, Klick daneben und ESC (Windows/macOS unverändert; alte Menüs mit `KATIECAD_NATIVE_MENU=1`)
 - Querverweise: gleicher Name über mehrere Blätter wird als Kette aufgelöst (abgehend → nächstes Blatt, ankommend → vorheriges Blatt), `L1.1`/`L1.2` sind nicht mehr nötig
 - Koordinatenfeld: Beschriftung um 0,1 mm kleiner (PDF-Druck wirkte dicker)
 - Menü: „Stutzen“ und „Brechen“ stehen jetzt unter Bearbeiten statt unter Einfügen
