@@ -2305,12 +2305,13 @@ class Querverweis(Element):
     BREITE = 2.0
     LAENGE = 5.0
     ABSTAND = 1.0
-    TEXT_HOEHE = 2.0            # Identifier
-    ZIEL_HOEHE = 1.0            # Target specification
+    TEXT_HOEHE = 2.5            # Identifier (default height)
+    ZIEL_HOEHE = 1.5            # Target specification (default height)
     _VEKTOR = {0: (1.0, 0.0), 90: (0.0, 1.0), 180: (-1.0, 0.0), 270: (0.0, -1.0)}
 
     def __init__(self, x, y, text="", art="abgehend", richtung=0,
-                 extern=False, **kw):
+                 extern=False, text_hoehe=None, ziel_hoehe=None,
+                 text_dx=0.0, text_dy=0.0, ziel_dx=0.0, ziel_dy=0.0, **kw):
         kw.setdefault("eig_farbe", True)
         super().__init__("querverweis", **kw)
         self.x, self.y = x, y
@@ -2319,11 +2320,47 @@ class Querverweis(Element):
         self.art = art if art in self.ARTEN else "abgehend"
         self.richtung = int(round(float(richtung) / 90.0) * 90) % 360
         self.ziel = []
+        # Optional own text heights (None = default) and text offsets (mm,
+        # relative to the automatic position)
+        self.text_hoehe = float(text_hoehe) if text_hoehe else None
+        self.ziel_hoehe = float(ziel_hoehe) if ziel_hoehe else None
+        self.text_dx, self.text_dy = float(text_dx), float(text_dy)
+        self.ziel_dx, self.ziel_dy = float(ziel_dx), float(ziel_dy)
 
     def to_dict(self):
         d = super().to_dict()
         d.pop("ziel", None)
         return d
+
+    def hoehe_text(self):
+        return self.text_hoehe or self.TEXT_HOEHE
+
+    def hoehe_ziel(self):
+        return self.ziel_hoehe or self.ZIEL_HOEHE
+
+    def texte_zuruecksetzen(self):
+        self.text_dx = self.text_dy = self.ziel_dx = self.ziel_dy = 0.0
+
+    def _text_lage(self):
+        """-> (angle, anchor key, (tx, ty), (zx, zy)): automatic positions of
+        identifier and target text (without the user offsets)."""
+        dx, dy = self._VEKTOR[self.richtung]
+        a = 0.0 if self.richtung in (0, 180) else 90.0
+        ex, ey = math.cos(math.radians(a)), math.sin(math.radians(a))
+        nx, ny = -ey, ex                       # "up" in the text system
+        if self.art == "abgehend":
+            sx, sy = dx, dy
+            qx = self.x + dx * (self.LAENGE + self.ABSTAND)
+            qy = self.y + dy * (self.LAENGE + self.ABSTAND)
+        else:
+            sx, sy = -dx, -dy
+            qx = self.x - dx * self.ABSTAND
+            qy = self.y - dy * self.ABSTAND
+        horiz = "links" if (ex * sx + ey * sy) > 0 else "rechts"
+        vt = (self.hoehe_text() / 2.0 + 0.3) if self.ziel_text() else 0.0
+        vz = -(0.6 + self.hoehe_ziel() / 2.0)
+        return (a, "mitte_" + horiz,
+                (qx + nx * vt, qy + ny * vt), (qx + nx * vz, qy + ny * vz))
 
     def ziel_text(self):
         if not self.ziel or not self.text.strip():
@@ -2351,32 +2388,18 @@ class Querverweis(Element):
         """Arrow (solid hatching) + text(s) as simple elements."""
         out = [Schraffur(self.pfeil_punkte(), "solid", layer=self.layer,
                          farbe=LEITUNG_FARBE, eig_farbe=True)]
-        dx, dy = self._VEKTOR[self.richtung]
-        a = 0.0 if self.richtung in (0, 180) else 90.0
-        ex, ey = math.cos(math.radians(a)), math.sin(math.radians(a))
-        nx, ny = -ey, ex                       # "up" in the text system
-        if self.art == "abgehend":
-            sx, sy = dx, dy
-            qx = self.x + dx * (self.LAENGE + self.ABSTAND)
-            qy = self.y + dy * (self.LAENGE + self.ABSTAND)
-        else:
-            sx, sy = -dx, -dy
-            qx = self.x - dx * self.ABSTAND
-            qy = self.y - dy * self.ABSTAND
-        horiz = "links" if (ex * sx + ey * sy) > 0 else "rechts"
+        a, anker, (tx, ty), (zx, zy) = self._text_lage()
         ziel = self.ziel_text()
         stil = dict(layer=self.layer, farbe=self.farbe,
                     linientyp=self.linientyp, eig_farbe=self.eig_farbe)
         if self.text.strip():
-            v = 1.3 if ziel else 0.0
-            out.append(Text(qx + nx * v, qy + ny * v, self.text,
-                            self.TEXT_HOEHE, a, "Arial",
-                            einfuegepunkt="mitte_" + horiz, **stil))
+            out.append(Text(tx + self.text_dx, ty + self.text_dy, self.text,
+                            self.hoehe_text(), a, "Arial",
+                            einfuegepunkt=anker, **stil))
         if ziel:
-            v = -1.1
-            out.append(Text(qx + nx * v, qy + ny * v, ziel,
-                            self.ZIEL_HOEHE, a, "Arial",
-                            einfuegepunkt="mitte_" + horiz, **stil))
+            out.append(Text(zx + self.ziel_dx, zy + self.ziel_dy, ziel,
+                            self.hoehe_ziel(), a, "Arial",
+                            einfuegepunkt=anker, **stil))
         return out
 
     def bbox(self):
@@ -2394,13 +2417,30 @@ class Querverweis(Element):
     def drehen(self, cx, cy, winkel_deg):
         self.x, self.y = punkte_drehen(self.x, self.y, cx, cy, winkel_deg)
         self.richtung = int(round((self.richtung - winkel_deg) / 90.0) * 90) % 360
+        for k in ("text", "ziel"):             # offsets turn with the symbol
+            ox, oy = punkte_drehen(getattr(self, k + "_dx"), getattr(self, k + "_dy"),
+                                   0.0, 0.0, winkel_deg)
+            setattr(self, k + "_dx", ox)
+            setattr(self, k + "_dy", oy)
 
     def griffe(self):
-        return [("p", self.x, self.y)]
+        _, _, (tx, ty), (zx, zy) = self._text_lage()
+        g = [("p", self.x, self.y)]
+        if self.text.strip():
+            g.append(("t", tx + self.text_dx, ty + self.text_dy))
+        if self.ziel_text():
+            g.append(("z", zx + self.ziel_dx, zy + self.ziel_dy))
+        return g
 
     def griff_bewegen(self, griff_id, x, y):
         if griff_id == "p":
             self.x, self.y = x, y
+        elif griff_id in ("t", "z"):
+            _, _, (tx, ty), (zx, zy) = self._text_lage()
+            bx, by = (tx, ty) if griff_id == "t" else (zx, zy)
+            k = "text" if griff_id == "t" else "ziel"
+            setattr(self, k + "_dx", x - bx)
+            setattr(self, k + "_dy", y - by)
 
 
 
