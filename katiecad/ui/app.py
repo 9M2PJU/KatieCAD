@@ -58,6 +58,7 @@ from katiecad.model.core import (
     GRIFF_RADIUS, MIN_VP_GROESSE, PASTE_OFFSET_MM,
     TEXT_BREITE, TEXT_ZEILE, CAD_VERSALHOEHE, LW_PX_FAKTOR, BEM_RICHTUNGEN,
     BEFEHLE, PdfSeite, ist_dunkel,
+    E_DEVICES, E_LINES, E_CABLE, E_CLAMPS, E_PIN, ELEKTRO_LAYER,
     Layer, Layout, Element, Linie, Kreis, Bogen, Rechteck, Polylinie, Text,
     Bemassung, Viewport, Schraffur, Bild, konturen_aus_elementen,
     AttributDefinition, Leitung, Verbindungspunkt, Querverweis,
@@ -3009,7 +3010,7 @@ class CadApp:
         if d is None:
             return
         ref = BlockReferenz(pt[0], pt[1], d.name, d.elemente,
-                            layer=self.aktiver_layer.get(),
+                            layer=self._block_layer(d.elemente),
                             farbe=self.zeichenfarbe,
                             linientyp=self.linientyp.get(),
                             eig_farbe=self.eigene_farbe.get(),
@@ -4065,6 +4066,7 @@ class CadApp:
         if self._ist_layout():
             return
         neu, weg, entfernt = leitungen_automatisch(self.elemente)
+        self._elektro_layer_pruefen()
         if entfernt and self.auswahl:
             ids = {id(e) for e in entfernt}
             self.auswahl = [e for e in self.auswahl if id(e) not in ids]
@@ -5381,6 +5383,38 @@ class CadApp:
         return {"layer": self.aktiver_layer.get(), "farbe": farbe,
                 "linientyp": lt, "eig_farbe": bool(self.eigene_farbe.get()),
                 "staerke": st}
+
+    def _elektro_layer(self, name):
+        """Creates an automatic electrical layer (E_*) if it is missing."""
+        if name not in self.layers:
+            farbe, staerke = ELEKTRO_LAYER.get(name, ("#c29bff", 0.35))
+            self.layers[name] = Layer(name, farbe, staerke)
+            try:
+                self.layer_cb.config(values=list(self.layers.keys()))
+            except Exception:
+                pass
+        return name
+
+    def _layer_daten_fuer(self, name):
+        """Like _layer_daten(), but on the given electrical layer."""
+        daten = self._layer_daten()
+        self._elektro_layer(name)
+        daten["layer"] = name
+        if not daten.get("eig_farbe"):
+            daten["farbe"] = self.layers[name].farbe
+        return daten
+
+    def _elektro_layer_pruefen(self, elemente=None):
+        """Makes sure all E_* layers used by elements exist."""
+        for el in (self.elemente if elemente is None else elemente):
+            if getattr(el, "layer", None) in ELEKTRO_LAYER:
+                self._elektro_layer(el.layer)
+
+    def _block_layer(self, elemente):
+        """Device blocks (with an electrical mask) go onto E_DEVICES."""
+        if any(isinstance(k, ElektroMaske) for k in elemente):
+            return self._elektro_layer(E_DEVICES)
+        return self.aktiver_layer.get()
 
     def _neue_linie(self, x1, y1, x2, y2):
         return Linie(x1, y1, x2, y2, **self._layer_daten())
@@ -7952,7 +7986,7 @@ class CadApp:
         v = self._vb_vorgabe
         return Verbindung(x, y, ausrichtung=v.get("ausrichtung", 0),
                           arme=v["arme"], punkt=v["punkt"],
-                          layer=self.aktiver_layer.get())
+                          layer=self._elektro_layer(E_LINES))
 
     def _verbindung_platzieren(self, x, y):
         if not self._vb_vorgabe:
@@ -7998,7 +8032,7 @@ class CadApp:
         self._mk_rolle = dlg.result["rolle"]
         self._mk_spiegel = dlg.result["spiegel"] or "liste"
         self._snapshot()
-        daten = self._layer_daten()
+        daten = self._layer_daten_fuer(E_DEVICES)
         daten["staerke"] = None
         self._ziel_liste().append(
             ElektroMaske(x, y, dlg.result["werte"], rolle=dlg.result["rolle"],
@@ -8015,7 +8049,7 @@ class CadApp:
             return
         w = dict(dlg.result["werte"])
         self._snapshot()
-        daten = self._layer_daten()
+        daten = self._layer_daten_fuer(E_CLAMPS)
         daten["staerke"] = None
         kl = Klemme(x, y, w, **daten)
         self._ziel_liste().append(kl)
@@ -8057,7 +8091,7 @@ class CadApp:
             return
         w = dict(dlg.result["werte"])
         self._snapshot()
-        daten = self._layer_daten()
+        daten = self._layer_daten_fuer(E_CABLE)
         daten["staerke"] = None
         self._ziel_liste().append(Kabel(p1[0], p1[1], w, laenge=x - p1[0], **daten))
         w["CAB"] = naechste_bezeichnung(w.get("CAB", ""))
@@ -8193,7 +8227,7 @@ class CadApp:
         self._vp_vorgabe["wert"] = naechste_bezeichnung(dlg.result["wert"])
         self._snapshot()
         x, y = self._auf_leitung_einrasten(x, y)
-        daten = self._layer_daten()
+        daten = self._layer_daten_fuer(E_PIN)
         daten["staerke"] = 0.25
         vp = Verbindungspunkt(x, y, None, Verbindungspunkt.TEXT_HOEHE, 0.0,
                               self.text_schriftart.get(), tag="VP",
@@ -8273,7 +8307,7 @@ class CadApp:
             dlg.setze(p1.name, ap.name)
         self._snapshot()
         self._ziel_liste().append(
-            Leitung(p1.x, p1.y, ap.x, ap.y, layer=self.aktiver_layer.get()))
+            Leitung(p1.x, p1.y, ap.x, ap.y, layer=self._elektro_layer(E_LINES)))
         self._leitung_p1 = None
         self._clear_temp()
         self.redraw()
@@ -8335,9 +8369,8 @@ class CadApp:
 
     def _neuer_querverweis(self, x, y):
         v = self._qv_vorgabe
-        daten = self._layer_daten()
+        daten = self._layer_daten_fuer(E_LINES)
         if "Schrift" in self.layers:
-            daten["layer"] = "Schrift"
             daten["farbe"] = self.layers["Schrift"].farbe
         daten["eig_farbe"] = True
         daten["staerke"] = None
@@ -8831,8 +8864,14 @@ class CadApp:
             if el in liste:
                 liste.remove(el)
 
+        ist_geraet = any(isinstance(k, ElektroMaske) for k in relativ)
+        if ist_geraet:
+            for k in relativ:
+                if isinstance(k, Verbindungspunkt):
+                    k.layer = E_DEVICES
         ref = BlockReferenz(bx, by, name, definition.elemente,
-                            layer=self.aktiver_layer.get(),
+                            layer=(self._elektro_layer(E_DEVICES) if ist_geraet
+                                   else self.aktiver_layer.get()),
                             farbe=self.zeichenfarbe,
                             linientyp=self.linientyp.get(),
                             eig_farbe=self.eigene_farbe.get(),
@@ -8992,7 +9031,7 @@ class CadApp:
             return
         self._snapshot()
         ref = BlockReferenz(x, y, d.name, d.elemente,
-                            layer=self.aktiver_layer.get(),
+                            layer=self._block_layer(d.elemente),
                             farbe=self.zeichenfarbe,
                             linientyp=self.linientyp.get(),
                             eig_farbe=self.eigene_farbe.get(),
@@ -9169,3 +9208,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
