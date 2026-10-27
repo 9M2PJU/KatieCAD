@@ -50,6 +50,7 @@ from katiecad.model.project import (Projekt, ProjektFehler, PROJEKT_ENDUNG,
 from katiecad.model.blocks import (block_speichern, block_laden,
                               vorschlag_dateiname, BlockDateiFehler,
                               vorschau_geometrie, standard_ordner, symbol_ordner)
+from katiecad.ui.menuleiste import MenuLeiste
 from katiecad.ui.sidebar import Seitenleiste
 from katiecad.ui.widgets import FlatButton, farb_swatch
 from katiecad.model.core import (
@@ -397,6 +398,8 @@ class CadApp:
         self._warte_auf_basispunkt = False
         self._hatch_pick = None
         self._letztes_fenster = None
+        self._menuleiste = None
+        self._menubar = None
 
         self._trim_status = "none"
         self._trim_grenzen = []
@@ -1208,9 +1211,39 @@ class CadApp:
                     pass
         menubar.add_cascade(label=tr("menu.hilfe"), menu=m_hilfe)
 
-        self.root.config(menu=menubar)
+        eintraege = [(menubar.entrycget(i, "label"), self.root.nametowidget(
+                          menubar.entrycget(i, "menu")))
+                     for i in range(menubar.index("end") + 1)]
+        if self._eigene_menueleiste():
+            # Linux/X11: own bar without grab (see menuleiste.py)
+            if self._menuleiste is None:
+                self._menuleiste = MenuLeiste(
+                    self.root, FARBEN["bg_mittel"], FARBEN["cyan"],
+                    FARBEN["cyan"], FARBEN["bg_dunkel"])
+                erstes = (self.root.pack_slaves() or [None])[0]
+                if erstes is not None:
+                    self._menuleiste.pack(side=tk.TOP, fill=tk.X, before=erstes)
+                else:
+                    self._menuleiste.pack(side=tk.TOP, fill=tk.X)
+            self._menuleiste.setze(eintraege)
+        else:
+            self.root.config(menu=menubar)
+        if self._menubar is not None and self._menubar is not menubar:
+            try:
+                self._menubar.destroy()
+            except tk.TclError:
+                pass
         self._menubar = menubar
         self._menues_schliessen_binden()
+
+    def _eigene_menueleiste(self):
+        """Own menu bar only on X11 (Linux); Windows/macOS stay native."""
+        if os.environ.get("KATIECAD_NATIVE_MENU"):
+            return False
+        try:
+            return self.root.tk.call("tk", "windowingsystem") == "x11"
+        except tk.TclError:
+            return False
 
     def _build_toolbars(self):
         for attr in ("tb1", "tb2", "tb3"):
@@ -9352,5 +9385,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-
 
