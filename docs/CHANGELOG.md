@@ -1,6 +1,7 @@
 # Änderungen
 
 ## 1.0.3
+- Info-Fenster: Maskottchen links neben den Texten (Datei `KatieCAD_Maskottchen.png`)
 - Info-Fenster lässt sich nur noch einmal öffnen (erneutes Öffnen holt das vorhandene nach vorn)
 - Neues Tastenkürzel Strg+B: öffnet die Blockliste (Blockauswahl)
 - Schriftkopf „Standard (eingebaut)“ entfernt (identisch mit „Example A3“); es gibt nur noch die Vorlagen aus dem Ordner title_blocks
