@@ -219,6 +219,8 @@ Kontakten legst du jeden Kontakt als eigenes Hilfsgerät an.
 
 ### Blattübergreifend: Querverweise
 
+**Kette über mehrere Blätter:** Du musst nicht `L1.1`, `L1.2` … schreiben. Mit gleichem Namen zeigt ein *abgehender* Pfeil auf den *ankommenden* Pfeil auf dem **nächsten** Blatt, ein *ankommender* auf den *abgehenden* des **vorherigen** Blattes (links nach rechts, in Blattreihenfolge). So läuft `L1` von Blatt 1 über 2 und 3 nach 4, und jeder Pfeil nennt nur seinen Nachbarn. Gibt es in dieser Richtung keinen passenden Partner, werden wie bisher alle anderen Stellen mit diesem Namen angezeigt.
+
 Setze am Ende einer Leitung einen **Querverweis** (Art *abgehend* oder
 *ankommend*, Richtung, Text, z. B. `L1`) und auf dem anderen Blatt einen mit
 gleichem Text. Das Ziel (Blatt/Spalte/Zeile) erscheint automatisch. Für die Listen
