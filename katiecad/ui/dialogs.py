@@ -1605,15 +1605,27 @@ class QuerverweisDialog(tk.Toplevel):
         ttk.Label(f, text=tr("dlg.qv.text")).grid(row=2, column=0, sticky=tk.W, pady=3, padx=(0, 10))
         self.e_text = ttk.Entry(f, textvariable=self.v_text, width=24)
         self.e_text.grid(row=2, column=1, sticky=tk.EW, pady=3)
+        from katiecad.model.core import Querverweis as _QV
+        self.v_th = tk.StringVar(value=_zahl_text(v.get("text_hoehe") or _QV.TEXT_HOEHE))
+        self.v_zh = tk.StringVar(value=_zahl_text(v.get("ziel_hoehe") or _QV.ZIEL_HOEHE))
+        for r, (lbl, var) in enumerate((("dlg.qv.text_hoehe", self.v_th),
+                                        ("dlg.qv.ziel_hoehe", self.v_zh)), start=3):
+            ttk.Label(f, text=tr(lbl)).grid(row=r, column=0, sticky=tk.W, pady=3, padx=(0, 10))
+            ttk.Entry(f, textvariable=var, width=10).grid(row=r, column=1, sticky=tk.W, pady=3)
         self.v_extern = tk.BooleanVar(value=bool(v.get("extern", False)))
         ttk.Checkbutton(f, text=tr("dlg.qv.extern"),
                         variable=self.v_extern).grid(
-            row=3, column=0, columnspan=2, sticky=tk.W, pady=(4, 0))
+            row=5, column=0, columnspan=2, sticky=tk.W, pady=(4, 0))
+        self.v_reset = tk.BooleanVar(value=False)
+        if v.get("bearbeiten"):
+            ttk.Checkbutton(f, text=tr("dlg.qv.reset"),
+                            variable=self.v_reset).grid(
+                row=6, column=0, columnspan=2, sticky=tk.W, pady=(2, 0))
         ttk.Label(f, text=tr("dlg.qv.hinweis"), style="Hint.TLabel",
                   wraplength=330, justify=tk.LEFT).grid(
-            row=4, column=0, columnspan=2, sticky=tk.W, pady=(6, 4))
+            row=7, column=0, columnspan=2, sticky=tk.W, pady=(6, 4))
         bf = ttk.Frame(f)
-        bf.grid(row=5, column=0, columnspan=2, pady=(8, 0))
+        bf.grid(row=8, column=0, columnspan=2, pady=(8, 0))
         ttk.Button(bf, text=tr("dlg.ok"), command=self._ok).pack(side=tk.LEFT, padx=4)
         ttk.Button(bf, text=tr("dlg.abbrechen"), command=self.destroy).pack(side=tk.LEFT, padx=4)
         self.bind("<Return>", lambda e: self._ok())
@@ -1626,8 +1638,18 @@ class QuerverweisDialog(tk.Toplevel):
     def _ok(self):
         art = self._arten[[tr("dlg.qv.art." + a) for a in self._arten].index(self.v_art.get())]
         rt = self._rt[[tr("dlg.qv.rt.%d" % r) for r in self._rt].index(self.v_rt.get())]
+        try:
+            th = float(self.v_th.get().replace(",", "."))
+            zh = float(self.v_zh.get().replace(",", "."))
+            if th <= 0 or zh <= 0:
+                raise ValueError
+        except ValueError:
+            messagebox.showerror(tr("dlg.qv.titel"), tr("dlg.qv.fehler_hoehe"), parent=self)
+            return
         self.result = {"art": art, "richtung": rt, "text": self.v_text.get().strip(),
-                       "extern": bool(self.v_extern.get())}
+                       "extern": bool(self.v_extern.get()),
+                       "text_hoehe": th, "ziel_hoehe": zh,
+                       "reset": bool(self.v_reset.get())}
         self.destroy()
 
 
@@ -2020,6 +2042,16 @@ class DokumentationDialog(tk.Toplevel):
         if namen:
             self.cb.current(idx)
 
+        ttk.Label(f, text=tr("dlg.doku.format"), style="Title.TLabel").pack(
+            anchor=tk.W, pady=(12, 2))
+        ff = ttk.Frame(f)
+        ff.pack(anchor=tk.W, padx=10)
+        self.v_format = tk.StringVar(
+            value=einst.get("format") if einst.get("format") in ("a4", "a3") else "a4")
+        for key, text in (("a4", "DIN A4"), ("a3", "DIN A3")):
+            ttk.Radiobutton(ff, text=text, value=key,
+                            variable=self.v_format).pack(side=tk.LEFT, padx=(0, 14))
+
         ttk.Label(f, text=tr("dlg.doku.hinweis"), style="Hint.TLabel",
                   wraplength=430, justify=tk.LEFT).pack(anchor=tk.W, pady=(12, 4))
         bf = ttk.Frame(f)
@@ -2039,6 +2071,7 @@ class DokumentationDialog(tk.Toplevel):
             "daten": {k: v.get().strip() for k, v in self.v_f.items()},
             "vorlage": pfad,
             "klemmen_geraete": bool(self.v_klg.get()),
+            "format": self.v_format.get(),
         }
         self.destroy()
 

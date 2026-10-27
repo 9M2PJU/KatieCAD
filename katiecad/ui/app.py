@@ -4610,7 +4610,7 @@ class CadApp:
                  bg=FARBEN["bg_mittel"], fg=FARBEN["text_dim"]).pack(anchor="w", pady=(0, 6))
 
         tk.Label(frame, text=tr("info.copyright"),
-                 font=("Helvetica", 9, "italic"),
+                 font=("Helvetica", 9),
                  bg=FARBEN["bg_mittel"], fg=FARBEN["text_dim"]).pack(anchor="w", pady=(0, 6))
 
         tk.Label(frame, text=tr("info.lizenz"),
@@ -8294,7 +8294,9 @@ class CadApp:
         daten["eig_farbe"] = True
         daten["staerke"] = None
         return Querverweis(x, y, v["text"], v["art"], v["richtung"],
-                           extern=v.get("extern", False), **daten)
+                           extern=v.get("extern", False),
+                           text_hoehe=v.get("text_hoehe"),
+                           ziel_hoehe=v.get("ziel_hoehe"), **daten)
 
     def _qv_platzieren(self, x, y):
         if not self._qv_vorgabe:
@@ -8351,10 +8353,17 @@ class CadApp:
         dlg = QuerverweisDialog(self.root, {"art": el.art,
                                             "richtung": el.richtung,
                                             "text": el.text,
-                                            "extern": el.extern})
+                                            "extern": el.extern,
+                                            "text_hoehe": el.hoehe_text(),
+                                            "ziel_hoehe": el.hoehe_ziel(),
+                                            "bearbeiten": True})
         if dlg.result is None:
             return
         self._snapshot()
+        el.text_hoehe = dlg.result.get("text_hoehe") or el.text_hoehe
+        el.ziel_hoehe = dlg.result.get("ziel_hoehe") or el.ziel_hoehe
+        if dlg.result.get("reset"):
+            el.texte_zuruecksetzen()
         el.extern = dlg.result.get("extern", False)
         el.art = dlg.result["art"]
         el.richtung = dlg.result["richtung"]
@@ -8568,7 +8577,8 @@ class CadApp:
             return
         p.daten = {**p.daten, **res["daten"]}      # keeps the revision table
         p.doku = {"berichte": res["berichte"], "vorlage": res["vorlage"],
-                  "klemmen_geraete": res["klemmen_geraete"]}
+                  "klemmen_geraete": res["klemmen_geraete"],
+                  "format": res.get("format", "a4")}
         vorlage = None
         try:
             if res["vorlage"]:
@@ -8582,7 +8592,8 @@ class CadApp:
             vorne, hinten = SEI.berichte_erzeugen(
                 infos, p.name, p.daten, set(res["berichte"]), vorlage,
                 SPRACHE["aktuell"], SEI.spalten_ordner(programm, p.ordner),
-                klemmen_in_geraeteliste=res["klemmen_geraete"])
+                klemmen_in_geraeteliste=res["klemmen_geraete"],
+                format=SEI.format_name(res.get("format")))
             basis = self._leere_zeichnung_daten(einstellungen_uebernehmen=True)
             neu_aktiv = ANW.ins_projekt(p, vorne, hinten, basis,
                                         self._json_atomar_schreiben,
