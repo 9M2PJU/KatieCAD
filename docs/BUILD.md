@@ -17,19 +17,19 @@ unten machen das bereits. Eigene Blöcke legst du weiter im Block-Browser/Projek
 0. `KatieCAD.ico` und `KatieCAD.png` müssen im Hauptordner des Repos liegen (ebenso `LICENSE`).
 1. `installer\build_windows.bat` ausführen → `dist\KatieCAD\KatieCAD.exe`
 2. Installer: Inno Setup installieren, `installer\KatieCAD.iss` öffnen, „Compile“
-   (oder `iscc /DAppVersion=1.0.3 installer\KatieCAD.iss`) → `release\KatieCAD-1.0.3-Windows-Setup.exe`
+   (oder `iscc /DAppVersion=1.0.4 installer\KatieCAD.iss`) → `release\KatieCAD-1.0.4-Windows-Setup.exe`
    Das Skript nimmt den ganzen Ordner `dist\KatieCAD` mit, also auch alle Bibliotheken.
 
 ## Linux
 1. `sh installer/build_unix.sh` → `dist/KatieCAD/KatieCAD`
-2. Als Paket (Debian/Ubuntu): `installer/build_deb.sh 1.0.3` → `release/KatieCAD-1.0.3-Linux-amd64.deb`,
-   installieren mit `sudo apt install ./release/KatieCAD-1.0.3-Linux-amd64.deb`
+2. Als Paket (Debian/Ubuntu): `installer/build_deb.sh 1.0.4` → `release/KatieCAD-1.0.4-Linux-amd64.deb`,
+   installieren mit `sudo apt install ./release/KatieCAD-1.0.4-Linux-amd64.deb`
    (legt das Programm nach `/opt/katiecad`, Startmenü-Eintrag und Befehl `katiecad`).
    Alternativ den Ordner `dist/KatieCAD` kopieren, er ist ohne Installation lauffähig.
 
 ## macOS
 1. `sh installer/build_unix.sh` → `dist/KatieCAD.app`
-2. Disk-Image: `mkdir dmg && cp -R dist/KatieCAD.app dmg/ && ln -s /Applications dmg/Applications && hdiutil create -volname KatieCAD -srcfolder dmg -ov -format UDZO KatieCAD-1.0.3-macOS.dmg`
+2. Disk-Image: `mkdir dmg && cp -R dist/KatieCAD.app dmg/ && ln -s /Applications dmg/Applications && hdiutil create -volname KatieCAD -srcfolder dmg -ov -format UDZO KatieCAD-1.0.4-macOS.dmg`
    Beim ersten Start: Rechtsklick auf die App > Öffnen (nicht signiert).
 
 ## Prüfen
