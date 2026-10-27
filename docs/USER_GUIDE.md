@@ -94,11 +94,11 @@ More drawing aids: **dimensions** (including radius and diameter), **hatch
 selection** (Insert menu), **layers** ("Layers…" button) and colour, line type and
 line weight in the toolbar.
 
-**Find and replace (Ctrl+F, Edit > Find and replace, command `FIND`):** enter the search text and the new text and choose the scope *Current sheet* or *Whole project*. KatieCAD lists all hits with sheet, object type and field and shows the new text next to it. It searches texts, dimension texts, cross references, masks (IND/TYP/PER ...), terminals, cables, pins and block attributes (so also the designation of devices). Optional: match case, whole words only. *Replace selected* changes only the highlighted rows, *Replace all* all of them. Changes in the open sheet can be undone with Ctrl+Z; changes in other sheets are saved immediately and cannot be undone there (KatieCAD asks first).
+**Find and replace (Ctrl+F, Edit > Find and replace, command `FIND`):** enter the search text and the new text and choose the scope *Current sheet* or *Whole project*. KatieCAD lists all hits with sheet, object type and field and shows the new text next to it. It searches texts, dimension texts, cross references, masks (IND/TYP/PER ...), terminals, cables, pins and block attributes (so also the designation of devices). **Double-click a hit** to jump to the object: KatieCAD opens the sheet if needed, selects the object and zooms to it; the search window stays open and moves aside. Optional: match case, whole words only. *Replace selected* changes only the highlighted rows, *Replace all* all of them. Changes in the open sheet can be undone with Ctrl+Z; changes in other sheets are saved immediately and cannot be undone there (KatieCAD asks first).
 
 **Match properties (Edit > Match properties, command `MA`):** click the source object first, then the target objects one after another. Layer, colour, line type and line weight are copied; for texts also height and font, for hatches angle and spacing. ESC or right-click ends.
 
-**Purge layers:** in the layer window ("Layers...") **Purge** deletes all layers no object uses (also not in layouts or blocks). Layer 0 and the active layer stay. KatieCAD asks first with the list; Ctrl+Z undoes it.
+**Purge layers:** in the layer window ("Layers...") **Purge** deletes all layers no object uses - in a project across all sheets (also layouts and blocks). Layer 0 and the active layer stay. KatieCAD asks first with the list. Ctrl+Z undoes it only for the open sheet; the other sheets are saved immediately.
 
 **Hatching like AutoCAD:** with nothing selected, choose Insert > Hatch, set pattern, spacing and angle, then click straight into an enclosed area. KatieCAD finds the smallest region around the click point (lines may cross; circles, rectangles and polylines count too) and hatches it. Click several areas one after another; ESC or right-click ends. If a closed boundary is already selected, that one is hatched as before.
 
@@ -355,4 +355,3 @@ In **Sheet properties (F2)** you also set the **sheet type** (circuit diagram, p
 
 Note: PDF export writes KatieCAD layers as PDF layers. You can toggle them in PDF viewers and re-import such a PDF into KatieCAD with the same layer names.
 **File > Import image...** inserts a photo or graphic (PNG, JPG, BMP, GIF, TIFF). The image is stored inside the drawing, so the original file is no longer needed. Resize with the yellow corner grip or **Scale**; move, rotate and mirror work as for other objects. Large images are reduced to at most 2400 pixels on the long side. Images appear in PDF output; on DXF export the image file is written next to the DXF file. Project DXF export does not include images.
-
