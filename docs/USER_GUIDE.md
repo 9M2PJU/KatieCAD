@@ -94,6 +94,10 @@ More drawing aids: **dimensions** (including radius and diameter), **hatch
 selection** (Insert menu), **layers** ("Layers…" button) and colour, line type and
 line weight in the toolbar.
 
+**Hatching like AutoCAD:** with nothing selected, choose Insert > Hatch, set pattern, spacing and angle, then click straight into an enclosed area. KatieCAD finds the smallest region around the click point (lines may cross; circles, rectangles and polylines count too) and hatches it. Click several areas one after another; ESC or right-click ends. If a closed boundary is already selected, that one is hatched as before.
+
+**Stretch with a preselection:** if you selected objects beforehand with a crossing window (right-to-left), **Stretch** (`STR`) jumps straight to the base point - no second window needed. Only the selected objects are stretched. With another kind of preselection (e.g. single click) the selection is kept and you only drag the window.
+
 ## 5. Projects and sheets
 
 A **project** is a folder with a project file (`*.katieprj`), one file per sheet
