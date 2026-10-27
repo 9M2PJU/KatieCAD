@@ -220,7 +220,9 @@ verfolgt KatieCAD den Strompfad über solche Paare hinweg, wenn es genau einen
 abgehenden und mindestens einen ankommenden Pfeil mit demselben Text gibt. Ein
 Potential wie `L1`, das an vielen Stellen vorkommt, bleibt ein Endpunkt.
 
-**Texte des Querverweises:** Bezeichnung (z. B. `L1`) und Zielangabe (z. B. „(Blatt 6/1/D)“) haben Standardhöhen von 2,5 mm und 1,5 mm. Im Querverweis-Dialog (Doppelklick) stellst du beide Höhen getrennt ein. Beide Texte lassen sich außerdem an ihrem gelben Griff verschieben. Mit **Textpositionen zurücksetzen** im Dialog stehen sie wieder in der Standardlage.
+**Texte des Querverweises:** Bezeichnung (z. B. `L1`) und Zielangabe (z. B. „(Blatt 6/1/D)“) stehen standardmäßig in einer Zeile nebeneinander und haben Standardhöhen von 2,5 mm und 1,5 mm. Im Querverweis-Dialog (Doppelklick) stellst du beide Höhen getrennt ein. Beide Texte lassen sich außerdem an ihrem gelben Griff verschieben. Mit **Textpositionen zurücksetzen** im Dialog stehen sie wieder in der Standardlage.
+
+**Texte frei verschieben:** Auch bei Klemmen, Masken (IND/TYP/PER/REF), Kabeln, Pins und Geräteblöcken lassen sich die Beschriftungen verschieben. Markiere das Objekt und ziehe den gelben Griff am jeweiligen Text. Bei einem eingefügten Gerät gilt die Verschiebung nur für dieses eine Exemplar. Im Rechtsklickmenü setzt **Textpositionen zurücksetzen** die Texte wieder in die Standardlage. Die Klemmennummer (NUM) ist seit 1.0.3 mit 1,75 mm besser lesbar.
 
 ### Klemmen und Kabel
 
