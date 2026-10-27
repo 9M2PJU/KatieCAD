@@ -829,6 +829,18 @@ def pdf_mehrseitig(seiten):
 # ============================================================
 # Layers
 # ============================================================
+# Layers that are created and used automatically for electrical objects
+E_DEVICES, E_LINES, E_CABLE, E_CLAMPS, E_PIN = (
+    "E_DEVICES", "E_LINES", "E_CABLE", "E_CLAMPS", "E_PIN")
+ELEKTRO_LAYER = {            # name -> (colour, line weight)
+    E_DEVICES: ("#c29bff", 0.35),
+    E_LINES: ("#ff2d2d", 0.35),
+    E_CABLE: ("#c29bff", 0.35),
+    E_CLAMPS: ("#c29bff", 0.35),
+    E_PIN: ("#c29bff", 0.35),
+}
+
+
 class Layer:
     def __init__(self, name, farbe="#c29bff", staerke=0.35, sichtbar=True):
         self.name = name
@@ -3473,3 +3485,4 @@ _inst(_FestMaske, skalieren=_sk_pos, spiegeln=_sp_pos)
 _inst(Kabel, skalieren=_sk_kabel, spiegeln=_sp_kabel)
 _inst(Koordinatenfeld, skalieren=_sk_kf, spiegeln=_sp_kf)
 _inst(Bild, skalieren=_sk_kf, spiegeln=_sp_kf)
+
