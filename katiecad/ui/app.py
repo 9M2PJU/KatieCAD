@@ -4596,7 +4596,17 @@ class CadApp:
     # Info window
     # --------------------------------------------------------
     def zeige_info_fenster(self):
+        alt = getattr(self, "_info_fenster", None)
+        try:
+            if alt is not None and alt.winfo_exists():     # only one at a time
+                alt.deiconify()
+                alt.lift()
+                alt.focus_force()
+                return
+        except tk.TclError:
+            pass
         info_win = tk.Toplevel(self.root)
+        self._info_fenster = info_win
         info_win.title(tr("info.titel") + " - KatieCAD")
         info_win.transient(self.root)
         info_win.configure(bg=FARBEN["bg_mittel"])
