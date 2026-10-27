@@ -65,22 +65,43 @@ def qv_texte_aus_blattdaten(daten):
                     feld = feld_an(felder, float(d.get("x", 0)), float(d.get("y", 0)))
                 except (TypeError, ValueError):
                     feld = ""
-                texte.append((t, feld))
+                texte.append((t, feld, d.get("art", "abgehend")))
     return texte
 
 
 def qv_texte_aus_elementen(elemente):
     """Cross references of an element list: list of (text, "column/row")."""
     felder = felder_aus_elementen(elemente)
-    return [(e.text.strip(), feld_an(felder, *_pos(e))) for e in elemente
+    return [(e.text.strip(), feld_an(felder, *_pos(e)), e.art) for e in elemente
             if isinstance(e, Querverweis) and e.text.strip()]
 
 
 def _text_feld(eintrag):
-    """Accepts "text" or (text, field)."""
+    """Accepts "text", (text, field) or (text, field, art) -> (text, field, art)."""
     if isinstance(eintrag, (tuple, list)):
-        return str(eintrag[0]), (eintrag[1] if len(eintrag) > 1 else "")
-    return str(eintrag), ""
+        return (str(eintrag[0]), (eintrag[1] if len(eintrag) > 1 else ""),
+                (eintrag[2] if len(eintrag) > 2 else None))
+    return str(eintrag), "", None
+
+
+def _kette_ziele(qv, blatt_nr, andere):
+    """Chain logic: with the same name over several sheets an outgoing
+    reference points to the incoming one on the NEXT sheet, an incoming one
+    to the outgoing one on the PREVIOUS sheet (left to right), so L1 does
+    not need to be numbered L1.1, L1.2 ... Without a clear partner in that
+    direction all other occurrences are used (old behaviour).
+    andere: [(sheet, field, other_qv, art)] without qv itself."""
+    gegen = "ankommend" if qv.art == "abgehend" else "abgehend"
+    kand = [o for o in andere if o[3] == gegen]
+    if qv.art == "abgehend":
+        kand = [o for o in kand if o[0] > blatt_nr]
+        ziel_nr = min((o[0] for o in kand), default=None)
+    else:
+        kand = [o for o in kand if o[0] < blatt_nr]
+        ziel_nr = max((o[0] for o in kand), default=None)
+    if ziel_nr is None:
+        return andere
+    return [o for o in kand if o[0] == ziel_nr]
 
 
 def querverweis_ziele(elemente, blatt_nr, andere_blaetter):
@@ -104,18 +125,21 @@ def querverweis_ziele(elemente, blatt_nr, andere_blaetter):
             eigene.append((qv, t, feld_an(felder, *_pos(qv))))
     vorkommen = defaultdict(list)                # text -> [(sheet, field, qv|None)]
     for qv, t, feld in eigene:
-        vorkommen[t].append((blatt_nr, feld, qv))
+        vorkommen[t].append((blatt_nr, feld, qv, qv.art))
     for nr, eintraege in andere_blaetter.items():
         for e in eintraege:
-            t, feld = _text_feld(e)
-            vorkommen[t].append((nr, feld, None))
+            t, feld, art = _text_feld(e)
+            vorkommen[t].append((nr, feld, None, art))
     for qv in qvs:
         t = qv.text.strip()
         if not t:
             qv.ziel = []
             continue
-        qv.ziel = sorted({(nr, feld) for nr, feld, anderer in vorkommen[t]
-                          if anderer is not qv})
+        andere = [o for o in vorkommen[t] if o[2] is not qv]
+        # (the chain applies only if the name appears on at least 3 places)
+        if len(andere) >= 2:
+            andere = _kette_ziele(qv, blatt_nr, andere)
+        qv.ziel = sorted({(o[0], o[1]) for o in andere})
 
 
 def ziele_fuer_alle_blaetter(blaetter):
