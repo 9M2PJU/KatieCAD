@@ -1,0 +1,161 @@
+{
+  "format": "katiecad-block",
+  "version": 1,
+  "block": {
+    "name": "Coil_L2",
+    "basispunkt": [
+      0.0,
+      0.0
+    ],
+    "elemente": [
+      {
+        "typ": "bogen",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (breit)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "cx": -11.262397683070098,
+        "cy": -3.749999999999858,
+        "r": 1.2772441207854688,
+        "start": 78.14471272830144,
+        "ende": 281.85528727169867
+      },
+      {
+        "typ": "bogen",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (breit)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "cx": -11.262397683070255,
+        "cy": -1.2500000000001705,
+        "r": 1.2772441207854688,
+        "start": 78.14471272830144,
+        "ende": 281.85528727169867
+      },
+      {
+        "typ": "bogen",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (breit)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "cx": -11.262397683070112,
+        "cy": -6.2500000000001705,
+        "r": 1.2772441207854688,
+        "start": 78.14471272830144,
+        "ende": 281.85528727169867
+      },
+      {
+        "typ": "bogen",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (breit)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "cx": -11.262397683070098,
+        "cy": -8.750000000000483,
+        "r": 1.2772441207854688,
+        "start": 78.14471272830144,
+        "ende": 281.85528727169867
+      },
+      {
+        "typ": "vpunkt",
+        "layer": "E_DEVICES",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (breit)",
+        "eig_farbe": true,
+        "staerke": 0.25,
+        "x": 0.0,
+        "y": -10.0,
+        "inhalt": "2",
+        "hoehe": 2.0,
+        "winkel": 0.0,
+        "schriftart": "Arial",
+        "einfuegepunkt": "mitte_links",
+        "tag": "VP1",
+        "prompt": "Pin 1",
+        "wert": "2",
+        "sichtbar": true,
+        "text_dx": -2.5,
+        "text_dy": 2.0,
+        "richtungen": [
+          0
+        ],
+        "radius": 0.5
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (breit)",
+        "eig_farbe": true,
+        "staerke": 0.7,
+        "x1": -11.0,
+        "y1": 0.0,
+        "x2": 0.0,
+        "y2": 0.0
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (breit)",
+        "eig_farbe": true,
+        "staerke": 0.7,
+        "x1": -10.999999999999844,
+        "y1": -10.000000000000654,
+        "x2": 0.0,
+        "y2": -10.0
+      },
+      {
+        "typ": "maske",
+        "layer": "E_DEVICES",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (breit)",
+        "eig_farbe": true,
+        "staerke": null,
+        "x": -19.0,
+        "y": -11.0,
+        "versatz": {},
+        "werte": {
+          "IND": "IND",
+          "TYP": "TYP",
+          "PER": "PER"
+        },
+        "ausgeblendet": [],
+        "platzhalter": true,
+        "rolle": "haupt",
+        "spiegel": "liste",
+        "sp_dx": 0.0,
+        "sp_dy": 0.0
+      },
+      {
+        "typ": "vpunkt",
+        "layer": "E_DEVICES",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (breit)",
+        "eig_farbe": true,
+        "staerke": 0.25,
+        "x": 0.0,
+        "y": 0.0,
+        "inhalt": "1",
+        "hoehe": 2.0,
+        "winkel": 0.0,
+        "schriftart": "Arial",
+        "einfuegepunkt": "mitte_links",
+        "tag": "VP2",
+        "prompt": "Pin 2",
+        "wert": "1",
+        "sichtbar": true,
+        "text_dx": -2.5,
+        "text_dy": 2.0,
+        "richtungen": [
+          0
+        ],
+        "radius": 0.5
+      }
+    ]
+  }
+}
