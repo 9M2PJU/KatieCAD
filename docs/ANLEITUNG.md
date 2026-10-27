@@ -96,6 +96,10 @@ Weitere Zeichenhilfen: **Bemaßung** (Menü Einfügen: **Radius-Bemaßung (DR)**
 **Schraffur auf Auswahl** (Menü Einfügen), **Layer** (Schaltfläche „Layer…“)
 und Farbe, Linienart und Linienstärke in der Werkzeugleiste.
 
+**Schraffur wie in AutoCAD:** Ist nichts markiert, wählst du im Menü Einfügen › Schraffur Muster, Abstand und Winkel und klickst dann direkt in einen umschlossenen Bereich. KatieCAD findet die kleinste Fläche um den Klickpunkt (Linien dürfen sich kreuzen, Kreise, Rechtecke und Polylinien zählen mit) und schraffiert sie. Du kannst nacheinander mehrere Bereiche anklicken; ESC oder Rechtsklick beendet. Ist bereits eine geschlossene Kontur markiert, wird wie bisher diese schraffiert.
+
+**Strecken mit Vorauswahl:** Hast du Objekte vorher mit einem überkreuzenden Fenster (von rechts nach links) markiert, springt **Strecken** (`STR`) gleich zur Basispunkt-Abfrage – das Fenster muss nicht noch einmal aufgezogen werden. Gestreckt werden dann nur die markierten Objekte. Bei anderer Vorauswahl (z. B. Einzelklick) bleibt die Auswahl erhalten und du ziehst nur noch das Fenster auf.
+
 ## 5. Projekte und Blätter
 
 Ein **Projekt** ist ein Ordner mit einer Projektdatei (`*.katieprj`), einer Datei
@@ -351,4 +355,3 @@ Im Dialog **Blatt-Eigenschaften (F2)** legst du außerdem die **Art des Blatts**
 **Datei > Bild importieren…** fügt ein Foto oder eine Grafik (PNG, JPG, BMP, GIF, TIFF) ein. Das Bild wird in der Zeichnung gespeichert, die Originaldatei wird also nicht mehr gebraucht. Die Größe änderst du am gelben Eckgriff oder mit **Skalieren**; verschieben, drehen und spiegeln gehen wie bei anderen Objekten. Große Bilder werden auf höchstens 2400 Pixel Kantenlänge verkleinert. Im PDF-Export erscheint das Bild, beim DXF-Export wird die Bilddatei neben die DXF-Datei geschrieben. Der Projekt-DXF-Export enthält keine Bilder.
 
 Hinweis: Beim PDF-Export (Drucken als PDF) werden die KatieCAD-Layer als PDF-Layer mitgeschrieben. Solche PDFs kannst du in PDF-Programmen layerweise ein- und ausblenden und in KatieCAD wieder mit denselben Layernamen importieren.
-
