@@ -1140,7 +1140,8 @@ class CadApp:
         m_bloecke.add_command(label=tr("menu.einfuegen.block_erzeugen"),
                               command=self.block_erzeugen)
         m_bloecke.add_command(label=tr("menu.einfuegen.block_liste"),
-                              command=self.block_liste)
+                              command=self.block_liste,
+                              accelerator="Strg+B" if SPRACHE["aktuell"] == "de" else "Ctrl+B")
         m_bloecke.add_separator()
         m_bloecke.add_command(label=tr("menu.bloecke.attdef"),
                               command=self.attdef_erstellen)
@@ -2167,6 +2168,8 @@ class CadApp:
         self.root.bind("<Control-P>", lambda e: self.drucken())
         self.root.bind("<Control-s>", lambda e: self.speichern())
         self.root.bind("<Control-S>", lambda e: self.speichern())
+        self.root.bind("<Control-b>", lambda e: self.block_liste())
+        self.root.bind("<Control-B>", lambda e: self.block_liste())
         self.root.bind("<g>", self.zoom_grenzen)
         self.root.bind("<G>", self.zoom_grenzen)
         self.entry_eingabe.bind("<Tab>", self._on_tab)
