@@ -4612,8 +4612,11 @@ class CadApp:
         info_win.configure(bg=FARBEN["bg_mittel"])
         info_win.resizable(False, False)
 
-        frame = tk.Frame(info_win, bg=FARBEN["bg_mittel"], padx=22, pady=16)
-        frame.pack(fill=tk.BOTH, expand=True)
+        aussen = tk.Frame(info_win, bg=FARBEN["bg_mittel"])
+        aussen.pack(fill=tk.BOTH, expand=True)
+        self._info_maskottchen(aussen)
+        frame = tk.Frame(aussen, bg=FARBEN["bg_mittel"], padx=22, pady=16)
+        frame.pack(side="left", fill=tk.BOTH, expand=True)
 
         title_row = tk.Frame(frame, bg=FARBEN["bg_mittel"])
         title_row.pack(anchor="w", fill="x")
@@ -4694,6 +4697,34 @@ class CadApp:
         w = info_win.winfo_width()
         h = info_win.winfo_height()
         info_win.geometry(f"+{mx - w // 2}+{my - h // 2}")
+
+    def _info_maskottchen(self, eltern, hoehe=300):
+        """Mascot picture on the left of the About window (optional file
+        KatieCAD_Maskottchen.png next to KatieCAD.png)."""
+        pfad = _symbol_datei("KatieCAD_Maskottchen.png")
+        if pfad is None:
+            return
+        bild = None
+        if PILLOW_VERFUEGBAR:
+            try:
+                img = Image.open(pfad).convert("RGBA")
+                b = max(1, round(img.width * hoehe / img.height))
+                bild = ImageTk.PhotoImage(
+                    img.resize((b, hoehe), Image.Resampling.LANCZOS))
+            except Exception as e:
+                print(f"[KatieCAD] Maskottchen (Pillow): {e}")
+        if bild is None:
+            try:
+                p = tk.PhotoImage(file=pfad)
+                n = max(1, round(p.height() / hoehe))
+                bild = p.subsample(n, n) if n > 1 else p
+            except tk.TclError as e:
+                print(f"[KatieCAD] Maskottchen konnte nicht geladen werden: {e}")
+                return
+        lbl = tk.Label(eltern, image=bild, bg=FARBEN["bg_mittel"], bd=0,
+                       highlightthickness=0)
+        lbl.image = bild
+        lbl.pack(side="left", padx=(14, 0), pady=10, anchor="s")
 
     def log_oeffnen(self):
         """Opens the program log in the system's text editor."""
