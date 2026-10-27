@@ -5506,9 +5506,38 @@ class CadApp:
             daten["farbe"] = self.layers[name].farbe
         return daten
 
-    def ungenutzte_layer(self):
-        """Names of the layers that no object (model, layouts, block
-        contents) uses. Layer 0 and the active layer are never listed."""
+    def _andere_blaetter_daten(self):
+        """JSON data of all other drawing sheets: [(index, path, dict)]."""
+        p = self.projekt
+        out = []
+        if p is None:
+            return out
+        for i, b in enumerate(p.blaetter):
+            if i == p.aktiv or getattr(b, "bericht", None):
+                continue
+            pfad = p.blatt_pfad(i)
+            try:
+                with open(pfad, "r", encoding="utf-8") as f:
+                    d = json.load(f)
+            except (OSError, ValueError):
+                continue
+            if isinstance(d, dict):
+                out.append((i, pfad, d))
+        return out
+
+    @staticmethod
+    def _layer_aus_dicts(liste, benutzt):
+        for d in liste:
+            if isinstance(d, dict):
+                benutzt.add(d.get("layer", "0"))
+                kinder = d.get("elemente")
+                if isinstance(kinder, list):
+                    CadApp._layer_aus_dicts(kinder, benutzt)
+
+    def ungenutzte_layer(self, projektweit=True):
+        """Names of the layers that no object uses - in this drawing and,
+        with a project, in no other sheet either (model, layouts, block
+        contents). Layer 0 and the active layer are never listed."""
         benutzt = {"0", self.aktiver_layer.get()}
 
         def sammeln(liste):
@@ -5520,7 +5549,67 @@ class CadApp:
         sammeln(self.elemente)
         for lay in self.layouts:
             sammeln(lay.elemente)
-        return [n for n in self.layers if n not in benutzt]
+        kandidaten = list(self.layers)
+        if projektweit and self.projekt is not None:
+            for _i, _pf, d in self._andere_blaetter_daten():
+                self._layer_aus_dicts(d.get("elemente", []), benutzt)
+                for lay in d.get("layouts", []):
+                    if isinstance(lay, dict):
+                        self._layer_aus_dicts(lay.get("elemente", []), benutzt)
+                for ld in d.get("layers", []):
+                    if isinstance(ld, dict) and ld.get("name") not in kandidaten:
+                        kandidaten.append(ld.get("name"))
+        return [n for n in kandidaten if n not in benutzt]
+
+    def layer_bereinigen_anwenden(self, namen, projektweit=True):
+        """Removes the layers `namen` from this drawing and (project) from
+        the layer tables of all other sheets."""
+        for n in namen:
+            self.layers.pop(n, None)
+        if projektweit and self.projekt is not None:
+            for _i, pfad, d in self._andere_blaetter_daten():
+                alt = d.get("layers", [])
+                neu = [ld for ld in alt
+                       if not (isinstance(ld, dict) and ld.get("name") in namen)]
+                if len(neu) != len(alt):
+                    d["layers"] = neu
+                    try:
+                        self._json_atomar_schreiben(pfad, d)
+                    except OSError as e:
+                        print(f"[KatieCAD] Layer bereinigen: {e}")
+            self._qv_cache.clear()
+
+    def zu_element_springen(self, el):
+        """Selects `el` and centres the view on it."""
+        b = el.bbox()
+        cw = self.canvas.winfo_width() or 1200
+        ch = self.canvas.winfo_height() or 700
+        bw, bh = max(b[2] - b[0], 1.0), max(b[3] - b[1], 1.0)
+        zoom = min(cw * 0.3 / bw, ch * 0.3 / bh)
+        zoom = max(1.0, min(zoom, 8.0))
+        cx, cy = (b[0] + b[2]) / 2, (b[1] + b[3]) / 2
+        self.view["zoom"] = zoom
+        self.view["ox"] = cw / 2 - cx * zoom
+        self.view["oy"] = ch / 2 + cy * zoom
+        self.auswahl = [el]
+        self.redraw()
+        self._zeichne_raster()
+
+    def suchen_ersetzen(self):
+        if self._ist_layout():
+            self.status.set("Suchen und Ersetzen gilt für die Zeichnung (Modell)."
+                            if SPRACHE["aktuell"] == "de" else
+                            "Find and replace works on the drawing (model).")
+            return
+        alt = getattr(self, "_such_dialog", None)
+        try:
+            if alt is not None and alt.winfo_exists():
+                alt.deiconify()
+                alt.lift()
+                return
+        except tk.TclError:
+            pass
+        self._such_dialog = SuchenErsetzenDialog(self.root, self)
 
     def _elektro_layer_pruefen(self, elemente=None):
         """Makes sure all E_* layers used by elements exist."""
@@ -9324,13 +9413,6 @@ class CadApp:
     # --------------------------------------------------------
     # Find and replace
     # --------------------------------------------------------
-    def suchen_ersetzen(self):
-        if self._ist_layout():
-            self.status.set("Suchen und Ersetzen gilt für die Zeichnung (Modell)."
-                            if SPRACHE["aktuell"] == "de" else
-                            "Find and replace works on the drawing (model).")
-            return
-        SuchenErsetzenDialog(self.root, self)
 
     # --------------------------------------------------------
     # Match properties
@@ -9536,4 +9618,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
