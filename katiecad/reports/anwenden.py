@@ -15,9 +15,10 @@ def blatt_daten(basis, seite, bg_layout=None):
     """Drawing data (dict for the .cadjson file) of a report sheet:
     empty model, one A4 layout with the content, view = layout."""
     d = dict(basis)
-    lay = Layout("Layout1", FORMAT, bg_layout or d.get("bg_layout"),
+    fmt = getattr(seite, "format", FORMAT)
+    lay = Layout("Layout1", fmt, bg_layout or d.get("bg_layout"),
                  list(seite.elemente))
-    d["layout_format"] = FORMAT
+    d["layout_format"] = fmt
     d["elemente"] = []
     d["layouts"] = [lay.to_dict()]
     d["aktives_layout"] = 0

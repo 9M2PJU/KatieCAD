@@ -22,15 +22,16 @@ GRAFIK_SPALTE = "bruecke"   # column with the bridge graphic (rows: _bruecke)
 PUNKT_R = 0.9           # mm radius of a bridge dot
 
 
-def _punkt(x, y):
+def _punkt(x, y, skala=1.0):
     """Filled dot (hatch over a 16-gon)."""
     import math
-    pts = [(x + PUNKT_R * math.cos(2 * math.pi * i / 16),
-            y + PUNKT_R * math.sin(2 * math.pi * i / 16)) for i in range(16)]
+    r = PUNKT_R * skala
+    pts = [(x + r * math.cos(2 * math.pi * i / 16),
+            y + r * math.sin(2 * math.pi * i / 16)) for i in range(16)]
     return Schraffur(pts, "solid", staerke=0.25, **LINIE)
 
 
-def _bruecken_zeichnen(el, z, xa, b, y, hoehe, lanes):
+def _bruecken_zeichnen(el, z, xa, b, y, hoehe, lanes, skala=1.0):
     """Bridge graphic of one row in the column [xa, xa + b]."""
     yc = y - hoehe / 2.0
     for lane, punkt, hoch, runter in z.get("_bruecke", ()):
@@ -42,7 +43,7 @@ def _bruecken_zeichnen(el, z, xa, b, y, hoehe, lanes):
         elif runter:
             el.append(Linie(x, yc, x, y - hoehe, staerke=0.35, **LINIE))
         if punkt:
-            el.append(_punkt(x, yc))
+            el.append(_punkt(x, yc, skala))
 
 
 class Spalte:
@@ -91,14 +92,14 @@ def _zerhacken(s, breite, hoehe):
     return out
 
 
-def umbrechen(wert, breite, hoehe):
+def umbrechen(wert, breite, hoehe, min_text=MIN_TEXT):
     """-> (lines: list[str], effective text height). Shrinks the font
     down to MIN_TEXT if an indivisible piece would not fit otherwise."""
     teile, ist_liste = _teile(wert)
     if not teile:
         return [], hoehe
     h = hoehe
-    while h > MIN_TEXT and max(_breite(t, h) for t in teile) > breite:
+    while h > min_text and max(_breite(t, h) for t in teile) > breite:
         h = round(h - 0.1, 3)
     zeilen, akt = [], ""
     for i, t in enumerate(teile):
@@ -149,22 +150,26 @@ def zeilen_vorbereiten(zeilen, gruppe=None, leer_bei_wiederholung=()):
 
 
 def tabellen_seiten(spalten, zeilen, flaeche, titel="", textgroesse=2.5,
-                    zeilenhoehe=6.0, leer_text="", seite_pro_gruppe=False):
+                    zeilenhoehe=6.0, leer_text="", seite_pro_gruppe=False, skala=1.0):
     """Draws the table in `flaeche` = (x1, y1, x2, y2) and, if needed, breaks
     it across several pages (header row is repeated). seite_pro_gruppe: every
     group (rows with `_gruppe` True, e.g. a terminal strip) starts a new page.
     -> list of pages; each page is a list of elements."""
     x1, y1, x2, y2 = flaeche
+    # skala: scaling for larger sheets (A3 = 1.414); RAND_X_ etc. are A4 values
+    RAND_X_, RAND_Y_ = RAND_X * skala, RAND_Y * skala
+    MIN_ = MIN_TEXT * skala
+    TITEL_HOEHE_, TITEL_PLATZ_ = TITEL_HOEHE * skala, TITEL_PLATZ * skala
     breiten = spaltenbreiten(spalten, x2 - x1)
     xs = [x1]
     for b in breiten:
         xs.append(xs[-1] + b)
 
-    kopf_h = max(zeilenhoehe, 1.4 * textgroesse + 2 * RAND_Y)
+    kopf_h = max(zeilenhoehe, 1.4 * textgroesse + 2 * RAND_Y_)
     for sp, b in zip(spalten, breiten):             # Header row may wrap
-        lines, h = umbrechen(sp.titel, b - 2 * RAND_X, textgroesse)
+        lines, h = umbrechen(sp.titel, b - 2 * RAND_X_, textgroesse, MIN_)
         if lines:
-            kopf_h = max(kopf_h, _blockhoehe(len(lines), h) + 2 * RAND_Y)
+            kopf_h = max(kopf_h, _blockhoehe(len(lines), h) + 2 * RAND_Y_)
     # Measure rows
     gemessen = []
     for z in zeilen:
@@ -173,17 +178,17 @@ def tabellen_seiten(spalten, zeilen, flaeche, titel="", textgroesse=2.5,
             if sp.key == GRAFIK_SPALTE:             # graphics only, no text
                 zellen.append(([], textgroesse))
                 continue
-            lines, h = umbrechen(z.get(sp.key, ""), b - 2 * RAND_X, textgroesse)
+            lines, h = umbrechen(z.get(sp.key, ""), b - 2 * RAND_X_, textgroesse, MIN_)
             zellen.append((lines, h))
             if lines:
-                hoehe = max(hoehe, _blockhoehe(len(lines), h) + 2 * RAND_Y)
+                hoehe = max(hoehe, _blockhoehe(len(lines), h) + 2 * RAND_Y_)
         gemessen.append((z, zellen, hoehe))
     if not gemessen:
         gemessen = [({}, [([leer_text], textgroesse)] +
                      [([], textgroesse)] * (len(spalten) - 1), zeilenhoehe)] \
             if leer_text else []
 
-    oben = y2 - (TITEL_PLATZ if titel else 0.0)
+    oben = y2 - (TITEL_PLATZ_ if titel else 0.0)
     frei = oben - kopf_h - y1
     seiten, akt, benutzt = [], [], 0.0
     for eintrag in gemessen:
@@ -200,14 +205,14 @@ def tabellen_seiten(spalten, zeilen, flaeche, titel="", textgroesse=2.5,
     for seite in seiten:
         el = []
         if titel:
-            el.append(Text(x1, y2, titel, TITEL_HOEHE, 0.0, "Arial",
+            el.append(Text(x1, y2, titel, TITEL_HOEHE_, 0.0, "Arial",
                            einfuegepunkt="oben_links", **TEXT))
         unten = oben - kopf_h - sum(e[2] for e in seite)
         # Header row
         for sp, xa, b in zip(spalten, xs, breiten):
-            lines, h = umbrechen(sp.titel, b - 2 * RAND_X, textgroesse)
+            lines, h = umbrechen(sp.titel, b - 2 * RAND_X_, textgroesse, MIN_)
             if lines:
-                tx = {"l": xa + RAND_X, "r": xa + b - RAND_X,
+                tx = {"l": xa + RAND_X_, "r": xa + b - RAND_X_,
                       "c": xa + b / 2.0}[sp.ausr]
                 el.append(_text(tx, oben - kopf_h / 2.0, "\n".join(lines),
                                 h, sp.ausr))
@@ -218,11 +223,11 @@ def tabellen_seiten(spalten, zeilen, flaeche, titel="", textgroesse=2.5,
             yc = y - hoehe / 2.0
             for sp, xa, b, (lines, h) in zip(spalten, xs, breiten, zellen):
                 if sp.key == GRAFIK_SPALTE:
-                    _bruecken_zeichnen(el, z, xa, b, y, hoehe, lanes)
+                    _bruecken_zeichnen(el, z, xa, b, y, hoehe, lanes, skala)
                     continue
                 if not lines:
                     continue
-                tx = {"l": xa + RAND_X, "r": xa + b - RAND_X,
+                tx = {"l": xa + RAND_X_, "r": xa + b - RAND_X_,
                       "c": xa + b / 2.0}[sp.ausr]
                 el.append(_text(tx, yc, "\n".join(lines), h, sp.ausr))
             y -= hoehe
