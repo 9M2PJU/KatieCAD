@@ -1,5 +1,10 @@
 # Änderungen
 
+## 1.0.4
+- Suchen und Ersetzen über das ganze Projekt (alle Blätter)
+- Eigenschaften übertragen (Layer, Farbe, Linientyp, Stärke, Texthöhe) von einem Objekt auf andere
+- Layerfenster: „Bereinigen“ löscht alle nicht verwendeten Layer
+
 ## 1.0.3
 - Info-Fenster: Maskottchen links neben den Texten (Datei `KatieCAD_Maskottchen.png`)
 - Info-Fenster lässt sich nur noch einmal öffnen (erneutes Öffnen holt das vorhandene nach vorn)
