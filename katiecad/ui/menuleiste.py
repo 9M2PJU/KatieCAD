@@ -26,6 +26,7 @@ class MenuLeiste(tk.Frame):
         self._eintraege = []           # [(label_widget, tk.Menu)]
         self._offen = None             # index of the open menu
         self._popup = None
+        self._cache = {}               # index -> (popup, zeilen): built once
         self._zeilen = []              # [(row_frame, menu_index, state, widgets)]
         self._aktiv = None             # highlighted row (index into _zeilen)
         try:
@@ -46,6 +47,12 @@ class MenuLeiste(tk.Frame):
         self.schliessen()
         for w, _m in self._eintraege:
             w.destroy()
+        for pop, _z in self._cache.values():
+            try:
+                pop.destroy()
+            except tk.TclError:
+                pass
+        self._cache = {}
         self._eintraege = []
         for i, (label, menu) in enumerate(eintraege):
             w = tk.Label(self, text=label, bg=self._bg, fg=self._fg,
@@ -54,6 +61,17 @@ class MenuLeiste(tk.Frame):
             w.bind("<Button-1>", lambda e, i=i: self._umschalten(i))
             w.bind("<Enter>", lambda e, i=i: self._ueber(i))
             self._eintraege.append((w, menu))
+        self.after(200, self._vorbauen)
+
+    def _vorbauen(self):
+        """Builds all drop-downs once in the background (opening is then
+        instant); they are only refreshed when opened."""
+        for i in range(len(self._eintraege)):
+            if i not in self._cache:
+                try:
+                    self._bauen(i)
+                except tk.TclError:
+                    return
 
     def _faerben(self):
         for i, (w, _m) in enumerate(self._eintraege):
@@ -78,27 +96,12 @@ class MenuLeiste(tk.Frame):
         self._offen = i
         self._faerben()
         w, menu = self._eintraege[i]
-        pop = tk.Toplevel(self)
-        pop.withdraw()
-        pop.overrideredirect(True)
-        try:
-            pop.attributes("-topmost", True)
-        except tk.TclError:
-            pass
-        rahmen = tk.Frame(pop, bg=self._fg, bd=0)
-        rahmen.pack(fill=tk.BOTH, expand=True)
-        innen = tk.Frame(rahmen, bg=self._bg, bd=0)
-        innen.pack(fill=tk.BOTH, expand=True, padx=1, pady=1)
-        self._zeilen = []
+        if i not in self._cache:
+            self._bauen(i)
+        pop, zeilen = self._cache[i]
+        self._zeilen = zeilen
         self._aktiv = None
-        try:
-            ende = menu.index("end")
-        except tk.TclError:
-            ende = None
-        if ende is not None:
-            for idx in range(ende + 1):
-                self._zeile(innen, menu, idx)
-        pop.update_idletasks()
+        self._auffrischen(zeilen)
         x = w.winfo_rootx()
         y = w.winfo_rooty() + w.winfo_height()
         br, ho = pop.winfo_reqwidth(), pop.winfo_reqheight()
@@ -111,6 +114,59 @@ class MenuLeiste(tk.Frame):
         self._popup = pop
         if tastatur:
             self._weiter(+1)
+
+    def _bauen(self, i):
+        w, menu = self._eintraege[i]
+        pop = tk.Toplevel(self)
+        pop.withdraw()
+        pop.overrideredirect(True)
+        try:
+            pop.attributes("-topmost", True)
+        except tk.TclError:
+            pass
+        rahmen = tk.Frame(pop, bg=self._fg, bd=0)
+        rahmen.pack(fill=tk.BOTH, expand=True)
+        innen = tk.Frame(rahmen, bg=self._bg, bd=0)
+        innen.pack(fill=tk.BOTH, expand=True, padx=1, pady=1)
+        self._zeilen = []
+        try:
+            ende = menu.index("end")
+        except tk.TclError:
+            ende = None
+        if ende is not None:
+            for idx in range(ende + 1):
+                self._zeile(innen, menu, idx)
+        pop.update_idletasks()
+        self._cache[i] = (pop, self._zeilen)
+        self._zeilen = []
+
+    def _auffrischen(self, zeilen):
+        """Takes over state and check marks of the menu entries."""
+        for nr, z in enumerate(zeilen):
+            zeile, idx, _alt, (l1, l2, l3), menu = z
+            typ = menu.type(idx)
+            try:
+                state = menu.entrycget(idx, "state")
+            except tk.TclError:
+                state = "normal"
+            marke = ""
+            if typ in ("checkbutton", "radiobutton"):
+                try:
+                    var = menu.entrycget(idx, "variable")
+                    wert = menu.tk.globalgetvar(str(var))
+                    soll = menu.entrycget(idx, "onvalue" if typ == "checkbutton"
+                                          else "value")
+                    if str(wert) == str(soll):
+                        marke = "\u2713"
+                except tk.TclError:
+                    pass
+            fg = self._fg if state != "disabled" else self._sperr
+            for wdg in (zeile, l1, l2, l3):
+                wdg.config(bg=self._bg)
+            l1.config(text=marke, fg=fg)
+            l2.config(fg=fg)
+            l3.config(fg=fg)
+            zeilen[nr] = (zeile, idx, state, (l1, l2, l3), menu)
 
     def _zeile(self, innen, menu, idx):
         typ = menu.type(idx)
@@ -201,7 +257,7 @@ class MenuLeiste(tk.Frame):
     def _popup_zerstoeren(self):
         if self._popup is not None:
             try:
-                self._popup.destroy()
+                self._popup.withdraw()
             except tk.TclError:
                 pass
         self._popup = None
