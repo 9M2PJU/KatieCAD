@@ -6780,6 +6780,9 @@ class CadApp:
             if any(isinstance(e, BlockReferenz) for e in self.auswahl):
                 m.add_command(label=tr("menu.einfuegen.block_aufloesen"),
                               command=self.block_aufloesen)
+            if any(hasattr(e, "texte_zuruecksetzen") for e in self.auswahl):
+                m.add_command(label=tr("menu.bearbeiten.texte_zuruecksetzen"),
+                              command=self.texte_zuruecksetzen)
             m.add_separator()
             m.add_command(label=tr("menu.bearbeiten.eigenschaften"),
                           command=self.eigenschaften_fenster)
@@ -6793,6 +6796,19 @@ class CadApp:
         m.add_command(label=("Zoom Grenzen" if de else "Zoom extents"),
                       command=self.zoom_grenzen)
         self._menue_zeigen(m, event.x_root, event.y_root)
+
+    def texte_zuruecksetzen(self):
+        """Puts the freely moved texts of the selected objects (terminals,
+        masks, cables, pins, devices, cross references) back to their
+        automatic position."""
+        ziele = [e for e in self.auswahl if hasattr(e, "texte_zuruecksetzen")]
+        if not ziele:
+            return
+        self._snapshot()
+        for e in ziele:
+            e.texte_zuruecksetzen()
+        self.redraw()
+        self.status.set(tr("msg.texte_zurueckgesetzt", n=len(ziele)))
 
     def _menue_zeigen(self, m, x, y):
         """Pops up a context menu. Windows/Mac: tk_popup. Linux (X11):
