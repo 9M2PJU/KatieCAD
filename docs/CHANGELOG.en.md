@@ -6,6 +6,10 @@
 - Documentation: cover sheet, table of contents and lists in DIN A4 or DIN A3 (content scaled)
 - Sheet list: select several sheets (Ctrl/Shift + click) to move and delete them together
 - Fix: "Create documentation" now shows errors in a window and writes them to the log instead of silently doing nothing
+- Cross reference: identifier and target note stand side by side on one line by default
+- Terminals: terminal number (NUM) enlarged from 1.0 to 1.75 mm
+- Texts freely movable (yellow grips) for terminals, masks, cables, pins and device blocks (per instance); right-click › Reset text positions
+- Coordinate grid: labels stay inside their strip in print
 
 ## 1.0.2
 - Installation location per sheet (sheet properties, F2): appears in the title block (`EINBAUORT` / `PLACE`) and separates the device, terminal and cable lists
