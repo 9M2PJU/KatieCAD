@@ -214,6 +214,8 @@ each contact as its own auxiliary device.
 
 ### Across sheets: cross references
 
+**Chain over several sheets:** you do not need `L1.1`, `L1.2` ... With the same name an *outgoing* arrow points to the *incoming* arrow on the **next** sheet, an *incoming* one to the *outgoing* one on the **previous** sheet (left to right, in sheet order). So `L1` can run from sheet 1 over 2 and 3 to 4 and each arrow names only its neighbour. If there is no matching partner in that direction, all other places with this name are shown as before.
+
 At the end of a wire, place a **cross reference** (type *outgoing* or *incoming*,
 direction, text, e.g. `L1`) and place one with the same text on the other sheet. The
 target (sheet/column/row) is shown automatically. For the lists, KatieCAD follows the
