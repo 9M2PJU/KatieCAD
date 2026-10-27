@@ -281,6 +281,7 @@ changes in them are lost; your drawing sheets stay untouched.
 | F2 | Sheet properties (name, installation location) |
 | F3 / F7 / F8 / F9 | Object snap / show grid / ortho / grid snap |
 | F4 | Show / hide side bar |
+| Ctrl+B | Open the block list (block selection) |
 | G | Show everything (zoom extents) |
 | B / I / BL / X | Create block / insert / block list / explode (in the input line) |
 
