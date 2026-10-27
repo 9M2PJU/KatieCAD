@@ -96,6 +96,12 @@ Weitere Zeichenhilfen: **Bemaßung** (Menü Einfügen: **Radius-Bemaßung (DR)**
 **Schraffur auf Auswahl** (Menü Einfügen), **Layer** (Schaltfläche „Layer…“)
 und Farbe, Linienart und Linienstärke in der Werkzeugleiste.
 
+**Suchen und Ersetzen (Strg+F, Bearbeiten › Suchen und Ersetzen, Befehl `SUCHEN`):** Gibt den Suchtext und den neuen Text ein und wähle den Bereich *Aktuelles Blatt* oder *Ganzes Projekt*. KatieCAD listet alle Treffer mit Blatt, Objektart und Feld und zeigt daneben den neuen Text. Durchsucht werden Texte, Bemaßungstexte, Querverweise, Masken (IND/TYP/PER …), Klemmen, Kabel, Pins und Block-Attribute (bei Geräten also auch deren Bezeichnung). Optional: Groß-/Kleinschreibung beachten, nur ganze Wörter. *Auswahl ersetzen* ändert nur die markierten Zeilen, *Alle ersetzen* alle. Änderungen im geöffneten Blatt lassen sich mit Strg+Z zurücknehmen, Änderungen in anderen Blättern werden sofort gespeichert und lassen sich dort nicht rückgängig machen (KatieCAD fragt vorher nach).
+
+**Eigenschaften übertragen (Bearbeiten › Eigenschaften übertragen, Befehl `EU`):** Erst das Quellobjekt anklicken, dann nacheinander die Zielobjekte. Übertragen werden Layer, Farbe, Linientyp und Linienstärke; bei Texten zusätzlich Höhe und Schriftart, bei Schraffuren Winkel und Abstand. ESC oder Rechtsklick beendet.
+
+**Layer bereinigen:** Im Layerfenster („Layer…“) löscht **Bereinigen** alle Layer, die kein Objekt benutzt (auch nicht im Layout oder in Blöcken). Layer 0 und der aktive Layer bleiben. Vorher fragt KatieCAD mit der Liste nach; Strg+Z macht es rückgängig.
+
 **Schraffur wie in AutoCAD:** Ist nichts markiert, wählst du im Menü Einfügen › Schraffur Muster, Abstand und Winkel und klickst dann direkt in einen umschlossenen Bereich. KatieCAD findet die kleinste Fläche um den Klickpunkt (Linien dürfen sich kreuzen, Kreise, Rechtecke und Polylinien zählen mit) und schraffiert sie. Du kannst nacheinander mehrere Bereiche anklicken; ESC oder Rechtsklick beendet. Ist bereits eine geschlossene Kontur markiert, wird wie bisher diese schraffiert.
 
 **Strecken mit Vorauswahl:** Hast du Objekte vorher mit einem überkreuzenden Fenster (von rechts nach links) markiert, springt **Strecken** (`STR`) gleich zur Basispunkt-Abfrage – das Fenster muss nicht noch einmal aufgezogen werden. Gestreckt werden dann nur die markierten Objekte. Bei anderer Vorauswahl (z. B. Einzelklick) bleibt die Auswahl erhalten und du ziehst nur noch das Fenster auf.
@@ -289,6 +295,7 @@ unverändert.
 | F3 / F7 / F8 / F9 | Objektfang / Raster anzeigen / Ortho / Rasterfang |
 | F4 | Seitenleiste ein-/ausblenden |
 | Strg+B | Blockliste (Blockauswahl) öffnen |
+| Strg+F | Suchen und Ersetzen |
 | G | Alles anzeigen (Zoom Grenzen) |
 | B / I / BL / X | Block erzeugen / einfügen / Blockliste / auflösen (in der Eingabezeile) |
 
