@@ -1,6 +1,7 @@
 # Änderungen
 
 ## 1.0.3
+- Automatische Elektro-Layer: Geräte → E_DEVICES, Leitungen/Verbindungen/Querverweise → E_LINES, Kabel → E_CABLE, Klemmen → E_CLAMPS, einzelne Pins → E_PIN (statt Layer 0); Layer werden bei Bedarf angelegt
 - Koordinatenfeld: Auswahl DIN A4 (6 × 4) oder DIN A3 (8 × 5, 395 × 252,59 mm) oder eigene Werte
 - Querverweis: Texthöhen von Bezeichnung und Zielangabe einstellbar (Standard jetzt 2,5 / 1,5 mm), Texte per Griff verschiebbar, Position zurücksetzbar
 - Dokumentation: Deckblatt, Inhaltsverzeichnis und Listen wahlweise in DIN A4 oder DIN A3 (Inhalte skaliert)
