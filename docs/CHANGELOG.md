@@ -6,6 +6,10 @@
 - Dokumentation: Deckblatt, Inhaltsverzeichnis und Listen wahlweise in DIN A4 oder DIN A3 (Inhalte skaliert)
 - Blattliste: mehrere Blätter markieren (Strg/Umschalt + Klick), gemeinsam verschieben und löschen
 - Fix: „Dokumentation erzeugen“ zeigt Fehler jetzt in einem Fenster an und schreibt sie ins Log, statt still nichts zu tun
+- Querverweis: Bezeichnung und Zielangabe stehen standardmäßig in einer Zeile nebeneinander
+- Klemmen: Klemmennummer (NUM) von 1,0 auf 1,75 mm vergrößert
+- Texte frei verschiebbar (gelbe Griffe) bei Klemmen, Masken, Kabeln, Pins und Geräteblöcken (je Exemplar); Rechtsklick › Textpositionen zurücksetzen
+- Koordinatenfeld: Beschriftung bleibt im Druck innerhalb ihres Streifens
 
 ## 1.0.2
 - Einbauort pro Blatt (Blatt-Eigenschaften, F2): erscheint im Schriftfeld (`EINBAUORT` / `PLACE`) und unterscheidet Geräte-, Klemmen- und Kabellisten
