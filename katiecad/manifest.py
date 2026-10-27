@@ -4,7 +4,7 @@ katiecad/manifest.py - Central list of all modules + version.
 Used for a start-up self-check: are all modules present?
 """
 
-VERSION = "1.0.2"
+VERSION = "1.0.3"
 
 MODULE = {
     "katiecad.ui.app":            "CadApp: UI, events, tools, state, main()",
