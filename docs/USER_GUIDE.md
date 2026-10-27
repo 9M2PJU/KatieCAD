@@ -302,6 +302,8 @@ On the Mac, Cmd replaces Ctrl.
 - **Safety:** drawing sheets are saved automatically when you switch sheets. Use
   Ctrl+S to save the project at any time.
 
+**Linux - menu bar:** on Linux KatieCAD draws its own menu bar (a click opens it; a click elsewhere, ESC or switching to another program closes it; F10 and the arrow keys work). To get the standard Tk menus start with `KATIECAD_NATIVE_MENU=1 python3 main.py`.
+
 ## Project check / contact mirror
 **Project › Check project…** checks all drawing sheets: duplicate main devices and cables, auxiliary parts without a main device, duplicate terminals, cross references that occur more than twice / have no counterpart / use the same arrow type twice, and open terminal connections. Double-click a finding to jump to it. Mark cross references that intentionally have no counterpart (supply, handover) with **Handover / external** in the cross-reference dialog.
 
