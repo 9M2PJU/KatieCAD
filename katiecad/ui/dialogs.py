@@ -116,7 +116,16 @@ SOFTWARE."""
 
 def zeige_lizenz_fenster(parent):
     """Shows the MIT licence in a separate, scrollable window."""
+    alt = getattr(zeige_lizenz_fenster, "_fenster", None)
+    try:
+        if alt is not None and alt.winfo_exists():       # only one at a time
+            alt.deiconify()
+            alt.lift()
+            return
+    except tk.TclError:
+        pass
     win = tk.Toplevel(parent)
+    zeige_lizenz_fenster._fenster = win
     win.title("License – KatieCAD")
     win.geometry("620x520")
     win.minsize(400, 300)
