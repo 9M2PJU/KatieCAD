@@ -152,7 +152,7 @@ class Seitenleiste(ttk.Frame):
         tf = ttk.Frame(self.f_blaetter)
         tf.pack(fill=tk.BOTH, expand=True)
         self.tree = ttk.Treeview(tf, columns=("nr", "name", "ort"),
-                                 show="headings", selectmode="browse")
+                                 show="headings", selectmode="extended")
         self.tree.heading("nr", text=tr("sb.spalte_nr"))
         self.tree.heading("name", text=tr("sb.spalte_name"))
         self.tree.column("nr", width=46, anchor=tk.CENTER, stretch=False)
@@ -234,7 +234,8 @@ class Seitenleiste(ttk.Frame):
                 for i, b in enumerate(p.blaetter):
                     self.tree.item(str(i), values=(p.nummer(i), b.name, b.einbauort))
             if p.blaetter and 0 <= p.aktiv < len(p.blaetter):
-                if self.tree.selection() != (str(p.aktiv),):
+                if len(self.tree.selection()) <= 1 and \
+                        self.tree.selection() != (str(p.aktiv),):
                     self.tree.selection_set(str(p.aktiv))
                 self.tree.focus(str(p.aktiv))
                 self.tree.see(str(p.aktiv))
@@ -248,14 +249,29 @@ class Seitenleiste(ttk.Frame):
         if self._sync:
             return
         sel = self.tree.selection()
-        if not sel:
-            return
+        if len(sel) != 1:
+            return                      # several sheets selected: no switching
         index = int(sel[0])
         p = self.app.projekt
         if p is None or index == p.aktiv:
             return
         if not self.app.blatt_wechseln(index):
             self.aktualisieren()        # Reset selection
+
+    def auswahl_indizes(self):
+        """Sorted sheet indices of all selected rows."""
+        try:
+            return sorted(int(i) for i in self.tree.selection())
+        except ValueError:
+            return []
+
+    def auswahl_setzen(self, indizes):
+        """Selects several rows (without switching the sheet)."""
+        self._sync = True
+        try:
+            self.tree.selection_set([str(i) for i in indizes])
+        finally:
+            self._sync = False
 
     def _zeile_unter(self, event):
         iid = self.tree.identify_row(event.y)
@@ -271,7 +287,9 @@ class Seitenleiste(ttk.Frame):
         p = self.app.projekt
         if idx is None or p is None:
             return
-        if idx != p.aktiv and not self.app.blatt_wechseln(idx):
+        if str(idx) in self.tree.selection() and len(self.tree.selection()) > 1:
+            pass                        # right click inside a multiple selection
+        elif idx != p.aktiv and not self.app.blatt_wechseln(idx):
             return
         m = tk.Menu(self, tearoff=0, bg=FARBEN["bg_mittel"], fg=FARBEN["cyan"],
                     activebackground=FARBEN["cyan"],
@@ -293,3 +311,4 @@ class Seitenleiste(ttk.Frame):
             m.tk_popup(event.x_root, event.y_root)
         finally:
             m.grab_release()
+
