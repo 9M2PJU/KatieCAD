@@ -1046,6 +1046,10 @@ class CadApp:
                             command=lambda: self._op_start("mirror"))
         m_bearb.add_command(label=tr("menu.bearbeiten.strecken"),
                             command=lambda: self._op_start("stretch"))
+        m_bearb.add_command(label=tr("tb.wz.stutzen"),
+                            command=lambda: self._werkzeug_aus_menue("stutzen"))
+        m_bearb.add_command(label=tr("tb.wz.brechen"),
+                            command=lambda: self._werkzeug_aus_menue("brechen"))
         m_bearb.add_separator()
         m_bearb.add_command(label=tr("menu.bearbeiten.alles_loeschen"), command=self.neu)
         m_bearb.add_separator()
@@ -1082,11 +1086,6 @@ class CadApp:
                            command=lambda: self._bem_art_starten("radius"))
         m_einf.add_command(label=tr("menu.einfuegen.durchmesser"),
                            command=lambda: self._bem_art_starten("durchmesser"))
-        m_einf.add_separator()
-        m_einf.add_command(label=tr("tb.wz.stutzen"),
-                           command=lambda: self._werkzeug_aus_menue("stutzen"))
-        m_einf.add_command(label=tr("tb.wz.brechen"),
-                           command=lambda: self._werkzeug_aus_menue("brechen"))
         m_einf.add_separator()
         m_einf.add_command(label=tr("menu.einfuegen.viewport"),
                            command=self.viewport_modus_starten)
@@ -9281,3 +9280,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
