@@ -2,7 +2,7 @@
   "format": "katiecad-block",
   "version": 1,
   "block": {
-    "name": "Coil_L2",
+    "name": "L2",
     "basispunkt": [
       0.0,
       0.0
@@ -15,7 +15,7 @@
         "linientyp": "Volllinie (breit)",
         "eig_farbe": true,
         "staerke": 0.35,
-        "cx": -11.262397683070098,
+        "cx": -11.262397683070105,
         "cy": -3.749999999999858,
         "r": 1.2772441207854688,
         "start": 78.14471272830144,
@@ -28,7 +28,7 @@
         "linientyp": "Volllinie (breit)",
         "eig_farbe": true,
         "staerke": 0.35,
-        "cx": -11.262397683070255,
+        "cx": -11.262397683070247,
         "cy": -1.2500000000001705,
         "r": 1.2772441207854688,
         "start": 78.14471272830144,
@@ -41,7 +41,7 @@
         "linientyp": "Volllinie (breit)",
         "eig_farbe": true,
         "staerke": 0.35,
-        "cx": -11.262397683070112,
+        "cx": -11.262397683070105,
         "cy": -6.2500000000001705,
         "r": 1.2772441207854688,
         "start": 78.14471272830144,
@@ -54,7 +54,7 @@
         "linientyp": "Volllinie (breit)",
         "eig_farbe": true,
         "staerke": 0.35,
-        "cx": -11.262397683070098,
+        "cx": -11.262397683070105,
         "cy": -8.750000000000483,
         "r": 1.2772441207854688,
         "start": 78.14471272830144,
@@ -86,30 +86,6 @@
         "radius": 0.5
       },
       {
-        "typ": "linie",
-        "layer": "0",
-        "farbe": "#c29bff",
-        "linientyp": "Volllinie (breit)",
-        "eig_farbe": true,
-        "staerke": 0.7,
-        "x1": -11.0,
-        "y1": 0.0,
-        "x2": 0.0,
-        "y2": 0.0
-      },
-      {
-        "typ": "linie",
-        "layer": "0",
-        "farbe": "#c29bff",
-        "linientyp": "Volllinie (breit)",
-        "eig_farbe": true,
-        "staerke": 0.7,
-        "x1": -10.999999999999844,
-        "y1": -10.000000000000654,
-        "x2": 0.0,
-        "y2": -10.0
-      },
-      {
         "typ": "maske",
         "layer": "E_DEVICES",
         "farbe": "#c29bff",
@@ -125,7 +101,7 @@
           "PER": "PER"
         },
         "ausgeblendet": [],
-        "platzhalter": true,
+        "platzhalter": false,
         "rolle": "haupt",
         "spiegel": "liste",
         "sp_dx": 0.0,
@@ -155,6 +131,30 @@
           0
         ],
         "radius": 0.5
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": -11.0,
+        "y1": 0.0,
+        "x2": 0.0,
+        "y2": 0.0
+      },
+      {
+        "typ": "linie",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "x1": -10.999999999999858,
+        "y1": -10.000000000000654,
+        "x2": 0.0,
+        "y2": -10.0
       }
     ]
   }
