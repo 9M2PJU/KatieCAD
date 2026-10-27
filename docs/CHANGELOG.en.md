@@ -1,6 +1,9 @@
 # Changes
 
 ## 1.0.3
+- Hatch like AutoCAD: with nothing selected, click straight into an enclosed area (crossing lines allowed), several areas in a row
+- Stretch: if objects were preselected with a crossing window, the second window drag is skipped; only the selected objects are stretched
+- Cross reference "outgoing west" / "incoming east": identifier next to the arrow tip/base, the target note behind it
 - Automatic electrical layers: devices → E_DEVICES, wires/junctions/cross references → E_LINES, cables → E_CABLE, terminals → E_CLAMPS, single pins → E_PIN (instead of layer 0); layers are created on demand
 - Coordinate grid: choose DIN A4 (6 x 4), DIN A3 (8 x 5, 395 x 252.59 mm) or custom values
 - Cross reference: text heights of identifier and target note adjustable (new default 2.5 / 1.5 mm), texts movable by grip, position resettable
