@@ -1,6 +1,7 @@
 # Changes
 
 ## 1.0.3
+- Automatic electrical layers: devices → E_DEVICES, wires/junctions/cross references → E_LINES, cables → E_CABLE, terminals → E_CLAMPS, single pins → E_PIN (instead of layer 0); layers are created on demand
 - Coordinate grid: choose DIN A4 (6 x 4), DIN A3 (8 x 5, 395 x 252.59 mm) or custom values
 - Cross reference: text heights of identifier and target note adjustable (new default 2.5 / 1.5 mm), texts movable by grip, position resettable
 - Documentation: cover sheet, table of contents and lists in DIN A4 or DIN A3 (content scaled)
