@@ -1,6 +1,7 @@
 # Changes
 
 ## 1.0.3
+- About window: mascot picture on the left of the texts (file `KatieCAD_Maskottchen.png`)
 - The About window can only be opened once (opening it again brings the existing one to the front)
 - New shortcut Ctrl+B: opens the block list (block selection)
 - Title block "Standard (built-in)" removed (identical to "Example A3"); only the templates from the title_blocks folder remain
