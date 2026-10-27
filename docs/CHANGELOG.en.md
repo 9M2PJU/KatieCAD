@@ -1,9 +1,9 @@
 # Changes
 
 ## 1.0.4
-- Find and replace across the whole project (all sheets)
+- Find and replace across the whole project (all sheets); double-click a hit to jump to the object
 - Match properties (layer, colour, line type, weight, text height) from one object to others
-- Layer window: "Purge" deletes all unused layers
+- Layer window: "Purge" deletes all unused layers (across all sheets in a project)
 
 ## 1.0.3
 - About window: mascot picture on the left of the texts (file `KatieCAD_Maskottchen.png`)
