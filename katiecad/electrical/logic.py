@@ -13,7 +13,7 @@ from copy import deepcopy
 
 from katiecad.model.core import (Querverweis, Verbindungspunkt, BlockReferenz,
                            Verbindung, Klemme, ElektroMaske, Leitung,
-                           Koordinatenfeld, Text, Kabel)
+                           Koordinatenfeld, Text, Kabel, E_LINES)
 from katiecad.common.i18n import tr
 
 
@@ -728,8 +728,7 @@ def leitungen_automatisch(elemente):
     for k, (x1, y1, x2, y2, bes) in soll.items():
         if k in vorhanden:
             continue
-        elemente.append(Leitung(x1, y1, x2, y2, auto=True,
-                                layer=getattr(bes, "layer", "0")))
+        elemente.append(Leitung(x1, y1, x2, y2, auto=True, layer=E_LINES))
         neu += 1
     return neu, len(weg), weg
 
