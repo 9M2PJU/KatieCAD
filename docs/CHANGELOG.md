@@ -1,5 +1,12 @@
 # Änderungen
 
+## 1.0.3
+- Koordinatenfeld: Auswahl DIN A4 (6 × 4) oder DIN A3 (8 × 5, 395 × 252,59 mm) oder eigene Werte
+- Querverweis: Texthöhen von Bezeichnung und Zielangabe einstellbar (Standard jetzt 2,5 / 1,5 mm), Texte per Griff verschiebbar, Position zurücksetzbar
+- Dokumentation: Deckblatt, Inhaltsverzeichnis und Listen wahlweise in DIN A4 oder DIN A3 (Inhalte skaliert)
+- Blattliste: mehrere Blätter markieren (Strg/Umschalt + Klick), gemeinsam verschieben und löschen
+- Fix: „Dokumentation erzeugen“ zeigt Fehler jetzt in einem Fenster an und schreibt sie ins Log, statt still nichts zu tun
+
 ## 1.0.2
 - Einbauort pro Blatt (Blatt-Eigenschaften, F2): erscheint im Schriftfeld (`EINBAUORT` / `PLACE`) und unterscheidet Geräte-, Klemmen- und Kabellisten
 - Menü: „Block/Gerät einfügen“ steht über „Block erzeugen“
@@ -17,9 +24,6 @@
 - Bildimport (Datei > Bild importieren…): Bilder werden in der Zeichnung gespeichert, im PDF ausgegeben und beim DXF-Export als Datei neben die DXF geschrieben
 - PDF-Export schreibt die KatieCAD-Layer als PDF-Layer (in Acrobat, Bluebeam, Browser-Viewern ein-/ausblendbar; wieder importierbar)
 - Schraffur: Auswahlfeld (Linien/Vollfläche) mit Abstand und Winkel in einem Dialog statt Texteingabe
-- Koordinatenfeld: Auswahl DIN A4 (6 × 4) oder DIN A3 (8 × 5, 395 × 252,59 mm) oder eigene Werte
-- Querverweis: Texthöhen von Bezeichnung und Zielangabe einstellbar (Standard jetzt 2,5 / 1,5 mm), Texte per Griff verschiebbar, Position zurücksetzbar
-- Dokumentation: Deckblatt, Inhaltsverzeichnis und Listen wahlweise in DIN A4 oder DIN A3 (Inhalte skaliert)
 - Info-Fenster kompakter, passt sich dem Inhalt an
 - Info-Fenster: Log-Button öffnet die Log-Datei im Editor (keine Reiter mehr)
 

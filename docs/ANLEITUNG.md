@@ -111,8 +111,9 @@ Menü **Projekt**:
   (siehe Abschnitt 9)
 
 In der **Seitenleiste** wechselst du mit einem Klick das Blatt. Das aktuelle Blatt
-wird dabei automatisch gespeichert. Doppelklick benennt ein Blatt um. Rückgängig
-gilt je Blatt.
+wird dabei automatisch gespeichert. Doppelklick benennt ein Blatt um. Mit **Strg** oder **Umschalt** + Klick markierst du
+mehrere Blätter und kannst sie gemeinsam mit den Pfeiltasten verschieben oder mit „−“ löschen
+(beim Markieren mehrerer Blätter bleibt das aktuelle Blatt geöffnet). Rückgängig gilt je Blatt.
 
 Ohne Projekt arbeitest du in einer einzelnen Zeichnung (Menü **Datei**: Neu,
 Öffnen, Speichern …).

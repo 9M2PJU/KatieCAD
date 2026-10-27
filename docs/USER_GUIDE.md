@@ -108,7 +108,9 @@ A **project** is a folder with a project file (`*.katieprj`), one file per sheet
 - **Create / update documentation…** and **Export lists as CSV…** (see section 9)
 
 In the **side bar**, one click switches the sheet. The current sheet is saved
-automatically. A double click renames a sheet. Undo is kept per sheet.
+automatically. A double click renames a sheet. Select several sheets with **Ctrl** or **Shift** + click
+to move them together with the arrow buttons or delete them with "−" (while several
+sheets are selected, the current sheet stays open). Undo is kept per sheet.
 
 Without a project you work on a single drawing (**File** menu: New, Open, Save …).
 

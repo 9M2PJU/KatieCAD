@@ -1,5 +1,12 @@
 # Changes
 
+## 1.0.3
+- Coordinate grid: choose DIN A4 (6 x 4), DIN A3 (8 x 5, 395 x 252.59 mm) or custom values
+- Cross reference: text heights of identifier and target note adjustable (new default 2.5 / 1.5 mm), texts movable by grip, position resettable
+- Documentation: cover sheet, table of contents and lists in DIN A4 or DIN A3 (content scaled)
+- Sheet list: select several sheets (Ctrl/Shift + click) to move and delete them together
+- Fix: "Create documentation" now shows errors in a window and writes them to the log instead of silently doing nothing
+
 ## 1.0.2
 - Installation location per sheet (sheet properties, F2): appears in the title block (`EINBAUORT` / `PLACE`) and separates the device, terminal and cable lists
 - Menu: "Insert block/device" now sits above "Create block"
@@ -17,9 +24,6 @@
 - Image import (File > Import image...): images are stored inside the drawing, written to PDF output, and saved as a file next to the DXF on DXF export
 - PDF export writes KatieCAD layers as PDF layers (toggle them in Acrobat, Bluebeam, etc.; re-importable)
 - Hatch: selection box (lines/solid fill) with spacing and angle in one dialog instead of typing
-- Coordinate grid: choose DIN A4 (6 x 4), DIN A3 (8 x 5, 395 x 252.59 mm) or custom values
-- Cross reference: text heights of identifier and target note adjustable (new default 2.5 / 1.5 mm), texts movable by grip, position resettable
-- Documentation: cover sheet, table of contents and lists in DIN A4 or DIN A3 (content scaled)
 - More compact Info window that fits its content
 - Info window: Log button opens the log file in the editor (no tabs)
 
