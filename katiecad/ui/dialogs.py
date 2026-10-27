@@ -9,12 +9,14 @@ NEW (electrical base): ProjektNeuDialog, AttributDefinitionDialog,
                      BlockAttributeDialog
 """
 
+import json
 import os
 import sys
 import tkinter as tk
 from tkinter import ttk, colorchooser, messagebox, filedialog
 
 from katiecad.common.i18n import tr, SPRACHE
+from katiecad.electrical import suchen as SU
 from katiecad.model.core import (
     FARBEN, ZEICHNUNGSFORMATE, LINIENTYPEN, LINIENSTAERKEN,
     SCHRIFTARTEN, MASSSTAEBE, BEM_RICHTUNGEN,
@@ -653,9 +655,29 @@ class LayerDialog(tk.Toplevel):
                    command=self.bearbeite).pack(side=tk.LEFT, padx=2)
         ttk.Button(bf, text=tr("dlg.layer.loeschen"),
                    command=self.loeschen).pack(side=tk.LEFT, padx=2)
+        ttk.Button(bf, text=tr("dlg.layer.bereinigen"),
+                   command=self.bereinigen).pack(side=tk.LEFT, padx=2)
         ttk.Button(bf, text=tr("dlg.schliessen"),
                    command=self.destroy).pack(side=tk.RIGHT, padx=2)
         self.wait_window(self)
+
+    def bereinigen(self):
+        """Deletes all layers no object uses (layer 0 and the active layer stay)."""
+        ungenutzt = self.app.ungenutzte_layer()
+        if not ungenutzt:
+            messagebox.showinfo("Layer", tr("msg.layer.bereinigt_nichts"), parent=self)
+            return
+        if not messagebox.askyesno(
+                "Layer", tr("msg.layer.bereinigt_frage", n=len(ungenutzt),
+                            namen=", ".join(ungenutzt)), parent=self):
+            return
+        self.app._snapshot()
+        for name in ungenutzt:
+            self.app.layers.pop(name, None)
+        self.app.layer_cb.config(values=list(self.app.layers.keys()))
+        self._aktualisiere()
+        self.app.redraw()
+        self.app.status.set(tr("msg.layer.bereinigt", n=len(ungenutzt)))
 
     def _aktualisiere(self):
         for item in self.tree.get_children():
@@ -2871,3 +2893,157 @@ class TitleBlockDialog(tk.Toplevel):
         key = self._keys[sel[0]]
         self.result = "" if key is None else key
         self.destroy()
+
+
+class SuchenErsetzenDialog(tk.Toplevel):
+    """Find and replace texts in the open sheet or the whole project."""
+
+    def __init__(self, parent, app):
+        super().__init__(parent)
+        self.app = app
+        self._treffer = []
+        self._daten = {}
+        self.title(tr("dlg.sr.titel"))
+        self.transient(parent)
+        self.configure(bg=FARBEN["bg_mittel"])
+        _modal(self)
+        f = ttk.Frame(self, padding=10)
+        f.pack(fill=tk.BOTH, expand=True)
+        self.v_such = tk.StringVar()
+        self.v_neu = tk.StringVar()
+        self.v_gross = tk.BooleanVar(value=False)
+        self.v_wort = tk.BooleanVar(value=False)
+        hat_projekt = app.projekt is not None
+        self.v_bereich = tk.StringVar(value="projekt" if hat_projekt else "blatt")
+        ttk.Label(f, text=tr("dlg.sr.suchen")).grid(row=0, column=0, sticky=tk.W, pady=3)
+        e1 = ttk.Entry(f, textvariable=self.v_such, width=40)
+        e1.grid(row=0, column=1, columnspan=3, sticky=tk.EW)
+        ttk.Label(f, text=tr("dlg.sr.ersetzen")).grid(row=1, column=0, sticky=tk.W, pady=3)
+        ttk.Entry(f, textvariable=self.v_neu, width=40).grid(
+            row=1, column=1, columnspan=3, sticky=tk.EW)
+        ttk.Checkbutton(f, text=tr("dlg.sr.gross"), variable=self.v_gross).grid(
+            row=2, column=1, sticky=tk.W)
+        ttk.Checkbutton(f, text=tr("dlg.sr.wort"), variable=self.v_wort).grid(
+            row=2, column=2, columnspan=2, sticky=tk.W)
+        ttk.Label(f, text=tr("dlg.sr.bereich")).grid(row=3, column=0, sticky=tk.W, pady=3)
+        ttk.Radiobutton(f, text=tr("dlg.sr.blatt"), value="blatt",
+                        variable=self.v_bereich).grid(row=3, column=1, sticky=tk.W)
+        rb = ttk.Radiobutton(f, text=tr("dlg.sr.projekt"), value="projekt",
+                             variable=self.v_bereich)
+        rb.grid(row=3, column=2, sticky=tk.W)
+        if not hat_projekt:
+            rb.state(["disabled"])
+        spalten = ("blatt", "objekt", "feld", "text", "neu")
+        self.tree = ttk.Treeview(f, columns=spalten, show="headings",
+                                 height=12, selectmode="extended")
+        for c, w in (("blatt", 120), ("objekt", 110), ("feld", 70),
+                     ("text", 170), ("neu", 170)):
+            self.tree.heading(c, text=tr("dlg.sr.col." + c))
+            self.tree.column(c, width=w)
+        self.tree.grid(row=4, column=0, columnspan=4, sticky=tk.NSEW, pady=(8, 4))
+        sb = ttk.Scrollbar(f, orient=tk.VERTICAL, command=self.tree.yview)
+        sb.grid(row=4, column=4, sticky=tk.NS, pady=(8, 4))
+        self.tree.configure(yscrollcommand=sb.set)
+        self.v_status = tk.StringVar(value=tr("dlg.sr.hinweis"))
+        ttk.Label(f, textvariable=self.v_status, style="Hint.TLabel",
+                  wraplength=560, justify=tk.LEFT).grid(
+            row=5, column=0, columnspan=4, sticky=tk.W, pady=4)
+        bf = ttk.Frame(f)
+        bf.grid(row=6, column=0, columnspan=4, sticky=tk.EW, pady=(6, 0))
+        ttk.Button(bf, text=tr("dlg.sr.btn_suchen"), command=self.suchen).pack(
+            side=tk.LEFT, padx=2)
+        ttk.Button(bf, text=tr("dlg.sr.btn_auswahl"),
+                   command=lambda: self.ersetzen(nur_auswahl=True)).pack(side=tk.LEFT, padx=2)
+        ttk.Button(bf, text=tr("dlg.sr.btn_alle"),
+                   command=lambda: self.ersetzen(nur_auswahl=False)).pack(side=tk.LEFT, padx=2)
+        ttk.Button(bf, text=tr("dlg.schliessen"), command=self.destroy).pack(
+            side=tk.RIGHT, padx=2)
+        f.columnconfigure(1, weight=1)
+        f.rowconfigure(4, weight=1)
+        self.bind("<Return>", lambda e: self.suchen())
+        self.bind("<Escape>", lambda e: self.destroy())
+        e1.focus_set()
+        self.wait_window(self)
+
+    def _lade(self, pfad):
+        try:
+            with open(pfad, "r", encoding="utf-8") as fh:
+                return json.load(fh)
+        except (OSError, ValueError):
+            return None
+
+    def _blatt_name(self, i):
+        p = self.app.projekt
+        if p is None:
+            return "-"
+        return "%s %s" % (p.nummer(i), p.blaetter[i].name)
+
+    def suchen(self):
+        such = self.v_such.get()
+        for it in self.tree.get_children():
+            self.tree.delete(it)
+        self._treffer, self._daten = [], {}
+        if not such:
+            return
+        app = self.app
+        app._blatt_sichern()
+        self._treffer, self._daten = SU.suche_projekt(
+            app.projekt, app.elemente, such, self.v_gross.get(),
+            self.v_wort.get(), self.v_bereich.get() == "projekt", self._lade)
+        neu = self.v_neu.get()
+        for i, t in enumerate(self._treffer):
+            self.tree.insert("", "end", iid=str(i), values=(
+                self._blatt_name(t.blatt), tr("dlg.sr.art." + t.art), t.feld,
+                t.text, SU.ersetzt(t.text, such, neu, self.v_gross.get(),
+                                   self.v_wort.get())))
+        if self._treffer:
+            blaetter = len({t.blatt for t in self._treffer})
+            self.v_status.set(tr("dlg.sr.n_treffer", n=len(self._treffer), b=blaetter))
+        else:
+            self.v_status.set(tr("dlg.sr.keine"))
+
+    def ersetzen(self, nur_auswahl):
+        such = self.v_such.get()
+        if not such:
+            return
+        if not self._treffer:
+            self.suchen()
+        if nur_auswahl:
+            ids = [int(i) for i in self.tree.selection()]
+            hits = [self._treffer[i] for i in ids]
+            if not hits:
+                self.v_status.set(tr("dlg.sr.nichts_gewaehlt"))
+                return
+        else:
+            hits = list(self._treffer)
+        if not hits:
+            return
+        app = self.app
+        aktiv = app.projekt.aktiv if app.projekt is not None else 0
+        fremd = [t for t in hits if t.blatt != aktiv]
+        if fremd and not messagebox.askyesno(
+                tr("dlg.sr.titel"), tr("dlg.sr.frage_anderes", n=len(hits),
+                                       m=len(fremd)), parent=self):
+            return
+        neu = self.v_neu.get()
+        gross, wort = self.v_gross.get(), self.v_wort.get()
+        eigene = [t for t in hits if t.blatt == aktiv]
+        n = 0
+        if eigene:
+            app._snapshot()
+            n += SU.ersetze(eigene, such, neu, gross, wort)
+        geaendert = set()
+        for t in fremd:
+            if SU.ersetze([t], such, neu, gross, wort):
+                n += 1
+                geaendert.add(t.blatt)
+        for i in geaendert:
+            try:
+                app._json_atomar_schreiben(app.projekt.blatt_pfad(i), self._daten[i])
+            except OSError as ex:
+                messagebox.showerror(tr("dlg.sr.titel"), str(ex), parent=self)
+        app._qv_cache.clear()
+        app.redraw()
+        self.suchen()
+        self.v_status.set(tr("dlg.sr.fertig", n=n))
+
