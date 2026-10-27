@@ -1,7 +1,7 @@
 ; Inno Setup script - Windows installer for KatieCAD
-; Build:  iscc /DAppVersion=1.0.2 installer\KatieCAD.iss
+; Build:  iscc /DAppVersion=1.0.3 installer\KatieCAD.iss
 #ifndef AppVersion
-  #define AppVersion "1.0.2"
+  #define AppVersion "1.0.3"
 #endif
 
 [Setup]
@@ -37,4 +37,3 @@ Name: "{autodesktop}\KatieCAD"; Filename: "{app}\KatieCAD.exe"; Tasks: desktopic
 
 [Run]
 Filename: "{app}\KatieCAD.exe"; Description: "{cm:LaunchProgram,KatieCAD}"; Flags: nowait postinstall skipifsilent
-
