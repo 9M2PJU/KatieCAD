@@ -18,6 +18,8 @@
 - PDF export writes KatieCAD layers as PDF layers (toggle them in Acrobat, Bluebeam, etc.; re-importable)
 - Hatch: selection box (lines/solid fill) with spacing and angle in one dialog instead of typing
 - Coordinate grid: choose DIN A4 (6 x 4), DIN A3 (8 x 5, 395 x 252.59 mm) or custom values
+- Cross reference: text heights of identifier and target note adjustable (new default 2.5 / 1.5 mm), texts movable by grip, position resettable
+- Documentation: cover sheet, table of contents and lists in DIN A4 or DIN A3 (content scaled)
 - More compact Info window that fits its content
 - Info window: Log button opens the log file in the editor (no tabs)
 

@@ -219,6 +219,8 @@ verfolgt KatieCAD den Strompfad über solche Paare hinweg, wenn es genau einen
 abgehenden und mindestens einen ankommenden Pfeil mit demselben Text gibt. Ein
 Potential wie `L1`, das an vielen Stellen vorkommt, bleibt ein Endpunkt.
 
+**Texte des Querverweises:** Bezeichnung (z. B. `L1`) und Zielangabe (z. B. „(Blatt 6/1/D)“) haben Standardhöhen von 2,5 mm und 1,5 mm. Im Querverweis-Dialog (Doppelklick) stellst du beide Höhen getrennt ein. Beide Texte lassen sich außerdem an ihrem gelben Griff verschieben. Mit **Textpositionen zurücksetzen** im Dialog stehen sie wieder in der Standardlage.
+
 ### Klemmen und Kabel
 
 - Setze die Klemmen nebeneinander. **NUM** zählt beim nächsten Setzen selbst hoch.
@@ -231,14 +233,14 @@ Potential wie `L1`, das an vielen Stellen vorkommt, bleibt ein Endpunkt.
 ## 9. Dokumentation erzeugen
 
 **Projekt > Dokumentation erzeugen / aktualisieren…** erstellt als normale
-A4-Blätter im Projekt:
+Blätter im Projekt, wahlweise in **DIN A4** oder **DIN A3** (Auswahl im Dialog; bei A3 werden Flächen, Texte und Zeilenhöhen passend skaliert):
 
 - **Deckblatt** und **Inhaltsverzeichnis** (vor den Zeichnungsblättern)
 - **Geräteliste**, **Klemmenplan** und **Kabelplan** (dahinter)
 
 Im Dialog wählst du die gewünschten Blätter, die Schriftkopf-Vorlage und die
 Projektdaten (Anlage, Kunde, Auftragsnummer, Zeichnungsnummer, Firma, gezeichnet /
-geprüft von, Revision, Datum). Die Berichtsblätter werden bei jedem Lauf komplett
+geprüft von, Revision, Datum) und das Blattformat. Die Berichtsblätter werden bei jedem Lauf komplett
 neu erzeugt. Handänderungen darin gehen verloren, deine Zeichnungsblätter bleiben
 unverändert.
 

@@ -163,7 +163,7 @@ All tools are in the **Electrical** menu and in the toolbar.
 | **Cross reference** (QV) | Arrow that continues a current path on another sheet. Same text = belongs together. |
 | **Terminal** (KLEMME) | Terminal block with two connections (top/bottom) and the fields IND (terminal strip), TYP, PER, NUM (number). |
 | **Cable** (KABEL) | Horizontal line with a label. Where a vertical wire crosses it, a core marker (L1, L2, L3, N, PE …) appears automatically; the designation can be changed. |
-| **Coordinate field** (FELD) | Column/row grid of the sheet, so that references can be given as "sheet/column/row". |
+| **Coordinate field** (FELD) | Column/row grid of the sheet, so that references can be given as "sheet/column/row". In the dialog choose **DIN A4** (287 × 164 mm, 6 × 4), **DIN A3** (395 × 252.59 mm, 8 × 5) or enter your own values. |
 
 ### Ready-made symbols
 
@@ -213,6 +213,8 @@ current path across such pairs when there is exactly one outgoing and at least o
 incoming arrow with the same text. A potential such as `L1` that occurs in many
 places stays an end point.
 
+**Cross-reference texts:** the identifier (e.g. `L1`) and the target note (e.g. "(Sheet 6/1/D)") have default heights of 2.5 mm and 1.5 mm. In the cross-reference dialog (double-click) you set both heights separately. Both texts can also be moved with their yellow grips. **Reset text positions** in the dialog puts them back to the default position.
+
 ### Terminals and cables
 
 - Place the terminals side by side. **NUM** counts up by itself on the next
@@ -223,15 +225,15 @@ places stays an end point.
 
 ## 9. Generating documentation
 
-**Project > Create / update documentation…** creates ordinary A4 sheets in the
-project:
+**Project > Create / update documentation…** creates ordinary sheets in the
+project, in either **DIN A4** or **DIN A3** (chosen in the dialog; on A3 areas, texts and row heights are scaled to fit):
 
 - **cover sheet** and **table of contents** (in front of the drawing sheets)
 - **device list**, **terminal diagram** and **cable plan** (behind them)
 
 In the dialog you choose the sheets, the title block template and the project data
 (plant, customer, order number, drawing number, company, drawn / checked by,
-revision, date). The report sheets are rebuilt completely on every run. Manual
+revision, date) and the sheet format. The report sheets are rebuilt completely on every run. Manual
 changes in them are lost; your drawing sheets stay untouched.
 
 - The lists are built from the masks (IND/TYP/PER), terminals, cables and the wires
