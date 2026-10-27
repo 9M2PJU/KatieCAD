@@ -82,7 +82,7 @@ from katiecad.ui.dialogs import (
     _BlockNameDialog, _BlockAuswahlDialog, BlockBrowserDialog,
     BlockSpeichernDialog,
     ProjektNeuDialog, AttributDefinitionDialog, BlockAttributeDialog,
-    QuerverweisDialog, PruefungDialog, EigenschaftenPalette, VerbindungspunkteDialog, ProjektDruckDialog,
+    SuchenErsetzenDialog, QuerverweisDialog, PruefungDialog, EigenschaftenPalette, VerbindungspunkteDialog, ProjektDruckDialog,
     VerbindungspunktDialog, VerbindungDialog, FestMaskeDialog,
     KoordinatenfeldDialog,
     TitleBlockDialog, DokumentationDialog, ProjektEigenschaftenDialog,
@@ -397,6 +397,7 @@ class CadApp:
 
         self._warte_auf_basispunkt = False
         self._hatch_pick = None
+        self._prop_pick = None
         self._letztes_fenster = None
         self._menuleiste = None
         self._menubar = None
@@ -1034,6 +1035,10 @@ class CadApp:
         m_bearb.add_command(label=tr("menu.bearbeiten.duplizieren"), command=self.duplizieren)
         m_bearb.add_command(label=tr("menu.bearbeiten.eigenschaften"),
                             command=self.eigenschaften_fenster)
+        m_bearb.add_command(label=tr("menu.bearbeiten.suchen"),
+                            command=self.suchen_ersetzen)
+        m_bearb.add_command(label=tr("menu.bearbeiten.eig_uebertragen"),
+                            command=self.eigenschaften_uebertragen_start)
         m_bearb.add_separator()
         m_bearb.add_command(label=tr("menu.bearbeiten.verschieben"),
                             command=lambda: self._op_start("move"))
@@ -2168,6 +2173,8 @@ class CadApp:
         self.root.bind("<Control-P>", lambda e: self.drucken())
         self.root.bind("<Control-s>", lambda e: self.speichern())
         self.root.bind("<Control-S>", lambda e: self.speichern())
+        self.root.bind("<Control-f>", lambda e: self.suchen_ersetzen())
+        self.root.bind("<Control-F>", lambda e: self.suchen_ersetzen())
         self.root.bind("<Control-b>", lambda e: self.block_liste())
         self.root.bind("<Control-B>", lambda e: self.block_liste())
         self.root.bind("<g>", self.zoom_grenzen)
@@ -2224,6 +2231,7 @@ class CadApp:
             self._griff_drag_el = None
             self._griff_drag_id = None
         self._schraffur_pick_ende()
+        self._eigenschaften_ende()
         self._bem_abbrechen()
         self._bogen_abbrechen()
         self._trim_abbrechen()
@@ -2541,6 +2549,9 @@ class CadApp:
             return
         if getattr(self, "_hatch_pick", None):
             self._schraffur_pick_ende()
+            return
+        if getattr(self, "_prop_pick", None) is not None:
+            self._eigenschaften_ende()
             return
         if self._op is not None:
             self._op_rechtsklick()
@@ -3352,6 +3363,9 @@ class CadApp:
             return
         if getattr(self, "_hatch_pick", None):
             self._schraffur_klick(event)
+            return
+        if getattr(self, "_prop_pick", None) is not None:
+            self._eigenschaften_klick(event)
             return
         if self._block_erzeuge_auswahl is not None:
             x, y = self._eingabepunkt(event)
@@ -5492,6 +5506,22 @@ class CadApp:
             daten["farbe"] = self.layers[name].farbe
         return daten
 
+    def ungenutzte_layer(self):
+        """Names of the layers that no object (model, layouts, block
+        contents) uses. Layer 0 and the active layer are never listed."""
+        benutzt = {"0", self.aktiver_layer.get()}
+
+        def sammeln(liste):
+            for el in liste:
+                benutzt.add(getattr(el, "layer", "0"))
+                kinder = getattr(el, "elemente", None)
+                if isinstance(kinder, (list, tuple)):
+                    sammeln(kinder)
+        sammeln(self.elemente)
+        for lay in self.layouts:
+            sammeln(lay.elemente)
+        return [n for n in self.layers if n not in benutzt]
+
     def _elektro_layer_pruefen(self, elemente=None):
         """Makes sure all E_* layers used by elements exist."""
         for el in (self.elemente if elemente is None else elemente):
@@ -6818,6 +6848,10 @@ class CadApp:
             self.undo()
         elif cmd == "redo":
             self.redo()
+        elif cmd == "suchen":
+            self.suchen_ersetzen()
+        elif cmd == "matchprop":
+            self.eigenschaften_uebertragen_start()
         elif cmd == "attdef":
             self.attdef_erstellen()
         elif cmd == "attedit":
@@ -9287,6 +9321,78 @@ class CadApp:
     # --------------------------------------------------------
     # Hatching
     # --------------------------------------------------------
+    # --------------------------------------------------------
+    # Find and replace
+    # --------------------------------------------------------
+    def suchen_ersetzen(self):
+        if self._ist_layout():
+            self.status.set("Suchen und Ersetzen gilt für die Zeichnung (Modell)."
+                            if SPRACHE["aktuell"] == "de" else
+                            "Find and replace works on the drawing (model).")
+            return
+        SuchenErsetzenDialog(self.root, self)
+
+    # --------------------------------------------------------
+    # Match properties
+    # --------------------------------------------------------
+    _EIG_ALLGEMEIN = ("layer", "farbe", "eig_farbe", "linientyp", "staerke")
+
+    def eigenschaften_uebertragen_start(self):
+        """Pick a source object, then click the objects that receive its
+        layer, colour, line type, weight (and text height / hatch pattern)."""
+        de = SPRACHE["aktuell"] == "de"
+        self._prop_pick = {"quelle": None, "anzahl": 0}
+        if self.aktives_werkzeug.get() != "auswahl":
+            self.aktives_werkzeug.set("auswahl")
+            self._werkzeug_gewechselt()
+        self.status.set("EIGENSCHAFTEN ÜBERTRAGEN: Quellobjekt anklicken "
+                        "(ESC = abbrechen)." if de else
+                        "MATCH PROPERTIES: click the source object (ESC = cancel).")
+
+    def _eigenschaften_ende(self):
+        if self._prop_pick is not None:
+            n = self._prop_pick.get("anzahl", 0)
+            self._prop_pick = None
+            de = SPRACHE["aktuell"] == "de"
+            self.status.set((f"Eigenschaften auf {n} Objekt(e) übertragen." if de
+                             else f"Properties applied to {n} object(s)."))
+
+    def _eigenschaften_anwenden(self, quelle, ziel):
+        """Copies the properties of `quelle` onto `ziel`; returns True if
+        something was applied."""
+        if ziel is quelle:
+            return False
+        for k in self._EIG_ALLGEMEIN:
+            if hasattr(quelle, k) and hasattr(ziel, k):
+                setattr(ziel, k, getattr(quelle, k))
+        if isinstance(quelle, Text) and isinstance(ziel, Text):
+            ziel.hoehe, ziel.schriftart = quelle.hoehe, quelle.schriftart
+        if isinstance(quelle, Schraffur) and isinstance(ziel, Schraffur):
+            ziel.muster, ziel.abstand, ziel.winkel = (quelle.muster,
+                                                       quelle.abstand, quelle.winkel)
+        return True
+
+    def _eigenschaften_klick(self, event):
+        de = SPRACHE["aktuell"] == "de"
+        x, y = self.px_to_mm(event.x, event.y)
+        el = self._element_unter_maus(x, y, 8 / self.view["zoom"])
+        if el is None:
+            return
+        pp = self._prop_pick
+        if pp["quelle"] is None:
+            pp["quelle"] = el
+            self.auswahl = [el]
+            self.redraw()
+            self.status.set("Quelle gewählt. Jetzt die Zielobjekte anklicken "
+                            "(ESC / Rechtsklick = fertig)." if de else
+                            "Source picked. Now click the target objects "
+                            "(ESC / right-click = done).")
+            return
+        self._snapshot()
+        if self._eigenschaften_anwenden(pp["quelle"], el):
+            pp["anzahl"] += 1
+        self.redraw()
+
     def _schraffur_pick_start(self):
         """Like AutoCAD: no selection needed - click into a closed area."""
         de = SPRACHE["aktuell"] == "de"
@@ -9430,3 +9536,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
