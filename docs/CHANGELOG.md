@@ -1,6 +1,9 @@
 # Änderungen
 
 ## 1.0.3
+- Querverweise: gleicher Name über mehrere Blätter wird als Kette aufgelöst (abgehend → nächstes Blatt, ankommend → vorheriges Blatt), `L1.1`/`L1.2` sind nicht mehr nötig
+- Koordinatenfeld: Beschriftung um 0,1 mm kleiner (PDF-Druck wirkte dicker)
+- Menü: „Stutzen“ und „Brechen“ stehen jetzt unter Bearbeiten statt unter Einfügen
 - Schraffur wie in AutoCAD: ohne Auswahl direkt in einen umschlossenen Bereich klicken (kreuzende Linien erlaubt), mehrere Bereiche nacheinander
 - Strecken: wurden Objekte vorher mit einem überkreuzenden Fenster markiert, entfällt das zweite Aufziehen; gestreckt werden nur die markierten Objekte
 - Querverweis „abgehend West“ / „ankommend Ost“: Bezeichnung steht an der Pfeilspitze bzw. -basis, der Verweis dahinter
