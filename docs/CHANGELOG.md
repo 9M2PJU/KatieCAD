@@ -1,6 +1,7 @@
 # Änderungen
 
 ## 1.0.3
+- Neues Tastenkürzel Strg+B: öffnet die Blockliste (Blockauswahl)
 - Schriftkopf „Standard (eingebaut)“ entfernt (identisch mit „Example A3“); es gibt nur noch die Vorlagen aus dem Ordner title_blocks
 - Linux: eigene Menüleiste ohne Grab statt der Tk-Menüleiste – aufgeklappte Menüs schließen sich bei Fokuswechsel, Klick daneben und ESC (Windows/macOS unverändert; alte Menüs mit `KATIECAD_NATIVE_MENU=1`)
 - Querverweise: gleicher Name über mehrere Blätter wird als Kette aufgelöst (abgehend → nächstes Blatt, ankommend → vorheriges Blatt), `L1.1`/`L1.2` sind nicht mehr nötig
