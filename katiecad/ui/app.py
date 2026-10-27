@@ -1213,7 +1213,8 @@ class CadApp:
 
         eintraege = [(menubar.entrycget(i, "label"), self.root.nametowidget(
                           menubar.entrycget(i, "menu")))
-                     for i in range(menubar.index("end") + 1)]
+                     for i in range(menubar.index("end") + 1)
+                     if menubar.type(i) == "cascade"]
         if self._eigene_menueleiste():
             # Linux/X11: own bar without grab (see menuleiste.py)
             if self._menuleiste is None:
@@ -9385,4 +9386,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
