@@ -60,7 +60,7 @@ jobs:
             --add-data "title_blocks${SEP}title_blocks" \
             --add-data "report_templates${SEP}report_templates" \
             --add-data "docs${SEP}docs" \
-            --add-data "KatieCAD.ico${SEP}." --add-data "KatieCAD.png${SEP}." \
+            --add-data "KatieCAD.ico${SEP}." --add-data "KatieCAD.png${SEP}." --add-data "KatieCAD_Maskottchen.png${SEP}." \
             main.py
 
       - name: Windows installer (Inno Setup)
