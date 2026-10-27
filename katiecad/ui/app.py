@@ -7463,26 +7463,50 @@ class CadApp:
         p.speichern()
         self.status.set(tr("msg.blatt.dupliziert", name=b.name))
 
+    def _blatt_auswahl(self):
+        """Indices of the sheets selected in the sheet list (at least the
+        active sheet)."""
+        p = self.projekt
+        sl = getattr(self, "seitenleiste", None)
+        idx = []
+        if sl is not None and hasattr(sl, "auswahl_indizes"):
+            try:
+                idx = [i for i in sl.auswahl_indizes() if 0 <= i < len(p.blaetter)]
+            except Exception:
+                idx = []
+        return idx or [p.aktiv]
+
     def blatt_loeschen(self):
         p = self.projekt
         if p is None:
             self.status.set(tr("msg.projekt.kein_projekt"))
             return
-        if len(p.blaetter) <= 1:
+        idxs = sorted(set(self._blatt_auswahl()))
+        if len(idxs) >= len(p.blaetter):
             messagebox.showinfo(tr("msg.projekt.titel"),
                                 tr("msg.blatt.letztes"), parent=self.root)
             return
-        idx = p.aktiv
-        b = p.blaetter[idx]
-        if not messagebox.askyesno(
-                tr("msg.projekt.titel"),
-                tr("msg.blatt.loeschen_frage", nr=p.nummer(idx), name=b.name),
-                icon="warning", parent=self.root):
+        if len(idxs) == 1:
+            frage = tr("msg.blatt.loeschen_frage", nr=p.nummer(idxs[0]),
+                       name=p.blaetter[idxs[0]].name)
+        else:
+            frage = tr("msg.blatt.loeschen_mehrere", n=len(idxs))
+        if not messagebox.askyesno(tr("msg.projekt.titel"), frage,
+                                   icon="warning", parent=self.root):
             return
-        self._undo_pro_blatt.pop(p.blatt_pfad(b), None)
-        p.blatt_entfernen(idx)
-        neu = min(idx, len(p.blaetter) - 1)
-        self._blatt_laden(neu)
+        aktiv_blatt = p.blaetter[p.aktiv]
+        aktiv_weg = p.aktiv in idxs
+        for idx in reversed(idxs):
+            b = p.blaetter[idx]
+            self._undo_pro_blatt.pop(p.blatt_pfad(b), None)
+            p.blatt_entfernen(idx)
+        if aktiv_weg:
+            neu = min(idxs[0], len(p.blaetter) - 1)
+            self._blatt_laden(neu)
+        else:                              # the open sheet stays loaded
+            p.aktiv = p.blaetter.index(aktiv_blatt)
+            self.seitenleiste.aktualisieren()
+            self._update_titel()
         try:
             p.speichern()
         except OSError:
@@ -7536,18 +7560,26 @@ class CadApp:
         self._update_titel()
 
     def blatt_verschieben(self, delta):
+        """Moves the selected sheets (one or several) up (-1) or down (+1)."""
         p = self.projekt
         if p is None:
             return
-        neu = p.blatt_verschieben(p.aktiv, delta)
-        if neu == p.aktiv:
-            return
-        p.aktiv = neu
+        idxs = sorted(set(self._blatt_auswahl()))
+        n = len(p.blaetter)
+        if (delta < 0 and idxs[0] == 0) or (delta > 0 and idxs[-1] == n - 1):
+            return                         # the block is already at the end
+        aktiv_blatt = p.blaetter[p.aktiv]
+        gewaehlt = [p.blaetter[i] for i in idxs]
+        for i in (idxs if delta < 0 else reversed(idxs)):
+            p.blatt_verschieben(i, delta)
+        p.aktiv = p.blaetter.index(aktiv_blatt)
         try:
             p.speichern()
         except OSError:
             pass
         self.seitenleiste.aktualisieren()
+        if len(gewaehlt) > 1 and hasattr(self.seitenleiste, "auswahl_setzen"):
+            self.seitenleiste.auswahl_setzen([p.blaetter.index(b) for b in gewaehlt])
         self._update_titel()
 
     # ========================================================
@@ -8599,9 +8631,12 @@ class CadApp:
                                         self._json_atomar_schreiben,
                                         bg_layout=self.bg_layout)
             p.speichern()
-        except (OSError, ValueError) as e:
+        except Exception as e:           # also unexpected errors: never fail silently
+            import traceback
+            traceback.print_exc()        # ends up in the program log
             messagebox.showerror(tr("dlg.doku.titel"),
-                                 tr("msg.doku.fehler", fehler=e), parent=self.root)
+                                 tr("msg.doku.fehler", fehler=f"{type(e).__name__}: {e}"),
+                                 parent=self.root)
             return
         self._blatt_laden(neu_aktiv)
         p.speichern()
