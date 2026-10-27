@@ -2122,6 +2122,154 @@ def _kreis_polygon(cx, cy, r, n=None):
              cy + r * math.sin(2 * math.pi * i / n)) for i in range(n)]
 
 
+def bereich_an_punkt(elemente, punkt, tol=0.05):
+    """Finds the smallest closed region around `punkt` that is bounded by
+    lines, arcs, circles, rectangles and polylines (they may cross each
+    other, like AutoCAD's "pick internal point").
+    Returns (points, source element) or None."""
+    segs = []                                     # (a, b, source)
+
+    def kette(pts, quelle, zu=False):
+        pts = list(pts)
+        for i in range(len(pts) - 1):
+            segs.append((pts[i], pts[i + 1], quelle))
+        if zu and len(pts) > 2:
+            segs.append((pts[-1], pts[0], quelle))
+
+    for el in elemente:
+        if isinstance(el, Kreis):
+            kette(_kreis_polygon(el.cx, el.cy, el.r), el, True)
+        elif isinstance(el, Rechteck):
+            kette([(el.x1, el.y1), (el.x2, el.y1), (el.x2, el.y2),
+                   (el.x1, el.y2)], el, True)
+        elif isinstance(el, Polylinie):
+            kette(el.punkte, el, bool(el.geschlossen))
+        elif isinstance(el, Linie):
+            kette([(el.x1, el.y1), (el.x2, el.y2)], el)
+        elif isinstance(el, Bogen):
+            sw = bogen_sweep(el.start, el.ende)
+            n = int(max(8, min(360, sw / 3.0)))
+            kette(bogen_punkte(el.cx, el.cy, el.r, el.start, el.ende, n), el)
+    segs = [sg for sg in segs
+            if math.hypot(sg[1][0] - sg[0][0], sg[1][1] - sg[0][1]) > 1e-9]
+    if not segs or len(segs) > 4000:
+        return None
+
+    # split every segment at crossings / T-junctions
+    schnitt = [[0.0, 1.0] for _ in segs]
+    bb = [(min(a[0], b[0]) - tol, min(a[1], b[1]) - tol,
+           max(a[0], b[0]) + tol, max(a[1], b[1]) + tol) for a, b, _ in segs]
+    for i in range(len(segs)):
+        a, b, _ = segs[i]
+        rx, ry = b[0] - a[0], b[1] - a[1]
+        li = math.hypot(rx, ry)
+        for j in range(len(segs)):
+            if i == j:
+                continue
+            if (bb[i][2] < bb[j][0] or bb[j][2] < bb[i][0]
+                    or bb[i][3] < bb[j][1] or bb[j][3] < bb[i][1]):
+                continue
+            c, d, _ = segs[j]
+            sx, sy = d[0] - c[0], d[1] - c[1]
+            den = rx * sy - ry * sx
+            if abs(den) > 1e-12:
+                t = ((c[0] - a[0]) * sy - (c[1] - a[1]) * sx) / den
+                u = ((c[0] - a[0]) * ry - (c[1] - a[1]) * rx) / den
+                lj = math.hypot(sx, sy)
+                if -tol / li <= t <= 1 + tol / li and -tol / lj <= u <= 1 + tol / lj:
+                    schnitt[i].append(min(1.0, max(0.0, t)))
+            else:                                  # collinear touching ends
+                for q in (c, d):
+                    t = ((q[0] - a[0]) * rx + (q[1] - a[1]) * ry) / (li * li)
+                    dist = abs((q[0] - a[0]) * ry - (q[1] - a[1]) * rx) / li
+                    if 0.0 < t < 1.0 and dist <= tol:
+                        schnitt[i].append(t)
+
+    knoten = {}
+    koords = []
+
+    def nid(pt):
+        k = (round(pt[0] / tol), round(pt[1] / tol))
+        for dx in (0, -1, 1):
+            for dy in (0, -1, 1):
+                v = knoten.get((k[0] + dx, k[1] + dy))
+                if v is not None:
+                    return v
+        knoten[k] = len(koords)
+        koords.append(pt)
+        return knoten[k]
+
+    kanten = {}                                    # (u, v) -> source
+    for (a, b, q), ts in zip(segs, schnitt):
+        ts = sorted(set(ts))
+        ids = [nid((a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t))
+               for t in ts]
+        for u, v in zip(ids, ids[1:]):
+            if u != v:
+                kanten[(u, v)] = q
+                kanten[(v, u)] = q
+    nachbarn = {}
+    for (u, v) in kanten:
+        nachbarn.setdefault(u, []).append(v)
+
+    def winkel(u, v):
+        return math.atan2(koords[v][1] - koords[u][1], koords[v][0] - koords[u][0])
+
+    for u in nachbarn:
+        nachbarn[u].sort(key=lambda v, u=u: winkel(u, v))
+
+    px, py = punkt
+    treffer = []
+    for (u, v) in kanten:
+        if u > v:
+            continue
+        (x1, y1), (x2, y2) = koords[u], koords[v]
+        if (y1 > py) == (y2 > py):
+            continue
+        x = x1 + (py - y1) * (x2 - x1) / (y2 - y1)
+        if x > px:
+            treffer.append((x, u, v))
+    treffer.sort()
+    for _, u, v in treffer:
+        a, b = koords[u], koords[v]
+        if (b[0] - a[0]) * (py - a[1]) - (b[1] - a[1]) * (px - a[0]) < 0:
+            u, v = v, u                            # point on the left
+        start = (u, v)
+        kante = start
+        schleife = []
+        ok = False
+        for _ in range(len(kanten) + 2):
+            schleife.append(kante[0])
+            x, y = kante
+            nb = nachbarn[y]
+            nxt = nb[(nb.index(x) - 1) % len(nb)]   # next edge clockwise
+            kante = (y, nxt)
+            if kante == start:
+                ok = True
+                break
+        if not ok:
+            continue
+        pts = [koords[k] for k in schleife]
+        if len(pts) < 3:
+            continue
+        flaeche = 0.0
+        for i in range(len(pts)):
+            x1, y1 = pts[i]
+            x2, y2 = pts[(i + 1) % len(pts)]
+            flaeche += x1 * y2 - x2 * y1
+        if flaeche <= 0:
+            continue                               # outer boundary of an island
+        inside = False
+        for i in range(len(pts)):
+            x1, y1 = pts[i]
+            x2, y2 = pts[(i + 1) % len(pts)]
+            if (y1 > py) != (y2 > py) and px < x1 + (py - y1) * (x2 - x1) / (y2 - y1):
+                inside = not inside
+        if inside:
+            return pts, kanten[(schleife[0], schleife[1])]
+    return None
+
+
 def konturen_aus_elementen(elemente, tol=0.05):
     """Finds closed contours in an element list.
 
@@ -2461,11 +2609,9 @@ class Querverweis(Element):
             wz = pdf_textbreite(ziel, self.hoehe_ziel() / CAD_VERSALHOEHE)
             if links:                          # text runs away from the arrow
                 zx, zy = qx + ex * (wi + self.GAP), qy + ey * (wi + self.GAP)
-            elif a == 90.0:                    # upright text below the arrow:
-                # identifier next to the arrow, target note below it
+            else:                              # text ends at the arrow:
+                # identifier next to the arrow, target note further away
                 zx, zy = qx - ex * (wi + self.GAP), qy - ey * (wi + self.GAP)
-            else:                              # text ends at the arrow
-                tx, ty = qx - ex * (wz + self.GAP), qy - ey * (wz + self.GAP)
         return (a, "mitte_" + ("links" if links else "rechts"),
                 (tx, ty), (zx, zy))
 
@@ -3485,4 +3631,3 @@ _inst(_FestMaske, skalieren=_sk_pos, spiegeln=_sp_pos)
 _inst(Kabel, skalieren=_sk_kabel, spiegeln=_sp_kabel)
 _inst(Koordinatenfeld, skalieren=_sk_kf, spiegeln=_sp_kf)
 _inst(Bild, skalieren=_sk_kf, spiegeln=_sp_kf)
-
