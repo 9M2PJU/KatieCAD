@@ -218,7 +218,7 @@ class ToolbarDockMixin:
             r.grid_forget()
         for i, namen_z in enumerate(zeilen):
             while len(rahmen) <= i:
-                rahmen.append(tk.Frame(zone, bd=0, highlightthickness=0))
+                rahmen.append(ttk.Frame(zone))
             zf = rahmen[i]
             zf.grid(row=i, column=0, sticky="nw")
             for name in namen_z:
