@@ -614,4 +614,3 @@ def flaeche_treffer(nz, o, d):
             if t is not None and t > 1e-6 and (best is None or t < best[0]):
                 best = (t, fi)
     return best
-

@@ -277,8 +277,10 @@ def loch_setzen(koerper, x, y, r, tiefe=None):
 # --------------------------------------------------------------------------
 # Faces, work planes, sketches
 # --------------------------------------------------------------------------
-def flaeche_pick(elemente, kamera, cx, cy, mx, my):
-    """Face of a body under the screen point -> (body, plane, face points) or None."""
+def flaeche_pick(elemente, kamera, cx, cy, mx, my, tol=10.0):
+    """Face of a body under the screen point -> (body, plane, face points) or None.
+    Directly on an edge or corner (no face is hit exactly) the visible face whose
+    outline is within `tol` pixels wins, so edge points can be snapped."""
     o, d = kamera.strahl(mx, my, cx, cy)
     best = None
     for el in elemente:
@@ -293,9 +295,34 @@ def flaeche_pick(elemente, kamera, cx, cy, mx, my):
             e = G.ebene_von_flaeche(pts, k.zentrum3())
             if e is not None:
                 best = (tr_[0], k, e, pts)
-    if best is None:
+    if best is not None:
+        return best[1], best[2], best[3]
+    # fallback: front-facing face with the outline closest to the cursor
+    cand = None
+    for el in elemente:
+        if not ist_3d(el):
+            continue
+        for k in el.koerper():
+            nz = k.netz()
+            zen = k.zentrum3()
+            for f in nz.flaechen:
+                pts = [nz.punkte[i] for i in f]
+                e = G.ebene_von_flaeche(pts, zen)
+                if e is None:
+                    continue
+                w = G.ebene_basis(e)[2]
+                _o2, d2 = kamera.strahl(mx, my, cx, cy)
+                if G.v_dot(w, d2) > 1e-6:                     # back face
+                    continue
+                dist = _abstand_zug(kamera, cx, cy, mx, my, pts, True)
+                if dist is None or dist > tol:
+                    continue
+                key = (round(dist, 1), G.v_dot(w, d2))        # nearer outline, then more frontal
+                if cand is None or key < cand[0]:
+                    cand = (key, k, e, pts)
+    if cand is None:
         return None
-    return best[1], best[2], best[3]
+    return cand[1], cand[2], cand[3]
 
 
 def punkt_auf_ebene(kamera, cx, cy, mx, my, ebene, raster=None):
