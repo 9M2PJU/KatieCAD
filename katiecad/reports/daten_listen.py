@@ -160,7 +160,7 @@ def querverweisliste(netz, blaetter, nummer):
     felder = _felder(blaetter)
     gruppen = {}
     for n in netz.knoten:
-        if n.art != "qv" or not n.text:
+        if n.art != "qv" or not n.text or n.qv_art == "extern":
             continue
         g = gruppen.setdefault(n.text, {"ab": [], "an": []})
         (g["ab"] if n.qv_art == "abgehend" else g["an"]).append(
@@ -296,3 +296,4 @@ def revisionsuebersicht(projektdaten):
         if any(z.values()):
             zeilen.append(z)
     return zeilen
+
