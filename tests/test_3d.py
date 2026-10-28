@@ -281,4 +281,9 @@ _bl = {t.bez: t.bbox3() for t in _gl.teile}
 check(_bl["Türgriff"][0] < 100 and _b2["Türgriff"][3] > 500, "Türgriff links/rechts")
 for k in ("d3.schrank.griff", "d3.schrank.rechts", "d3.schrank.links"):
     check(k in I.TEXTE["de"] and k in I.TEXTE["en"], k)
+_tf = core.Text3D((10, 0, 20), "AB", 10, ebene=(10, 0, 20, 1, 0, 0, 0, 0, 1))
+_zz = _tf.zuege3()
+check(_zz and all(abs(p[1]) < 1e-9 for z in _zz for p in z), "Text3D liegt in der Fläche (vorne)")
+check(max(p[2] for z in _zz for p in z) <= 30.0 + 1e-9, "Text3D Höhe")
+_ft = core.Text3D((0, 0, 0), "X", 5); check(_ft.zuege3() == [], "Text3D ohne Ebene: kein Strichtext")
 print(f"test_3d - {ok} Checks bestanden")
