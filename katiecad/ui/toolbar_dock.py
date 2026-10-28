@@ -46,6 +46,50 @@ class ToolbarDockMixin:
     _tb_resize_id = None
     _tb_zonen = None
 
+    # ---- order inside a docking area ------------------------------------
+    def toolbar_reihenfolge(self):
+        if getattr(self, "_tb_reihe", None) is None:
+            try:
+                r = lade_konfiguration().get("toolbar_reihenfolge")
+            except Exception:
+                r = None
+            ok = isinstance(r, list) and sorted(r) == sorted(LEISTEN)
+            self._tb_reihe = list(r) if ok else list(LEISTEN)
+        return self._tb_reihe
+
+    def toolbar_verschieben(self, name, schritt):
+        """Moves a bar one place towards the front (-1) or the back (+1) of its area."""
+        r = self.toolbar_reihenfolge()
+        pos = self.toolbar_position(name)
+        gleiche = [n for n in r if self.toolbar_position(n) == pos]
+        if name not in gleiche:
+            return
+        i = gleiche.index(name) + schritt
+        if not 0 <= i < len(gleiche):
+            return
+        andere = gleiche[i]
+        a, b = r.index(name), r.index(andere)
+        r[a], r[b] = r[b], r[a]
+        self._toolbar_reihe_speichern()
+
+    def toolbar_vor(self, name, ziel):
+        """Places bar `name` directly in front of bar `ziel`."""
+        r = self.toolbar_reihenfolge()
+        if name == ziel or name not in r or ziel not in r:
+            return
+        r.remove(name)
+        r.insert(r.index(ziel), name)
+        self._toolbar_reihe_speichern()
+
+    def _toolbar_reihe_speichern(self):
+        try:
+            cfg = lade_konfiguration()
+            cfg["toolbar_reihenfolge"] = list(self._tb_reihe)
+            speichere_konfiguration(cfg)
+        except Exception:
+            pass
+        self._toolbar_anordnen()
+
     # ---- positions ----------------------------------------------------
     def toolbar_position(self, name="werkzeug"):
         if self._tb_pos_werte is None:
@@ -92,7 +136,7 @@ class ToolbarDockMixin:
             self._tb_info = {}
         koord = getattr(self, "_koord_bar", None)
         belegt = {p: [] for p in POSITIONEN}
-        for name in LEISTEN:
+        for name in self.toolbar_reihenfolge():
             tb = self._leiste(name)
             if tb is None:
                 continue
@@ -122,6 +166,7 @@ class ToolbarDockMixin:
                 tb = self._leiste(name)
                 if pos == "rechts":
                     tb.pack(in_=zone, side=tk.TOP, fill=tk.X, anchor="n")
+                    tb.tkraise()
                 if pos == "rechts":
                     self._leiste_gitter(name, len(namen))
                 else:
@@ -156,6 +201,7 @@ class ToolbarDockMixin:
             if x and x + w > frei:
                 reihe, x, spalte = reihe + 1, 0, 0
             tb.grid(in_=zone, row=reihe, column=spalte, sticky="nw")
+            tb.tkraise()                      # must lie above its zone, else it is hidden
             x += w
             spalte += 1
 
@@ -204,4 +250,23 @@ class ToolbarDockMixin:
             neu = ziel_position(relx, rely, self.toolbar_position(name))
             if neu != self.toolbar_position(name):
                 self.toolbar_position_setzen(neu, name)
+                return
+            # same area: dropped on another bar -> take its place
+            try:
+                unter = self.root.winfo_containing(px, py)
+            except Exception:
+                unter = None
+            while unter is not None and unter is not self.root:
+                for n in LEISTEN:
+                    if n != name and self._leiste(n) is unter and \
+                            self.toolbar_position(n) == self.toolbar_position(name):
+                        r = self.toolbar_reihenfolge()
+                        if r.index(n) < r.index(name):
+                            self.toolbar_vor(name, n)
+                        else:                         # behind it: swap places
+                            r.remove(name)
+                            r.insert(r.index(n) + 1, name)
+                            self._toolbar_reihe_speichern()
+                        return
+                unter = getattr(unter, "master", None)
         griff.bind("<ButtonRelease-1>", los)

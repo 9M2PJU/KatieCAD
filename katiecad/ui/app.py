@@ -1210,6 +1210,11 @@ class CadApp(AendernMixin, Ansicht3DMixin, ToolbarDockMixin):
             for _pos in ("oben", "unten", "rechts"):
                 m_n.add_command(label=tr("menu.ansicht.tb_" + _pos),
                                 command=lambda p=_pos, n=_name: self.toolbar_position_setzen(p, n))
+            m_n.add_separator()
+            m_n.add_command(label=tr("menu.ansicht.tb_vor"),
+                            command=lambda n=_name: self.toolbar_verschieben(n, -1))
+            m_n.add_command(label=tr("menu.ansicht.tb_zurueck"),
+                            command=lambda n=_name: self.toolbar_verschieben(n, 1))
             m_tb.add_cascade(label=tr("menu.ansicht.tb_" + _name), menu=m_n)
         m_ansicht.add_cascade(label=tr("menu.ansicht.tb"), menu=m_tb)
         m_ansicht.add_command(label=tr("menu.ansicht.zoom_grenzen"),
@@ -4945,7 +4950,7 @@ class CadApp(AendernMixin, Ansicht3DMixin, ToolbarDockMixin):
         if sl.ist_sichtbar():
             sl.ausblenden()
         else:
-            sl.einblenden(vor=self.canvas)
+            sl.einblenden(vor=self._ansicht3d if self._ansicht3d is not None else self.canvas)
         try:
             cfg = lade_konfiguration()
             cfg["sidebar_sichtbar"] = sl.ist_sichtbar()

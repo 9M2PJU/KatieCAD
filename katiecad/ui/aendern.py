@@ -196,7 +196,14 @@ class AendernMixin:
     # Manipulator
     # ------------------------------------------------------------
     def manipulator_umschalten(self):
-        self._manip_an = not getattr(self, "_manip_an", False)
+        self.manipulator_setzen(not getattr(self, "_manip_an", False))
+
+    def manipulator_setzen(self, an):
+        self._manip_an = bool(an)
+        try:
+            self._manip_var.set(self._manip_an)
+        except Exception:
+            pass
         self.redraw()
         self.status.set(tr("msg.manip.an" if self._manip_an else "msg.manip.aus"))
 
@@ -259,6 +266,7 @@ class AendernMixin:
                     "objekte": list(self.auswahl),
                     "achse": art if art in ("x", "y") else None}
         self.letzter_punkt = z
+        self._snap_ausschluss = list(self.auswahl)   # no snapping to the moving objects
         self.canvas.delete("manip")
         self._op_hinweis()
         if self._op["achse"]:
