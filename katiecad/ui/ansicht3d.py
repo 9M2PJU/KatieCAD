@@ -12,14 +12,16 @@ also pulls closed 2D shapes up or down into solids ("push/pull").
 """
 
 import math
+import re
 import tkinter as tk
-from tkinter import ttk, simpledialog, messagebox
+from tkinter import ttk, messagebox
 
 from katiecad.common.i18n import tr
-from katiecad.model.core import (FARBEN, UI_SCHRIFT, Koerper3D, Gruppe3D, quader, zylinder,
-                                 kegel, pyramide, kugel)
+from katiecad.model.core import (FARBEN, UI_SCHRIFT, Koerper3D, Gruppe3D, Skizze3D, Bemassung3D,
+                                 quader, zylinder, kegel, pyramide, kugel)
 from katiecad.model import geom3d as G
 from katiecad.model import szene3d as S
+from katiecad.ui.dialogs import _modal, _LayoutNameDialog
 
 BTN_MITTE, BTN_RECHTS = ("3", "2") if __import__("sys").platform == "darwin" else ("2", "3")
 
@@ -85,10 +87,7 @@ class Koerper3DDialog(tk.Toplevel):
             command=self.destroy).pack(side=tk.LEFT, padx=6)
         self.bind("<Return>", lambda e: self._ok())
         self.bind("<Escape>", lambda e: self.destroy())
-        try:
-            self.grab_set()
-        except tk.TclError:
-            pass
+        _modal(self)
 
     def _zahl(self, key):
         return float(self.vars[key].get().strip().replace(",", "."))
@@ -112,58 +111,53 @@ class Koerper3DDialog(tk.Toplevel):
 
 
 
-class LochDialog(tk.Toplevel):
-    """Hole (bore). result = (radius_mm, tiefe_mm | None, (x, y), mit_klick)."""
+class MassDialog(tk.Toplevel):
+    """Edit the dimensions of a body / sketch. result = {key: value} in display units."""
 
-    def __init__(self, parent, faktor, einheit, ort):
+    def __init__(self, parent, titel, felder):
         super().__init__(parent)
         self.result = None
-        self.f = faktor
-        self.title(tr("d3.neu.loch"))
+        self.title(titel)
         self.transient(parent)
         self.configure(bg=FARBEN["bg_mittel"])
         self.resizable(False, False)
         f = ttk.Frame(self, padding=12)
         f.pack(fill=tk.BOTH, expand=True)
         self.vars = {}
-        felder = [("durchmesser", tr("d3.dlg.durchmesser") + f" ({einheit})", "10"),
-                  ("tiefe", tr("d3.dlg.tiefe_loch") + f" ({einheit})", "0"),
-                  ("x", tr("d3.dlg.x") + f" ({einheit})", "%g" % (ort[0] / faktor)),
-                  ("y", tr("d3.dlg.y") + f" ({einheit})", "%g" % (ort[1] / faktor))]
         for r, (key, text, wert) in enumerate(felder):
             ttk.Label(f, text=text).grid(row=r, column=0, sticky=tk.W, pady=3)
-            v = tk.StringVar(value=wert)
+            v = tk.StringVar(value="%g" % round(wert, 6))
             self.vars[key] = v
             ttk.Entry(f, textvariable=v, width=12).grid(row=r, column=1, padx=8, pady=3)
-        self.klick = tk.BooleanVar(value=True)
-        ttk.Checkbutton(f, text=tr("d3.dlg.klick_loch"), variable=self.klick
-                        ).grid(row=len(felder), column=0, columnspan=2, sticky=tk.W, pady=6)
         bt = ttk.Frame(f)
-        bt.grid(row=len(felder) + 1, column=0, columnspan=2, pady=(6, 0))
+        bt.grid(row=len(felder), column=0, columnspan=2, pady=(10, 0))
         ttk.Button(bt, text="OK", command=self._ok).pack(side=tk.LEFT, padx=6)
         ttk.Button(bt, text=tr("dlg.abbrechen"), command=self.destroy).pack(side=tk.LEFT, padx=6)
         self.bind("<Return>", lambda e: self._ok())
         self.bind("<Escape>", lambda e: self.destroy())
-        try:
-            self.grab_set()
-        except tk.TclError:
-            pass
-
-    def _zahl(self, key):
-        return float(self.vars[key].get().strip().replace(",", "."))
+        _modal(self)
 
     def _ok(self):
         try:
-            d = self._zahl("durchmesser") * self.f
-            t = abs(self._zahl("tiefe")) * self.f
-            if d <= 0:
-                raise ValueError("d")
-            pos = (self._zahl("x") * self.f, self._zahl("y") * self.f)
+            res = {k: float(v.get().strip().replace(",", ".")) for k, v in self.vars.items()}
+            if any(x <= 0 for x in res.values()):
+                raise ValueError
         except ValueError:
             messagebox.showerror(tr("d3.titel"), tr("d3.msg.zahl"), parent=self)
             return
-        self.result = (d / 2.0, (t if t > 1e-9 else None), pos, bool(self.klick.get()))
+        self.result = res
         self.destroy()
+
+
+def frage_zahl(parent, titel, text, vorgabe):
+    """Number prompt in the program's own dialog style; None if cancelled."""
+    dlg = _LayoutNameDialog(parent, titel, vorgabe, text)
+    if dlg.result is None:
+        return None
+    try:
+        return float(dlg.result.strip().replace(",", "."))
+    except ValueError:
+        return None
 
 
 class _Info:
@@ -179,17 +173,32 @@ class _Info:
             pass
 
 
+def _vorzeichen(k):
+    """+1 / -1 for bodies whose pull direction is world Z (or on the ground), else 0."""
+    if not getattr(k, "ebene", None):
+        return 1.0
+    wz = G.ebene_basis(k.ebene)[2][2]
+    return (1.0 if wz > 0 else -1.0) if abs(wz) > 0.9 else 0.0
+
+
 class Ansicht3D(tk.Frame):
+    MODI = ("flaeche", "kreis", "rechteck", "poly", "bem")
+
     def __init__(self, app):
         super().__init__(app.root, bg=FARBEN["bg_mittel"])
         self.app = app
         z = app._3d_zustand()
+        self.zustand = z
         self.kamera = z["kamera"]
         self.wuerfel_var, self.persp_var, self.hoehe_var = z["wuerfel"], z["persp"], z["hoehe"]
+        self.raster_var = z["raster"]
         self.breite, self.hoehe = 900, 600
         self._drag = None
         self._platz = None
         self._achse = None
+        self._modus = None
+        self._skiz = None             # sketch / dimension in progress
+        self._maus = None
         self._spaeter_id = None
         self.wert_var = tk.StringVar()
         self.info_var = _Info(app)
@@ -209,10 +218,20 @@ class Ansicht3D(tk.Frame):
         ttk.Label(bar, text=tr("d3.titel"), style="Title.TLabel").pack(side=tk.LEFT, padx=(0, 8))
         a._umschalt_knopf(bar, "wuerfel", farbe, self.wuerfel_var, self.zeichne)
         a._umschalt_knopf(bar, "persp", farbe, self.persp_var, self._persp)
+        a._umschalt_knopf(bar, "raster3d", farbe, self.raster_var, self.zeichne)
         a._befehl_knopf(bar, "iso3d", farbe, lambda: self.ansicht("iso_so"))
         a._befehl_knopf(bar, "einpassen3d", farbe, self.einpassen)
         ttk.Separator(bar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=8)
         a._umschalt_knopf(bar, "hoehe3d", farbe, self.hoehe_var, lambda: None)
+        ttk.Separator(bar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=8)
+        a._befehl_knopf(bar, "flaeche3d", farbe, lambda: self.modus_setzen("flaeche"))
+        a._befehl_knopf(bar, "skizze_kreis", farbe, lambda: self.modus_setzen("kreis"))
+        a._befehl_knopf(bar, "skizze_rechteck", farbe, lambda: self.modus_setzen("rechteck"))
+        a._befehl_knopf(bar, "skizze_poly", farbe, lambda: self.modus_setzen("poly"))
+        a._befehl_knopf(bar, "ebene0", farbe, self.ebene_zuruecksetzen)
+        ttk.Separator(bar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=8)
+        a._befehl_knopf(bar, "bem3d", farbe, lambda: self.modus_setzen("bem"))
+        a._befehl_knopf(bar, "mass3d", farbe, self.massdialog)
         ttk.Label(bar, text=tr("d3.wert"), style="Title.TLabel").pack(side=tk.LEFT, padx=(10, 4))
         e = ttk.Entry(bar, textvariable=self.wert_var, width=10)
         e.pack(side=tk.LEFT)
@@ -224,6 +243,7 @@ class Ansicht3D(tk.Frame):
         c.bind("<Button-1>", self.on_klick)
         c.bind("<B1-Motion>", self.on_zug)
         c.bind("<ButtonRelease-1>", self.on_los)
+        c.bind("<Double-Button-1>", self.on_doppel)
         c.bind(f"<Button-{BTN_MITTE}>", lambda e: self._start_navigation(e, "mitte"))
         c.bind(f"<B{BTN_MITTE}-Motion>", self.on_navigation)
         c.bind(f"<ButtonRelease-{BTN_MITTE}>", self.on_navigation_ende)
@@ -237,6 +257,7 @@ class Ansicht3D(tk.Frame):
         c.bind("<Motion>", self.on_bewegt)
         c.bind("<Configure>", self.on_groesse)
         c.bind("<Escape>", lambda e: self.abbrechen())
+        c.bind("<Return>", lambda e: self._skizze_abschliessen())
 
     # ------------------------------------------------------------------
     # camera
@@ -275,7 +296,8 @@ class Ansicht3D(tk.Frame):
     def _start_navigation(self, e, taste):
         ctrl = bool(e.state & 0x4)
         art = "pan" if (taste == "rechts" or ctrl) else "orbit"
-        self._drag = {"art": art, "x": e.x, "y": e.y}
+        self._drag = {"art": art, "x": e.x, "y": e.y, "x0": e.x, "y0": e.y,
+                      "rechts": taste == "rechts"}
 
     def on_navigation(self, e):
         d = self._drag
@@ -290,8 +312,11 @@ class Ansicht3D(tk.Frame):
         self.zeichne()
 
     def on_navigation_ende(self, e):
-        if self._drag and self._drag["art"] in ("orbit", "pan"):
+        d = self._drag
+        if d and d["art"] in ("orbit", "pan"):
             self._drag = None
+            if d.get("rechts") and abs(e.x - d["x0"]) + abs(e.y - d["y0"]) < 4:
+                self.kontextmenue(e)
 
     # ------------------------------------------------------------------
     # drawing (wireframe only)
@@ -317,6 +342,11 @@ class Ansicht3D(tk.Frame):
             kw["dash"] = dash
         self.canvas.create_line(seg[0][0], seg[0][1], seg[1][0], seg[1][1], **kw)
 
+    def _polylinie(self, pts, farbe, breite=1, dash=None, tag="szene", geschlossen=False):
+        pts = list(pts) + ([pts[0]] if geschlossen and len(pts) > 2 else [])
+        for a, b in zip(pts, pts[1:]):
+            self._linie(a, b, farbe, breite, dash, tag)
+
     def _farbe(self, el):
         try:
             return self.app._effektive_zeichenfarbe(el)
@@ -334,6 +364,12 @@ class Ansicht3D(tk.Frame):
         l = self.app.layers.get(getattr(el, "layer", None))
         return not (l and not l.sichtbar)
 
+    def _text3(self, p, text, farbe, tag="szene"):
+        q = self.kamera.proj(p, *self._mitte())
+        if q is not None:
+            self.canvas.create_text(q[0], q[1] - 8, text=text, fill=farbe,
+                                    font=(UI_SCHRIFT, 9), tags=tag)
+
     def zeichne(self, *_):
         self._spaeter_id = None
         c = self.canvas
@@ -342,34 +378,45 @@ class Ansicht3D(tk.Frame):
             c.configure(bg=self.app.bg_modell)
         except Exception:
             pass
-        self._boden(*self._mitte())
+        if self.raster_var.get():
+            self._boden(*self._mitte())
+        else:
+            self._achsenkreuz()
         elemente = [e for e in self.app.elemente if self._sichtbar(e)]
         for el in elemente:
             if S.ist_3d(el):
                 continue
             farbe, br = self._farbe(el), self._breite(el)
-            for zug, geschlossen in S.flache_zuege(el):
-                pts = [(x, y, 0.0) for (x, y) in zug]
-                if geschlossen and len(pts) > 2:
-                    pts.append(pts[0])
-                for a, b in zip(pts, pts[1:]):
-                    self._linie(a, b, farbe, br)
+            for zug, geschlossen in S.zuege3(el):
+                self._polylinie(zug, farbe, br, geschlossen=geschlossen)
+            if isinstance(el, Bemassung3D):
+                self._text3(el.text_pos3(), el.wert_text(), farbe)
         for el, nz in S.koerper_netze(elemente):
             farbe, br = self._farbe(el), self._breite(el)
             for (i, j) in nz.kanten:
                 self._linie(nz.punkte[i], nz.punkte[j], farbe, br)
+        self._ebene_zeichnen()
         self._auswahl_zeichnen()
-        self._vorschau_platz_zeichnen()
+        self._vorschau_zeichnen()
         if self.wuerfel_var.get():
             self._wuerfel_zeichnen()
         self._manip_zeichnen()
 
+    def _achsenkreuz(self):
+        L = 60.0 / self.kamera.skala
+        for name, a in S.ACHSEN.items():
+            self._linie((0.0, 0.0, 0.0), (a[0] * L, a[1] * L, a[2] * L), ACHSEN_FARBE[name], 2,
+                        None, "boden")
+
+    def _raster_mm(self):
+        try:
+            return float(self.app._zahl(self.app.raster_mm, 5.0)) or 5.0
+        except Exception:
+            return 5.0
+
     def _boden(self, cx, cy):
         k = self.kamera
-        try:
-            schritt = float(self.app._zahl(self.app.raster_mm, 5.0)) or 5.0
-        except Exception:
-            schritt = 5.0
+        schritt = self._raster_mm()
         radius = max(self.breite, self.hoehe) / k.skala / 2.0 * 1.3
         while radius / schritt > 40:
             schritt *= 2
@@ -383,10 +430,34 @@ class Ansicht3D(tk.Frame):
         for j in range(j0, j1 + 1):
             self._linie((i0 * schritt, j * schritt, 0.0), (i1 * schritt, j * schritt, 0.0), farbe,
                         1, None, "boden")
-        L = 60.0 / k.skala
-        for name, a in S.ACHSEN.items():
-            self._linie((0.0, 0.0, 0.0), (a[0] * L, a[1] * L, a[2] * L), ACHSEN_FARBE[name], 2,
-                        None, "boden")
+        self._achsenkreuz()
+
+    def _ebene_zeichnen(self):
+        """Active work plane (a picked face): outline, local axes and grid."""
+        pl = self.zustand.get("plane")
+        if not pl:
+            return
+        e, pts = pl["ebene"], pl["pts"]
+        gelb = FARBEN["gelb"]
+        self._polylinie(pts, gelb, 2, None, "ebene", True)
+        lok = [G.ebene_lokal(e, p) for p in pts]
+        xs = [p[0] for p in lok]; ys = [p[1] for p in lok]
+        if self.raster_var.get():
+            r = self._raster_mm()
+            while (max(xs) - min(xs)) / r > 40 or (max(ys) - min(ys)) / r > 40:
+                r *= 2
+            i0, i1 = int(math.floor(min(xs) / r)), int(math.ceil(max(xs) / r))
+            j0, j1 = int(math.floor(min(ys) / r)), int(math.ceil(max(ys) / r))
+            for i in range(i0, i1 + 1):
+                self._linie(G.ebene_punkt(e, i * r, j0 * r), G.ebene_punkt(e, i * r, j1 * r),
+                            "#6b5a1f", 1, (2, 3), "ebene")
+            for j in range(j0, j1 + 1):
+                self._linie(G.ebene_punkt(e, i0 * r, j * r), G.ebene_punkt(e, i1 * r, j * r),
+                            "#6b5a1f", 1, (2, 3), "ebene")
+        L = 14.0 / self.kamera.skala
+        o = tuple(e[:3])
+        self._linie(o, G.ebene_punkt(e, L, 0), ACHSEN_FARBE["x"], 2, None, "ebene")
+        self._linie(o, G.ebene_punkt(e, 0, L), ACHSEN_FARBE["y"], 2, None, "ebene")
 
     def _auswahl_zeichnen(self):
         farbe = FARBEN["cyan"]
@@ -396,12 +467,8 @@ class Ansicht3D(tk.Frame):
                     for (i, j) in nz.kanten:
                         self._linie(nz.punkte[i], nz.punkte[j], farbe, 3, None, "auswahl")
             else:
-                for zug, geschlossen in S.flache_zuege(el):
-                    pts = [(x, y, 0.0) for (x, y) in zug]
-                    if geschlossen and len(pts) > 2:
-                        pts.append(pts[0])
-                    for a, b in zip(pts, pts[1:]):
-                        self._linie(a, b, farbe, 3, None, "auswahl")
+                for zug, geschlossen in S.zuege3(el):
+                    self._polylinie(zug, farbe, 3, None, "auswahl", geschlossen)
 
     # ---- view cube ------------------------------------------------------
     def _wuerfel_mitte(self):
@@ -481,18 +548,214 @@ class Ansicht3D(tk.Frame):
                                outline=FARBEN["bg_dunkel"], tags="manip")
 
     # ------------------------------------------------------------------
+    # modes: face, sketch, dimension
+    # ------------------------------------------------------------------
+    def _ebene(self):
+        pl = self.zustand.get("plane")
+        return pl["ebene"] if pl else G.BODEN_EBENE
+
+    def modus_setzen(self, modus):
+        self._skiz = None
+        self._platz = None
+        self._modus = modus
+        self.canvas.configure(cursor="tcross")
+        self.info_var.set(tr("d3.modus." + modus))
+        self.zeichne()
+
+    def ebene_zuruecksetzen(self):
+        self.zustand["plane"] = None
+        self.info_var.set(tr("d3.msg.ebene_boden"))
+        self.zeichne()
+
+    def _modus_ende(self):
+        self._modus = None
+        self._skiz = None
+        self.canvas.configure(cursor="crosshair")
+
+    def _raster_fang(self):
+        try:
+            if self.app.grid_snap.get():
+                return float(self.app._zahl(self.app.fang_mm, 5.0)) or None
+        except Exception:
+            pass
+        return None
+
+    def _lokal_punkt(self, e):
+        """Local point on the work plane under the mouse (vertex snap, then grid)."""
+        el = self._ebene()
+        mx, my = self._mitte()
+        fp = S.fang_punkt([x for x in self.app.elemente if self._sichtbar(x)], self.kamera,
+                          mx, my, e.x, e.y)
+        if fp is not None:
+            l = G.ebene_lokal(el, fp)
+            if abs(l[2]) < 1e-3:
+                return (l[0], l[1])
+        return S.punkt_auf_ebene(self.kamera, mx, my, e.x, e.y, el, self._raster_fang())
+
+    def _raum_punkt(self, e):
+        """3D point for dimensions: vertex snap, else the work plane."""
+        mx, my = self._mitte()
+        fp = S.fang_punkt([x for x in self.app.elemente if self._sichtbar(x)], self.kamera,
+                          mx, my, e.x, e.y)
+        if fp is not None:
+            return fp
+        l = S.punkt_auf_ebene(self.kamera, mx, my, e.x, e.y, self._ebene(), self._raster_fang())
+        return G.ebene_punkt(self._ebene(), l[0], l[1]) if l else None
+
+    def _stil(self):
+        try:
+            kw = self.app._layer_daten()
+            kw["staerke"] = None
+            kw["eig_farbe"] = True
+            return kw
+        except Exception:
+            return {}
+
+    def _modus_klick(self, e):
+        m = self._modus
+        if m == "flaeche":
+            r = S.flaeche_pick([x for x in self.app.elemente if self._sichtbar(x)], self.kamera,
+                               *self._mitte(), e.x, e.y)
+            if r is None:
+                self.info_var.set(tr("d3.msg.keine_flaeche"))
+                return
+            _k, ebene, pts = r
+            self.zustand["plane"] = {"ebene": ebene, "pts": pts}
+            self._modus_ende()
+            self.info_var.set(tr("d3.msg.ebene_gesetzt"))
+            self.zeichne()
+        elif m in ("kreis", "rechteck", "poly"):
+            p = self._lokal_punkt(e)
+            if p is None:
+                self.info_var.set(tr("d3.msg.keine_ebene"))
+                return
+            sk = self._skiz
+            if sk is None:
+                self._skiz = {"form": m, "pts": [p], "maus": p}
+                self.info_var.set(tr("d3.msg.skizze_" + m))
+            elif m == "kreis":
+                r = math.hypot(p[0] - sk["pts"][0][0], p[1] - sk["pts"][0][1])
+                if r > 1e-6:
+                    self._skizze_fertig("kreis", [sk["pts"][0][0], sk["pts"][0][1], r])
+            elif m == "rechteck":
+                q = sk["pts"][0]
+                if abs(p[0] - q[0]) > 1e-6 and abs(p[1] - q[1]) > 1e-6:
+                    self._skizze_fertig("rechteck", [q[0], q[1], p[0], p[1]])
+            else:
+                sk["pts"].append(p)
+            self.zeichne()
+        elif m == "bem":
+            p = self._raum_punkt(e)
+            if p is None:
+                self.info_var.set(tr("d3.msg.keine_ebene"))
+                return
+            sk = self._skiz
+            if sk is None:
+                self._skiz = {"form": "bem", "pts": [p]}
+                self.info_var.set(tr("d3.msg.bem_p2"))
+            elif len(sk["pts"]) == 1:
+                if G.v_len(G.v_sub(p, sk["pts"][0])) > 1e-6:
+                    sk["pts"].append(p)
+                    self.info_var.set(tr("d3.msg.bem_pos"))
+            else:
+                self._bem_fertig(self._bem_versatz(e, sk["pts"]))
+            self.zeichne()
+
+    def _bem_versatz(self, e, pts):
+        """Offset vector of a dimension: mouse point in the plane through p1 that faces the camera."""
+        p1, p2 = pts[0], pts[1]
+        o, d = self.kamera.strahl(e.x, e.y, *self._mitte())
+        f = self.kamera.basis()[2]
+        nenner = G.v_dot(d, f)
+        if abs(nenner) < 1e-9:
+            return (0.0, 0.0, 0.0)
+        t = G.v_dot(G.v_sub(p1, o), f) / nenner
+        q = G.v_add(o, G.v_mul(d, t))
+        off = G.v_sub(q, p1)
+        ax = G.v_norm(G.v_sub(p2, p1))
+        off = G.v_sub(off, G.v_mul(ax, G.v_dot(off, ax)))
+        return off
+
+    def _bem_fertig(self, versatz):
+        p1, p2 = self._skiz["pts"][0], self._skiz["pts"][1]
+        self.app._snapshot()
+        b = Bemassung3D(p1, p2, versatz, faktor=self.app._einh_faktor(), **self._stil())
+        self.app.elemente.append(b)
+        self.app.auswahl = [b]
+        self._skiz = None
+        self.app.redraw()
+        self.info_var.set(tr("d3.msg.bem_fertig", wert=b.wert_text(), einheit=self.app.einheit.get()))
+
+    def _skizze_fertig(self, form, daten):
+        self.app._snapshot()
+        sk = Skizze3D({"poly": "polylinie"}.get(form, form), self._ebene(), daten, **self._stil())
+        self.app.elemente.append(sk)
+        self.app.auswahl = [sk]
+        self._skiz = None
+        self.app.redraw()
+        self.info_var.set(tr("d3.msg.skizze_fertig"))
+
+    def _skizze_abschliessen(self):
+        """Enter: closes a polyline sketch."""
+        sk = self._skiz
+        if sk and sk["form"] == "poly" and len(sk["pts"]) >= 3:
+            self._skizze_fertig("poly", [list(p) for p in sk["pts"]])
+            self.zeichne()
+        elif sk is None and self.wert_var.get().strip():
+            self.wert_anwenden()
+
+    def _vorschau_zeichnen(self):
+        sk, m = self._skiz, self._modus
+        gelb = FARBEN["gelb"]
+        if self._platz is not None and self._platz.get("maus"):
+            pl = self._platz
+            p = self._bodenpunkt(pl["maus"], pl["z"])
+            if p is not None:
+                body = koerper_bauen(pl["art"], pl["par"], p[0], p[1], pl["z"])
+                nz = body.netz()
+                for (i, j) in nz.kanten:
+                    self._linie(nz.punkte[i], nz.punkte[j], gelb, 1, (4, 3), "vorschau")
+        if not sk or not self._maus:
+            return
+        if sk["form"] == "bem":
+            pts = sk["pts"]
+            if len(pts) == 1:
+                q = self._raum_punkt(self._maus)
+                if q:
+                    self._linie(pts[0], q, gelb, 1, (4, 3), "vorschau")
+            elif len(pts) == 2:
+                v = self._bem_versatz(self._maus, pts)
+                b = Bemassung3D(pts[0], pts[1], v, faktor=self.app._einh_faktor())
+                for zug in b.zuege3():
+                    self._polylinie(zug, gelb, 1, (4, 3), "vorschau")
+                self._text3(b.text_pos3(), b.wert_text(), gelb, "vorschau")
+            return
+        p = self._lokal_punkt(self._maus)
+        if p is None:
+            return
+        e = self._ebene()
+        q0 = sk["pts"][0]
+        if sk["form"] == "kreis":
+            r = math.hypot(p[0] - q0[0], p[1] - q0[1])
+            prof = G.kreis_profil(q0[0], q0[1], r, 32)
+            self._polylinie([G.ebene_punkt(e, x, y) for x, y in prof], gelb, 1, (4, 3), "vorschau", True)
+        elif sk["form"] == "rechteck":
+            prof = G.rechteck_profil(q0[0], q0[1], p[0], p[1])
+            self._polylinie([G.ebene_punkt(e, x, y) for x, y in prof], gelb, 1, (4, 3), "vorschau", True)
+        else:
+            pts = [G.ebene_punkt(e, x, y) for x, y in sk["pts"] + [p]]
+            self._polylinie(pts, gelb, 1, (4, 3), "vorschau")
+
+    # ------------------------------------------------------------------
     # mouse: selection, cube, manipulator
     # ------------------------------------------------------------------
     def _bodenpunkt(self, e, z=0.0):
         p = self.kamera.auf_ebene(e.x, e.y, *self._mitte(), z)
         if p is None:
             return None
-        try:
-            if self.app.grid_snap.get():
-                r = float(self.app._zahl(self.app.fang_mm, 5.0)) or 1.0
-                p = (round(p[0] / r) * r, round(p[1] / r) * r, p[2])
-        except Exception:
-            pass
+        r = self._raster_fang()
+        if r:
+            p = (round(p[0] / r) * r, round(p[1] / r) * r, p[2])
         return p
 
     def on_klick(self, e):
@@ -508,6 +771,9 @@ class Ansicht3D(tk.Frame):
                 self._drag = {"art": "wuerfel", "x": e.x, "y": e.y, "bewegt": False,
                               "name": name, "pfeil": pf}
                 return
+        if self._modus:
+            self._modus_klick(e)
+            return
         infos = self._manip_infos()
         achse = S.manip_treffer(infos, e.x, e.y)
         if achse:
@@ -530,6 +796,21 @@ class Ansicht3D(tk.Frame):
         self.app.redraw()
         self.zeichne()
 
+    def on_doppel(self, e):
+        if self._modus or self._platz is not None:
+            return
+        el = S.pick([x for x in self.app.elemente if self._sichtbar(x)], self.kamera,
+                    *self._mitte(), e.x, e.y)
+        if el is None:
+            return
+        self.app.auswahl = [el]
+        if S.parameter(el):
+            self.massdialog()
+        else:
+            self.app._element_bearbeiten(el)
+            self.app.redraw()
+            self.zeichne()
+
     def on_zug(self, e):
         d = self._drag
         if not d:
@@ -547,13 +828,7 @@ class Ansicht3D(tk.Frame):
             if not d["bewegt"]:
                 d["bewegt"] = True
                 self._manip_beginn(d)
-            raster = None
-            try:
-                if self.app.grid_snap.get():
-                    raster = float(self.app._zahl(self.app.fang_mm, 5.0)) or None
-            except Exception:
-                pass
-            mm = S.verschiebung_mm(d["info"], e.x - d["x"], e.y - d["y"], raster)
+            mm = S.verschiebung_mm(d["info"], e.x - d["x"], e.y - d["y"], self._raster_fang())
             self._manip_setzen(d, mm)
             self.zeichne()
 
@@ -569,6 +844,8 @@ class Ansicht3D(tk.Frame):
                     self.ansicht(d["name"])
         elif d["art"] == "manip":
             if d["bewegt"]:
+                if d.get("modus") == "extrudieren":
+                    self._extrusion_abschliessen(d["ziel"])
                 self.app.redraw()
                 self.zeichne()
                 self.info_var.set(tr("d3.msg.verschoben", achse=d["achse"].upper(),
@@ -580,17 +857,34 @@ class Ansicht3D(tk.Frame):
                 self.wert_var.set("")
 
     def on_bewegt(self, e):
+        self._maus = e
         if self._platz is not None:
             self._platz["maus"] = e
             self.zeichne()
+        elif self._skiz is not None:
+            self.zeichne()
+
+    def _extrusion_abschliessen(self, koerper):
+        """Bodies pulled downwards into the body below become pockets."""
+        gefallen = [k for k in koerper if S.extrusion_abschliessen(self.app.elemente, k)]
+        if gefallen:
+            self.app.auswahl = [x for x in self.app.auswahl if x not in gefallen]
+            self.info_var.set(tr("d3.msg.tasche"))
 
     # ---- manipulator actions ---------------------------------------------
     def _extrudierbare(self):
-        return [x for x in self.app.auswahl if S.extrudierbar(x)]
+        out = []
+        for x in self.app.auswahl:
+            if not S.extrudierbar(x):
+                continue
+            if isinstance(x, Skizze3D) and abs(G.ebene_basis(x.ebene)[2][2]) < 0.9:
+                continue
+            out.append(x)
+        return out
 
     def _hoehen_koerper(self):
         return [x for x in self.app.auswahl
-                if isinstance(x, Koerper3D) and x.art in ("prisma", "pyramide")]
+                if isinstance(x, Koerper3D) and x.art in ("prisma", "pyramide") and _vorzeichen(x)]
 
     def _manip_beginn(self, d):
         """First movement of a drag: prepares extrusion / height change."""
@@ -613,19 +907,23 @@ class Ansicht3D(tk.Frame):
         modus = d.get("modus", "verschieben")
         if modus == "extrudieren":
             for k in d["ziel"]:
-                k.hoehe_setzen(mm)
+                k.hoehe_setzen(mm * (_vorzeichen(k) or 1.0))
         elif modus == "hoehe":
             for k, h0 in zip(d["ziel"], d["h0"]):
-                k.hoehe_setzen(h0 + mm)
+                k.hoehe_setzen(h0 + mm * _vorzeichen(k))
         else:
             S.verschieben_achse(self.app.auswahl, d["achse"], mm - d["angewandt"])
             d["angewandt"] = mm
         d["mm"] = mm
 
     def wert_anwenden(self):
-        """Typed value: distance along the chosen axis (Z: height of the pulled shape)."""
+        """Typed value: sketch size while drawing, else distance along the chosen axis."""
         text = self.wert_var.get().strip()
         if not text:
+            return
+        sk = self._skiz
+        if sk and sk["form"] in ("kreis", "rechteck"):
+            self._skizze_wert(text, sk)
             return
         try:
             mm = float(text.replace(",", ".")) * self.app._einh_faktor()
@@ -639,6 +937,8 @@ class Ansicht3D(tk.Frame):
         d = {"achse": achse, "mm": 0.0}
         self._manip_beginn(d)
         self._manip_setzen(d, mm)
+        if d.get("modus") == "extrudieren":
+            self._extrusion_abschliessen(d["ziel"])
         self.wert_var.set("")
         self.app.redraw()
         self.zeichne()
@@ -646,8 +946,29 @@ class Ansicht3D(tk.Frame):
                              wert=f"{mm / self.app._einh_faktor():.2f}",
                              einheit=self.app.einheit.get()))
 
+    def _skizze_wert(self, text, sk):
+        """Typed size while drawing: circle = radius, rectangle = width [x height]."""
+        f = self.app._einh_faktor()
+        try:
+            teile = [t for t in re.split(r"[x; ]+", text.strip().lower()) if t]
+            zahlen = [float(t.replace(",", ".")) * f for t in teile]
+        except ValueError:
+            zahlen = []
+        if not zahlen or any(z <= 0 for z in zahlen):
+            self.info_var.set(tr("d3.msg.zahl"))
+            return
+        q = sk["pts"][0]
+        self.wert_var.set("")
+        if sk["form"] == "kreis":
+            self._skizze_fertig("kreis", [q[0], q[1], zahlen[0]])
+        else:
+            w = zahlen[0]
+            h = zahlen[1] if len(zahlen) > 1 else zahlen[0]
+            self._skizze_fertig("rechteck", [q[0], q[1], q[0] + w, q[1] + h])
+        self.zeichne()
+
     # ------------------------------------------------------------------
-    # creating bodies and holes
+    # creating bodies
     # ------------------------------------------------------------------
     def neuer_koerper(self, art):
         k = self.kamera
@@ -657,6 +978,7 @@ class Ansicht3D(tk.Frame):
         if not dlg.result:
             return
         par, pos, mit_klick = dlg.result
+        self._modus_ende()
         if mit_klick:
             self._platz = {"art": art, "par": par, "z": pos[2], "maus": None}
             self.info_var.set(tr("d3.msg.platzieren"))
@@ -664,15 +986,8 @@ class Ansicht3D(tk.Frame):
             self._erzeuge(art, par, pos)
 
     def _erzeuge(self, art, par, pos):
-        kw = {}
-        try:
-            kw = self.app._layer_daten()
-            kw["staerke"] = None
-            kw["eig_farbe"] = True
-        except Exception:
-            kw = {}
         body = koerper_bauen(art, par, pos[0], pos[1], pos[2])
-        for key, v in kw.items():
+        for key, v in self._stil().items():
             setattr(body, key, v)
         self.app._snapshot()
         self.app.elemente.append(body)
@@ -681,35 +996,6 @@ class Ansicht3D(tk.Frame):
         self.zeichne()
         self.info_var.set(tr("d3.msg.erzeugt", art=tr("d3.neu." + art)))
 
-    def loch_dialog(self):
-        ziele = S.loch_ziele(self.app.auswahl)
-        if not ziele:
-            self.info_var.set(tr("d3.msg.kein_loch_ziel"))
-            return
-        ziel = ziele[0]
-        k = self.kamera
-        mx, my = ziel.zentrum3()[0], ziel.zentrum3()[1]
-        dlg = LochDialog(self.app.root, self.app._einh_faktor(), self.app.einheit.get(), (mx, my))
-        self.app.root.wait_window(dlg)
-        if not dlg.result:
-            return
-        r, tiefe, pos, mit_klick = dlg.result
-        if mit_klick:
-            self._platz = {"art": "loch", "ziel": ziel, "r": r, "tiefe": tiefe,
-                           "z": S.loch_oben_z(ziel), "maus": None}
-            self.info_var.set(tr("d3.msg.platzieren"))
-        else:
-            self._loch_erzeugen(ziel, pos[0], pos[1], r, tiefe)
-
-    def _loch_erzeugen(self, ziel, x, y, r, tiefe):
-        self.app._snapshot()
-        if not S.loch_setzen(ziel, x, y, r, tiefe):
-            self.info_var.set(tr("d3.msg.loch_ausserhalb"))
-            return
-        self.app.redraw()
-        self.zeichne()
-        self.info_var.set(tr("d3.msg.loch_erzeugt"))
-
     def _platz_klick(self, e):
         pl = self._platz
         p = self._bodenpunkt(e, pl["z"])
@@ -717,31 +1003,16 @@ class Ansicht3D(tk.Frame):
             self.info_var.set(tr("d3.msg.keine_ebene"))
             return
         self._platz = None
-        if pl["art"] == "loch":
-            self._loch_erzeugen(pl["ziel"], p[0], p[1], pl["r"], pl["tiefe"])
-        else:
-            self._erzeuge(pl["art"], pl["par"], (p[0], p[1], pl["z"]))
-
-    def _vorschau_platz_zeichnen(self):
-        pl = self._platz
-        if not pl or not pl.get("maus"):
-            return
-        p = self._bodenpunkt(pl["maus"], pl["z"])
-        if p is None:
-            return
-        if pl["art"] == "loch":
-            pts = G.kreis_profil(p[0], p[1], pl["r"], 24)
-            pts = [(x, y, pl["z"]) for (x, y) in pts]
-            for a, b in zip(pts, pts[1:] + pts[:1]):
-                self._linie(a, b, FARBEN["gelb"], 1, (4, 3), "vorschau")
-            return
-        body = koerper_bauen(pl["art"], pl["par"], p[0], p[1], pl["z"])
-        nz = body.netz()
-        for (i, j) in nz.kanten:
-            self._linie(nz.punkte[i], nz.punkte[j], FARBEN["gelb"], 1, (4, 3), "vorschau")
+        self._erzeuge(pl["art"], pl["par"], (p[0], p[1], pl["z"]))
 
     def abbrechen(self):
-        if self._platz is not None:
+        if self._skiz is not None:
+            self._skiz = None
+            self.zeichne()
+        elif self._modus is not None:
+            self._modus_ende()
+            self.zeichne()
+        elif self._platz is not None:
             self._platz = None
             self.zeichne()
         elif self.app.auswahl:
@@ -750,31 +1021,78 @@ class Ansicht3D(tk.Frame):
             self.zeichne()
 
     # ------------------------------------------------------------------
-    # extrude, block, delete
+    # bore, extrude, size, block
     # ------------------------------------------------------------------
+    def loch_dialog(self):
+        """Bore / pocket from the selected sketches into the body they lie on."""
+        sk = [x for x in self.app.auswahl if isinstance(x, Skizze3D)]
+        if not sk:
+            self.info_var.set(tr("d3.msg.kein_loch_ziel"))
+            return
+        u = self.app.einheit.get()
+        t = frage_zahl(self.app.root, tr("d3.neu.loch"), tr("d3.dlg.tiefe_loch") + f" ({u})", "0")
+        if t is None:
+            return
+        tiefe = abs(t) * self.app._einh_faktor()
+        self.app._snapshot()
+        n = 0
+        for x in sk:
+            if S.skizze_in_ausschnitt(self.app.elemente, x, tiefe if tiefe > 1e-9 else None):
+                n += 1
+        self.app.auswahl = [x for x in self.app.auswahl if x in self.app.elemente]
+        self.app.redraw()
+        self.zeichne()
+        self.info_var.set(tr("d3.msg.loch_erzeugt") if n else tr("d3.msg.loch_ausserhalb"))
+
     def extrudieren_dialog(self):
-        ziele = self._extrudierbare()
+        ziele = [x for x in self.app.auswahl if S.extrudierbar(x)]
         if not ziele:
             self.info_var.set(tr("d3.msg.nichts_extrudierbar"))
             return
-        f, u = self.app._einh_faktor(), self.app.einheit.get()
-        h = simpledialog.askfloat(tr("d3.extrudieren"), tr("d3.msg.hoehe_frage", einheit=u),
-                                  initialvalue=20.0, parent=self.app.root)
+        u = self.app.einheit.get()
+        h = frage_zahl(self.app.root, tr("d3.extrudieren"), tr("d3.msg.hoehe_frage", einheit=u),
+                       "20")
         if h is None or abs(h) < 1e-9:
             return
         self.app._snapshot()
-        neu = S.extrudieren(self.app.elemente, ziele, h * f)
+        neu = S.extrudieren(self.app.elemente, ziele, h * self.app._einh_faktor())
         self.app.auswahl = [x for x in self.app.auswahl if x not in ziele] + neu
+        self._extrusion_abschliessen(neu)
         self.app.redraw()
         self.zeichne()
         self.info_var.set(tr("d3.msg.extrudiert", n=len(neu)))
+
+    def massdialog(self):
+        """Change size (radius, width, depth, height ...) of the selected body / sketch."""
+        ziele = [x for x in self.app.auswahl if S.parameter(x)]
+        if len(ziele) != 1:
+            self.info_var.set(tr("d3.msg.kein_mass"))
+            return
+        el = ziele[0]
+        f, u = self.app._einh_faktor(), self.app.einheit.get()
+        felder = []
+        for key, wert in S.parameter(el):
+            if key == "faktor":
+                felder.append((key, tr("d3.dlg.faktor"), 100.0))
+            else:
+                felder.append((key, tr("d3.dlg." + key) + f" ({u})", wert / f))
+        dlg = MassDialog(self.app.root, tr("d3.mass"), felder)
+        self.app.root.wait_window(dlg)
+        if not dlg.result:
+            return
+        par = {k: (v if k == "faktor" else v * f) for k, v in dlg.result.items()}
+        self.app._snapshot()
+        if S.parameter_setzen(el, par):
+            self.app.redraw()
+            self.zeichne()
+            self.info_var.set(tr("d3.msg.mass_geaendert"))
 
     def block_bilden(self):
         if len([x for x in self.app.auswahl if S.ist_3d(x)]) < 2:
             self.info_var.set(tr("d3.msg.block_min2"))
             return
-        name = simpledialog.askstring(tr("d3.block"), tr("d3.msg.block_name"),
-                                      initialvalue="3D-Block", parent=self.app.root) or "3D-Block"
+        name = frage_text(self.app.root, tr("d3.block"), tr("d3.msg.block_name"), "3D-Block") \
+            or "3D-Block"
         self.app._snapshot()
         g = S.gruppe_bilden(self.app.elemente, self.app.auswahl, name)
         self.app.auswahl = [g] if g else []
@@ -794,6 +1112,70 @@ class Ansicht3D(tk.Frame):
         self.zeichne()
         self.info_var.set(tr("d3.msg.block_aufgeloest"))
 
+    # ------------------------------------------------------------------
+    # context menu
+    # ------------------------------------------------------------------
+    def kontextmenue(self, e):
+        el = S.pick([x for x in self.app.elemente if self._sichtbar(x)], self.kamera,
+                    *self._mitte(), e.x, e.y)
+        if el is not None and el not in self.app.auswahl:
+            self.app.auswahl = [el]
+            self.app.redraw()
+            self.zeichne()
+        stil = dict(tearoff=0, bg=FARBEN["bg_mittel"], fg=FARBEN["cyan"],
+                    activebackground=FARBEN["cyan"], activeforeground=FARBEN["bg_dunkel"])
+        m = tk.Menu(self, **stil)
+        if self.app.auswahl:
+            m.add_command(label=tr("d3.ctx.eigenschaften"), command=self._ctx_eigenschaften)
+            if len([x for x in self.app.auswahl if S.parameter(x)]) == 1:
+                m.add_command(label=tr("d3.ctx.mass"), command=self.massdialog)
+            m.add_command(label=tr("d3.ctx.layer_aus"), command=self._ctx_layer_aus)
+            m.add_command(label=tr("d3.ctx.loeschen"), command=self._ctx_loeschen)
+            m.add_separator()
+        m.add_command(label=tr("d3.ctx.layer_ein"), command=self._ctx_layer_ein)
+        m.add_command(label=tr("d3.ctx.layer_dialog"), command=self.app.layer_verwalten)
+        try:
+            m.tk_popup(e.x_root, e.y_root)
+        finally:
+            m.grab_release()
+
+    def _ctx_eigenschaften(self):
+        if len(self.app.auswahl) == 1:
+            self.app._element_bearbeiten(self.app.auswahl[0])
+        else:
+            self.app.eigenschaften_fenster()
+        self.app.redraw()
+        self.zeichne()
+
+    def _ctx_layer_aus(self):
+        names = {getattr(x, "layer", None) for x in self.app.auswahl}
+        self.app._snapshot()
+        for n in names:
+            l = self.app.layers.get(n)
+            if l:
+                l.sichtbar = False
+        self.app.auswahl = []
+        self.app.redraw()
+        self.zeichne()
+        self.info_var.set(tr("d3.msg.layer_aus", layer=", ".join(sorted(str(n) for n in names))))
+
+    def _ctx_layer_ein(self):
+        self.app._snapshot()
+        for l in self.app.layers.values():
+            l.sichtbar = True
+        self.app.redraw()
+        self.zeichne()
+        self.info_var.set(tr("d3.msg.layer_ein"))
+
+    def _ctx_loeschen(self):
+        self.app.auswahl_loeschen()
+        self.zeichne()
+
+
+def frage_text(parent, titel, text, vorgabe):
+    dlg = _LayoutNameDialog(parent, titel, vorgabe, text)
+    return dlg.result or None
+
 
 class Ansicht3DMixin:
     """Methods of CadApp for the embedded 3D view."""
@@ -802,11 +1184,12 @@ class Ansicht3DMixin:
     _3d_state = None
 
     def _3d_zustand(self):
-        """State that survives switching back and forth (camera, toggles)."""
+        """State that survives switching back and forth (camera, toggles, work plane)."""
         if self._3d_state is None:
             self._3d_state = {"kamera": G.Kamera(), "wuerfel": tk.BooleanVar(value=True),
                               "persp": tk.BooleanVar(value=False),
-                              "hoehe": tk.BooleanVar(value=False)}
+                              "hoehe": tk.BooleanVar(value=False),
+                              "raster": tk.BooleanVar(value=True), "plane": None}
         return self._3d_state
 
     def _3d_var_holen(self):
@@ -850,7 +1233,7 @@ class Ansicht3DMixin:
             pass
 
     def ansicht3d_befehl(self, cmd):
-        """cmd: '3d', 'neu:<art>', 'extrudieren', 'loch', 'block', 'aufloesen'."""
+        """cmd: 'neu:<art>', 'extrudieren', 'loch', 'block', 'aufloesen', 'mass'."""
         w = self.ansicht3d_oeffnen()
         if cmd.startswith("neu:"):
             w.neuer_koerper(cmd.split(":", 1)[1])
@@ -862,3 +1245,5 @@ class Ansicht3DMixin:
             w.block_bilden()
         elif cmd == "aufloesen":
             w.block_aufloesen()
+        elif cmd == "mass":
+            w.massdialog()
