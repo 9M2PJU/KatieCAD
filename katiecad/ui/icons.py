@@ -77,6 +77,9 @@ def _zeichne(name, d, c, f):
     elif name == "brechen":
         L([(8, 50), (36, 50)]); L([(64, 50), (92, 50)])
         L([(30, 36), (42, 64)], 5); L([(58, 36), (70, 64)], 5)
+    elif name == "suchen":
+        d.ellipse([16 * f, 14 * f, 62 * f, 60 * f], outline=c, width=int(w * f))
+        L([(54, 54), (86, 86)], 9)
     # ---- electrical
     elif name == "vpunkt":
         d.ellipse([36 * f, 36 * f, 64 * f, 64 * f], outline=c, width=int(w * f))
@@ -108,7 +111,7 @@ def _zeichne(name, d, c, f):
 NAMEN = ("auswahl", "linie", "polylinie", "kreis", "bogen", "ellipse", "spline",
          "rechteck", "text", "bemassung", "stutzen", "brechen",
          "vpunkt", "verbindung", "querverweis", "maske", "klemme", "kabel",
-         "koordinatenfeld")
+         "koordinatenfeld", "suchen")
 
 
 def icon_png(name, farbe, groesse=26):
