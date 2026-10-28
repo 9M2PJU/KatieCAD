@@ -22,6 +22,9 @@ SCHRAENKE = (
 SOCKEL_HOEHEN = (0, 100, 150, 200)
 PLATTE_DICKE = 3.0
 PLATTE_ABSTAND = 15.0           # mounting plate: distance to the rear wall
+TUER_DICKE = 2.0                # door sheet thickness
+WAND_DICKE = 1.5                # side panel thickness
+SPALT = 3.0                     # door / side panels sit slightly inset (gap, visible in wireframe)
 
 
 def vorgabe_name(s):
@@ -34,7 +37,8 @@ def platte_vorschlag(breite, hoehe):
     return max(10.0, breite - 100.0), max(10.0, hoehe - 100.0)
 
 
-def schrank_bauen(breite, hoehe, tiefe, x=0.0, y=0.0, z=0.0, platte=None, sockel=0.0):
+def schrank_bauen(breite, hoehe, tiefe, x=0.0, y=0.0, z=0.0, platte=None, sockel=0.0,
+                  tuer=False, seite_l=False, seite_r=False):
     """Cabinet as a 3D block. Front towards -Y, rear wall at y + depth.
     platte = (width, height) of the mounting plate or None; sockel = plinth height (0 = none).
     (x, y, z) is the base corner of the whole block (floor level)."""
@@ -49,9 +53,19 @@ def schrank_bauen(breite, hoehe, tiefe, x=0.0, y=0.0, z=0.0, platte=None, sockel
         pz = z0 + (hoehe - ph) / 2.0
         py2 = y + tiefe - PLATTE_ABSTAND
         teile.append(_bez(quader(px, py2 - PLATTE_DICKE, px + pb, py2, pz, ph), "Montageplatte"))
+    if tuer:                       # door: thin panel on the front face (inside the cabinet depth)
+        teile.append(_bez(quader(x + SPALT, y, x + breite - SPALT, y + TUER_DICKE,
+                                 z0 + SPALT, hoehe - 2 * SPALT), "Tür"))
+    for aktiv, x1, bez in ((seite_l, x, "Seitenwand links"),
+                           (seite_r, x + breite - WAND_DICKE, "Seitenwand rechts")):
+        if aktiv:                  # side panels: thin panels on the left / right face
+            teile.append(_bez(quader(x1, y + SPALT, x1 + WAND_DICKE, y + tiefe - SPALT,
+                                     z0 + SPALT, hoehe - 2 * SPALT), bez))
     name = f"Schaltschrank {breite:g}x{hoehe:g}x{tiefe:g}"
     if platte:
         name += " + MP"
+    if tuer:
+        name += " + Tür"
     return Gruppe3D(teile, name=name)
 
 
