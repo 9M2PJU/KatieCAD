@@ -17,6 +17,7 @@ import math, sys, zlib
 from copy import deepcopy
 
 from katiecad.common.i18n import tr, SPRACHE
+from katiecad.model.geom2d import ellipse_punkte, spline_punkte
 
 
 # ============================================================
@@ -99,7 +100,7 @@ TEXT_ZEILE = 1.65
 CAD_VERSALHOEHE = 0.72
 LW_PX_FAKTOR = 6.5
 BEM_RICHTUNGEN = ("horizontal", "vertikal", "ausgerichtet",
-                  "radius", "durchmesser")
+                  "radius", "durchmesser", "winkel")
 
 # Tolerance for "point lies on object" (in model mm)
 TRIM_TOL = 1e-6
@@ -592,6 +593,10 @@ BEFEHLE = {
     "SUCHEN": "suchen", "FIND": "suchen", "ERSETZEN": "suchen", "SU": "suchen",
     "EU": "matchprop", "MA": "matchprop", "MATCHPROP": "matchprop",
     "EIGENSCHAFTENUEBERTRAGEN": "matchprop", "EIGENSCHAFTENÜBERTRAGEN": "matchprop",
+    "MESS": "messen", "MESSEN": "messen", "DI": "messen", "DIST": "messen",
+    "DISTANZ": "messen", "MEASURE": "messen",
+    "ABRUNDEN": "abrunden", "FILLET": "abrunden", "F": "abrunden",
+    "FASE": "fase", "CHAMFER": "fase", "CHA": "fase",
     "ATTDEF": "attdef", "ATTRIBUT": "attdef", "ATTRIBUTDEFINITION": "attdef",
     "ATTEDIT": "attedit", "ATTRIBUTEBEARBEITEN": "attedit",
     "BLOCKSPEICHERN": "block:speichern", "WBLOCK": "block:speichern",
@@ -603,6 +608,8 @@ BEFEHLE = {
     "POLYLINIE": "tool:polylinie", "PL": "tool:polylinie", "PLINE": "tool:polylinie",
     "KREIS": "tool:kreis", "CIRCLE": "tool:kreis", "K": "tool:kreis",
     "BOGEN": "tool:bogen", "ARC": "tool:bogen", "A": "tool:bogen",
+    "ELLIPSE": "tool:ellipse", "EL": "tool:ellipse",
+    "SPLINE": "tool:spline", "SPL": "tool:spline",
     "RECHTECK": "tool:rechteck", "REC": "tool:rechteck", "RECTANG": "tool:rechteck",
     "TEXT": "tool:text", "T": "tool:text",
     "BEMASSUNG": "tool:bemassung", "BEM": "tool:bemassung", "DIM": "tool:bemassung",
@@ -610,6 +617,8 @@ BEFEHLE = {
     "DIMRADIUS":   "bem:radius", "DR": "bem:radius",
     "RADIUS":      "bem:radius", "RBEM": "bem:radius",
     "DIMDIAMETER": "bem:durchmesser", "DD": "bem:durchmesser",
+    "WINKEL": "bem:winkel", "WINKELBEM": "bem:winkel", "ANGULAR": "bem:winkel",
+    "WINKELLINIEN": "bem:winkel_linien",
     "DURCHMESSER": "bem:durchmesser", "DIA": "bem:durchmesser",
     "STUTZEN": "tool:stutzen", "TRIM": "tool:stutzen", "TR": "tool:stutzen",
     "BRECHEN": "tool:brechen", "BREAK": "tool:brechen", "BR": "tool:brechen",
@@ -1110,6 +1119,91 @@ class Polylinie(Element):
                        for (x, y) in self.punkte]
 
 
+class Ellipse(Polylinie):
+    """Ellipse as a closed polyline (regenerated from its parameters):
+    centre, semi-axes a (direction `rot`, degrees) and b (perpendicular)."""
+
+    def __init__(self, cx, cy, a, b, rot=0.0, punkte=None, geschlossen=True, **kw):
+        super().__init__([], True, **kw)
+        self.typ = "ellipse"
+        self.cx, self.cy, self.a, self.b, self.rot = cx, cy, a, b, rot
+        self.neu_berechnen()
+
+    def neu_berechnen(self):
+        n = int(max(48, min(256, 24 + 12 * math.log2(1 + max(self.a, self.b)))))
+        self.punkte = ellipse_punkte(self.cx, self.cy, max(self.a, 1e-9),
+                                     max(self.b, 1e-9), self.rot, n)
+
+    def verschieben(self, dx, dy):
+        self.cx += dx; self.cy += dy
+        self.punkte = [(x + dx, y + dy) for (x, y) in self.punkte]
+
+    def griffe(self):
+        r = math.radians(self.rot)
+        c, s_ = math.cos(r), math.sin(r)
+        return [("c", self.cx, self.cy),
+                ("a", self.cx + self.a * c, self.cy + self.a * s_),
+                ("b", self.cx - self.b * s_, self.cy + self.b * c)]
+
+    def griff_bewegen(self, griff_id, x, y):
+        if griff_id == "c":
+            self.verschieben(x - self.cx, y - self.cy)
+            return
+        dx, dy = x - self.cx, y - self.cy
+        d = math.hypot(dx, dy)
+        if d < 1e-9:
+            return
+        if griff_id == "a":
+            self.a = d
+            self.rot = math.degrees(math.atan2(dy, dx)) % 360.0
+        elif griff_id == "b":
+            self.b = d
+            self.rot = (math.degrees(math.atan2(dy, dx)) - 90.0) % 360.0
+        self.neu_berechnen()
+
+    def drehen(self, cx, cy, winkel_deg):
+        self.cx, self.cy = punkte_drehen(self.cx, self.cy, cx, cy, winkel_deg)
+        self.rot = (self.rot + winkel_deg) % 360.0
+        self.neu_berechnen()
+
+
+class Spline(Polylinie):
+    """Smooth curve through the support points `stuetz` (Catmull-Rom),
+    stored as a polyline in `punkte`."""
+
+    def __init__(self, stuetz, geschlossen=False, punkte=None, **kw):
+        super().__init__([], geschlossen, **kw)
+        self.typ = "spline"
+        self.stuetz = [tuple(p) for p in stuetz]
+        self.neu_berechnen()
+
+    def neu_berechnen(self):
+        self.punkte = spline_punkte(self.stuetz, self.geschlossen)
+
+    def verschieben(self, dx, dy):
+        self.stuetz = [(x + dx, y + dy) for (x, y) in self.stuetz]
+        self.punkte = [(x + dx, y + dy) for (x, y) in self.punkte]
+
+    def griffe(self):
+        return [(f"s{i}", x, y) for i, (x, y) in enumerate(self.stuetz)]
+
+    def griff_bewegen(self, griff_id, x, y):
+        if not griff_id.startswith("s"):
+            return
+        try:
+            i = int(griff_id[1:])
+        except ValueError:
+            return
+        if 0 <= i < len(self.stuetz):
+            self.stuetz[i] = (x, y)
+            self.neu_berechnen()
+
+    def drehen(self, cx, cy, winkel_deg):
+        self.stuetz = [punkte_drehen(x, y, cx, cy, winkel_deg)
+                       for (x, y) in self.stuetz]
+        self.neu_berechnen()
+
+
 class Text(Element):
     EINFUEGEPUNKTE = (
         "oben_links", "oben_zentriert", "oben_rechts",
@@ -1210,9 +1304,12 @@ class Bemassung(Element):
                  richtung="ausgerichtet", text_override="",
                  tx=None, ty=None, hoehe=2.5, pfeil=2.5, dez=2,
                  offset=10.0, offset_x=0.0, offset_y=0.0,
-                 text_offset_x=0.0, text_offset_y=0.0, **kw):
+                 text_offset_x=0.0, text_offset_y=0.0, x3=None, y3=None, **kw):
         super().__init__("bemassung", **kw)
         self.x1, self.y1, self.x2, self.y2 = x1, y1, x2, y2
+        # angle dimension: (x1,y1) = vertex, (x2,y2)/(x3,y3) = points on the
+        # two legs, (mx,my) = point on the dimension arc (radius and sector)
+        self.x3, self.y3 = x3, y3
         self.richtung = richtung if richtung in BEM_RICHTUNGEN else "ausgerichtet"
         self.text_override = text_override or ""
         self.hoehe = float(hoehe)
@@ -1231,6 +1328,8 @@ class Bemassung(Element):
             ax = self.x1 + offset if self.x2 >= self.x1 else self.x1 - offset
             return (ax + offset_x, (self.y1 + self.y2) / 2 + offset_y)
         if self.richtung in ("radius", "durchmesser"):
+            return (self.x2, self.y2)
+        if self.richtung == "winkel":
             return (self.x2, self.y2)
         dx, dy = self.x2 - self.x1, self.y2 - self.y1
         L = math.hypot(dx, dy)
@@ -1259,7 +1358,32 @@ class Bemassung(Element):
             r = "horizontal"
         return r
 
+    def _winkel_daten(self):
+        """Angle dimension -> (a0, sweep, R) in degrees/mm or None.
+        The sector is the one in which the dimension arc point lies."""
+        if self.richtung != "winkel" or self.x3 is None or self.y3 is None:
+            return None
+        c = (self.x1, self.y1)
+        R = math.hypot(self.mx - c[0], self.my - c[1])
+        if (math.hypot(self.x2 - c[0], self.y2 - c[1]) < 1e-9
+                or math.hypot(self.x3 - c[0], self.y3 - c[1]) < 1e-9):
+            return None
+        a1 = math.degrees(math.atan2(self.y2 - c[1], self.x2 - c[0])) % 360.0
+        a2 = math.degrees(math.atan2(self.y3 - c[1], self.x3 - c[0])) % 360.0
+        if R < 1e-9:
+            am = (a1 + ((a2 - a1) % 360.0) / 2.0) % 360.0
+            R = 0.5 * min(math.hypot(self.x2 - c[0], self.y2 - c[1]),
+                          math.hypot(self.x3 - c[0], self.y3 - c[1]))
+        else:
+            am = math.degrees(math.atan2(self.my - c[1], self.mx - c[0])) % 360.0
+        if (am - a1) % 360.0 <= (a2 - a1) % 360.0:
+            return a1, (a2 - a1) % 360.0, R
+        return a2, (a1 - a2) % 360.0, R
+
     def wert(self):
+        if self.richtung == "winkel":
+            w = self._winkel_daten()
+            return w[1] if w else 0.0
         d = math.hypot(self.x2 - self.x1, self.y2 - self.y1)
         if self.richtung == "radius":
             return d
@@ -1272,6 +1396,12 @@ class Bemassung(Element):
         return d
 
     def text(self, faktor=1.0, komma=True):
+        if self.richtung == "winkel":
+            s = bem_zahl(self.wert(), self.dez, komma) + "\u00b0"
+            if self.text_override:
+                return (self.text_override.replace("<>", s)
+                        if "<>" in self.text_override else self.text_override)
+            return s
         s = bem_zahl(self.wert() / faktor, self.dez, komma)
         if self.richtung == "radius":
             s = "R" + s
@@ -1354,6 +1484,56 @@ class Bemassung(Element):
                 c = (b[0] + t[0] * d + up[0] * (tgap + h / 2),
                      b[1] + t[1] * d + up[1] * (tgap + h / 2))
             res["text"] = (txt, c[0], c[1], a_deg, tw, h)
+            return res
+
+        if r == "winkel":
+            wd = self._winkel_daten()
+            if wd is None:
+                return res
+            a0, sw, R = wd
+            C = (self.x1, self.y1)
+            a_end = a0 + sw
+            for ang in (a0, a_end):
+                u = (math.cos(math.radians(ang)), math.sin(math.radians(ang)))
+                # extension line along the leg up to the arc (only if the
+                # leg point lies inside the arc radius)
+                for q in ((self.x2, self.y2), (self.x3, self.y3)):
+                    aq = math.degrees(math.atan2(q[1] - C[1], q[0] - C[0]))
+                    if abs(((aq - ang) + 180.0) % 360.0 - 180.0) < 1e-6:
+                        dq = math.hypot(q[0] - C[0], q[1] - C[1])
+                        if dq < R - gap:
+                            res["linien"].append(
+                                (C[0] + u[0] * (dq + gap), C[1] + u[1] * (dq + gap),
+                                 C[0] + u[0] * (R + ueber), C[1] + u[1] * (R + ueber)))
+                        elif dq > R:
+                            res["linien"].append(
+                                (C[0] + u[0] * R, C[1] + u[1] * R,
+                                 C[0] + u[0] * (R + ueber), C[1] + u[1] * (R + ueber)))
+                        break
+            n = max(8, int(sw / 3.0) + 1)
+            pts = [(C[0] + R * math.cos(math.radians(a0 + sw * i / n)),
+                    C[1] + R * math.sin(math.radians(a0 + sw * i / n)))
+                   for i in range(n + 1)]
+            for i in range(n):
+                res["linien"].append((pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1]))
+            res["pfeile"].append((pts[0][0], pts[0][1],
+                                  math.radians(a0 - 90.0), pf))
+            res["pfeile"].append((pts[-1][0], pts[-1][1],
+                                  math.radians(a_end + 90.0), pf))
+            am = math.radians(a0 + sw / 2.0)
+            res["mitte"] = (C[0] + R * math.cos(am), C[1] + R * math.sin(am))
+            t_deg = (a0 + sw / 2.0 - 90.0)
+            t_deg = (t_deg + 180.0) % 360.0 - 180.0
+            if t_deg > 90.0 + 1e-9:
+                t_deg -= 180.0
+            elif t_deg <= -90.0 + 1e-9:
+                t_deg += 180.0
+            if manuell:
+                c = (self.tx, self.ty)
+            else:
+                d = R + tgap + h / 2
+                c = (C[0] + d * math.cos(am), C[1] + d * math.sin(am))
+            res["text"] = (txt, c[0], c[1], t_deg, tw, h)
             return res
 
         # ---------- Radius / diameter -------------
@@ -1453,6 +1633,8 @@ class Bemassung(Element):
     def verschieben(self, dx, dy):
         self.x1 += dx; self.y1 += dy
         self.x2 += dx; self.y2 += dy
+        if self.x3 is not None and self.y3 is not None:
+            self.x3 += dx; self.y3 += dy
         self.mx += dx; self.my += dy
         if self.tx is not None and self.ty is not None:
             self.tx += dx; self.ty += dy
@@ -1462,6 +1644,8 @@ class Bemassung(Element):
         mx, my = g["mitte"] if g["mitte"] else (self.mx, self.my)
         gr = [("p1", self.x1, self.y1), ("p2", self.x2, self.y2),
               ("mass", mx, my)]
+        if self.x3 is not None and self.y3 is not None:
+            gr.insert(2, ("p3", self.x3, self.y3))
         if g["text"]:
             gr.append(("text", g["text"][1], g["text"][2]))
         return gr
@@ -1471,6 +1655,8 @@ class Bemassung(Element):
             self.x1, self.y1 = x, y
         elif griff_id == "p2":
             self.x2, self.y2 = x, y
+        elif griff_id == "p3":
+            self.x3, self.y3 = x, y
         elif griff_id == "mass":
             self.mx, self.my = x, y
         elif griff_id == "text":
@@ -1479,6 +1665,8 @@ class Bemassung(Element):
     def drehen(self, cx, cy, winkel_deg):
         self.x1, self.y1 = punkte_drehen(self.x1, self.y1, cx, cy, winkel_deg)
         self.x2, self.y2 = punkte_drehen(self.x2, self.y2, cx, cy, winkel_deg)
+        if self.x3 is not None and self.y3 is not None:
+            self.x3, self.y3 = punkte_drehen(self.x3, self.y3, cx, cy, winkel_deg)
         self.mx, self.my = punkte_drehen(self.mx, self.my, cx, cy, winkel_deg)
         if self.tx is not None and self.ty is not None:
             self.tx, self.ty = punkte_drehen(self.tx, self.ty, cx, cy, winkel_deg)
@@ -1753,6 +1941,12 @@ class BlockReferenz(Element):
             el.__dict__.update(neu.__dict__)
         elif isinstance(el, Polylinie):
             el.punkte = [self._welt_pts(x, y) for (x, y) in el.punkte]
+            if isinstance(el, (Ellipse, Spline)):
+                # parameters would be stale after the transformation
+                for _k in ("cx", "cy", "a", "b", "rot", "stuetz"):
+                    el.__dict__.pop(_k, None)
+                el.typ = "polylinie"
+                el.__class__ = Polylinie
         elif isinstance(el, Text):
             el.x, el.y = self._welt_pts(el.x, el.y)
             el.hoehe *= self.skalierung
@@ -3474,6 +3668,8 @@ def _sk_schraffur(e, cx, cy, f):
 def _sk_bem(e, cx, cy, f):
     e.x1, e.y1 = _skal_pt(e.x1, e.y1, cx, cy, f)
     e.x2, e.y2 = _skal_pt(e.x2, e.y2, cx, cy, f)
+    if e.x3 is not None and e.y3 is not None:
+        e.x3, e.y3 = _skal_pt(e.x3, e.y3, cx, cy, f)
     e.mx, e.my = _skal_pt(e.mx, e.my, cx, cy, f)
     if e.tx is not None and e.ty is not None:
         e.tx, e.ty = _skal_pt(e.tx, e.ty, cx, cy, f)
@@ -3573,6 +3769,8 @@ def _sp_schraffur(e, ax, ay, bx, by):
 def _sp_bem(e, ax, ay, bx, by):
     e.x1, e.y1 = punkt_spiegeln(e.x1, e.y1, ax, ay, bx, by)
     e.x2, e.y2 = punkt_spiegeln(e.x2, e.y2, ax, ay, bx, by)
+    if e.x3 is not None and e.y3 is not None:
+        e.x3, e.y3 = punkt_spiegeln(e.x3, e.y3, ax, ay, bx, by)
     e.mx, e.my = punkt_spiegeln(e.mx, e.my, ax, ay, bx, by)
     if e.tx is not None and e.ty is not None:
         e.tx, e.ty = punkt_spiegeln(e.tx, e.ty, ax, ay, bx, by)
@@ -3625,6 +3823,33 @@ _inst(Kreis, skalieren=_sk_kreis, spiegeln=_sp_kreis)
 _inst(Bogen, skalieren=_sk_kreis, spiegeln=_sp_bogen)
 _inst(Rechteck, skalieren=_sk_rechteck, spiegeln=_sp_rechteck)
 _inst(Polylinie, skalieren=_sk_poly, spiegeln=_sp_poly)
+
+
+def _sk_ellipse(e, cx, cy, f):
+    e.cx, e.cy = _skal_pt(e.cx, e.cy, cx, cy, f)
+    e.a *= f
+    e.b *= f
+    e.neu_berechnen()
+
+
+def _sp_ellipse(e, ax, ay, bx, by):
+    e.cx, e.cy = punkt_spiegeln(e.cx, e.cy, ax, ay, bx, by)
+    e.rot = (2 * _phi(ax, ay, bx, by) - e.rot) % 360.0
+    e.neu_berechnen()
+
+
+def _sk_spline(e, cx, cy, f):
+    e.stuetz = [_skal_pt(x, y, cx, cy, f) for (x, y) in e.stuetz]
+    e.neu_berechnen()
+
+
+def _sp_spline(e, ax, ay, bx, by):
+    e.stuetz = [punkt_spiegeln(x, y, ax, ay, bx, by) for (x, y) in e.stuetz]
+    e.neu_berechnen()
+
+
+_inst(Ellipse, skalieren=_sk_ellipse, spiegeln=_sp_ellipse)
+_inst(Spline, skalieren=_sk_spline, spiegeln=_sp_spline)
 _inst(Text, skalieren=_sk_text, spiegeln=_sp_text)
 _inst(Schraffur, skalieren=_sk_schraffur, spiegeln=_sp_schraffur)
 _inst(Bemassung, skalieren=_sk_bem, spiegeln=_sp_bem)
