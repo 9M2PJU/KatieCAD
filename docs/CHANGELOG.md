@@ -4,6 +4,10 @@
 - Suchen und Ersetzen über das ganze Projekt (alle Blätter); Doppelklick auf einen Treffer springt zum Objekt
 - Eigenschaften übertragen (Layer, Farbe, Linientyp, Stärke, Texthöhe) von einem Objekt auf andere
 - Layerfenster: „Bereinigen“ löscht alle nicht verwendeten Layer (im Projekt über alle Blätter)
+- Messen zwischen zwei Punkten (Befehl `MESS` / `DI`): Abstand, dX, dY, Winkel
+- Abrunden (`ABRUNDEN` / `F`) und Fase (`FASE`) an Ecken zweier Linien
+- Neue Elemente Ellipse und Spline mit eigenen Zeichenwerkzeugen (Einfügen-Menü, Werkzeugleiste, Befehle `ELLIPSE`, `SPLINE`), Griffe, Drehen/Skalieren/Spiegeln, Strecken, Speichern/Laden, DXF-Export als Polylinie
+- Winkelbemaßung aus 3 Punkten oder 2 Linien (Befehle `WINKEL`, `WINKELLINIEN`), Griffe, Skalieren/Spiegeln/Drehen
 
 ## 1.0.3
 - Info-Fenster: Maskottchen links neben den Texten (Datei `KatieCAD_Maskottchen.png`)
@@ -62,4 +66,3 @@
 ## 1.0.0
 - Erstes Release: 2D-CAD, Blöcke, Projekte mit Blättern, Schaltpläne, Querverweise, Klemmen, Kabel,
   Reports, Schriftfeld-Automatik, DXF/DWG-Import und -Export, Installer für Windows, Linux und macOS
-
