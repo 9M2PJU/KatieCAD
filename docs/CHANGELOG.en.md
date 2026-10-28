@@ -4,6 +4,10 @@
 - Find and replace across the whole project (all sheets); double-click a hit to jump to the object
 - Match properties (layer, colour, line type, weight, text height) from one object to others
 - Layer window: "Purge" deletes all unused layers (across all sheets in a project)
+- Measure between two points (command `MEASURE` / `DI`): distance, dX, dY, angle
+- Fillet (`FILLET` / `F`) and chamfer (`CHAMFER`) at the corner of two lines
+- New elements ellipse and spline with their own drawing tools (Insert menu, toolbar, commands `ELLIPSE`, `SPLINE`), grips, rotate/scale/mirror, stretch, save/load, DXF export as polyline
+- Angle dimension from 3 points or 2 lines (commands `ANGULAR`, `WINKELLINIEN`), grips, scale/mirror/rotate
 
 ## 1.0.3
 - About window: mascot picture on the left of the texts (file `KatieCAD_Maskottchen.png`)
@@ -62,3 +66,4 @@
 ## 1.0.0
 - First release: 2D CAD, blocks, projects with sheets, schematics, cross references, terminals, cables,
   reports, title block automation, DXF/DWG import and export, installers for Windows, Linux and macOS
+
