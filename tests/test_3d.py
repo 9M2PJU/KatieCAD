@@ -253,4 +253,17 @@ for k in ("d3.modus.text", "d3.modus.messen", "d3.msg.mess_ok", "d3.msg.nur_2d")
     check(k in I.TEXTE["de"] and k in I.TEXTE["en"], k)
 for k in ("dlg.prop.breite", "dlg.prop.hoehe", "dlg.prop.anker", "dlg.prop.anker_ecke", "dlg.prop.anker_mitte"):
     check(k in I.TEXTE["de"] and k in I.TEXTE["en"], k)
+from katiecad.model import schrank as SCH
+_g = SCH.schrank_bauen(600, 1800, 300, 10, 20, 0, (499, 1696), 100)
+_bb = {t.bez: t.bbox3() for t in _g.teile}
+check(set(_bb) == {"Sockel", "Schaltschrank", "Montageplatte"}, "Schrank: Teile")
+check(_bb["Schaltschrank"][2] == 100 and _bb["Schaltschrank"][5] == 1900, "Schrank steht auf dem Sockel")
+check(abs((_bb["Montageplatte"][3] - _bb["Montageplatte"][0]) - 499) < 1e-9, "Montageplatte Breite")
+check(len(SCH.schrank_bauen(600, 1800, 300).teile) == 1, "Schrank ohne Platte/Sockel")
+check(len(SCH.SCHRAENKE) == 11 and all(s[3] < s[1] and s[4] < s[0] for s in SCH.SCHRAENKE), "Schrankliste plausibel")
+check(W.koerper_bauen("schrank", {"breite": 600, "hoehe": 1800, "tiefe": 300, "pb": 499, "ph": 1696, "platte": 1, "sockel": 0}, 0, 0, 0).teile.__len__() == 2, "koerper_bauen schrank")
+check(core.BEFEHLE.get("SCHRANK") == "3d:neu:schrank", "Befehl SCHRANK")
+for k in ("menu.3d.schrank", "d3.neu.schrank", "d3.schrank.auswahl", "d3.schrank.frei", "d3.schrank.pb", "d3.schrank.ph",
+          "d3.schrank.platte", "d3.schrank.sockel", "d3.schrank.ohne", "tb.wz.k_schrank"):
+    check(k in I.TEXTE["de"] and k in I.TEXTE["en"], k)
 print(f"test_3d - {ok} Checks bestanden")
