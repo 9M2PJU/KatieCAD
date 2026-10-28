@@ -13,6 +13,7 @@ from collections import defaultdict
 from katiecad.model.core import ElektroMaske, ort_text
 from katiecad.electrical.logic import (REF_FELD, geraete, felder_aus_elementen, feld_an,
                                        _pos)
+from katiecad.electrical.funktion import funktionen_je_blatt, funktion_an
 from katiecad.reports.netz import (natuerlich, ziele_texte, ende_ziele, knoten_text,
                                    wert_gesetzt)
 
@@ -60,13 +61,15 @@ def geraeteliste(blaetter, nummer, netz=None, klemmenleisten=True,
             schluessel = ("ind", eo, ind) if ind else ("ohne", id(g["obj"]))
             if schluessel not in gruppen:
                 gruppen[schluessel] = {"ind": ind, "eo": eo, "typ": "", "per": "",
-                                       "anzahl": 0, "orte": [], "haupt": None}
+                                       "anzahl": 0, "orte": [], "haupt": None,
+                                       "fpos": None}
                 reihenfolge.append(schluessel)
             z = gruppen[schluessel]
             typ, per = _typ_per(g["obj"])
             z["anzahl"] += 1
             z["orte"].append((g["rolle"] != "haupt", idx, g["feld"]))
             if g["rolle"] == "haupt" or z["haupt"] is None:
+                z["fpos"] = (idx,) + _pos(g["obj"])
                 z["haupt"] = g["rolle"]
                 if typ or not z["typ"]:
                     z["typ"] = typ or z["typ"]
@@ -76,12 +79,14 @@ def geraeteliste(blaetter, nummer, netz=None, klemmenleisten=True,
                 z["typ"] = z["typ"] or typ
                 z["per"] = z["per"] or per
     zeilen = []
+    ftexte = funktionen_je_blatt(blaetter)
     for s in reihenfolge:
         z = gruppen[s]
         orte = [_ort(nummer, i, f) for _h, i, f in sorted(z["orte"])]
+        fn = funktion_an(ftexte.get(z["fpos"][0], []), *z["fpos"][1:]) if z["fpos"] else []
         zeilen.append({"ind": z["ind"], "einbauort": z["eo"], "typ": z["typ"],
                        "per": z["per"], "anzahl": str(z["anzahl"]),
-                       "orte": orte, "ort": ", ".join(orte)})
+                       "orte": orte, "ort": ", ".join(orte), "funktion": fn})
     if klemmenleisten and netz is not None:
         felder = _felder(blaetter)
         leisten = {}
@@ -93,7 +98,9 @@ def geraeteliste(blaetter, nummer, netz=None, klemmenleisten=True,
             eo = _eo(einbauorte, kl["blatt"])
             z = leisten.setdefault((eo, kz), {"ind": kz, "eo": eo, "typ": "",
                                               "per": "", "anzahl": 0,
-                                              "orte": set()})
+                                              "orte": set(), "fn": None})
+            if z["fn"] is None:
+                z["fn"] = funktion_an(ftexte.get(kl["blatt"], []), *_pos(k))
             z["anzahl"] += 1
             z["typ"] = z["typ"] or wert_gesetzt(k.werte.get("TYP"), "TYP")
             z["per"] = z["per"] or wert_gesetzt(k.werte.get("PER"), "PER")
@@ -103,7 +110,8 @@ def geraeteliste(blaetter, nummer, netz=None, klemmenleisten=True,
             orte = [_ort(nummer, i, f) for i, f in sorted(z["orte"])]
             zeilen.append({"ind": kz, "einbauort": z["eo"], "typ": z["typ"],
                            "per": z["per"], "anzahl": str(z["anzahl"]),
-                           "orte": orte, "ort": ", ".join(orte)})
+                           "orte": orte, "ort": ", ".join(orte),
+                           "funktion": z["fn"] or []})
     # Devices without identifier at the end, otherwise naturally sorted
     zeilen.sort(key=lambda r: (natuerlich(r["einbauort"]), r["ind"] == "",
                                natuerlich(r["ind"])))
@@ -124,6 +132,7 @@ def klemmenplan(netz, blaetter, nummer, einbauorte=None):
     targets on that side, and the rows carry `_bruecke` = [(lane, dot, up,
     down)] for the bridge graphic."""
     felder = _felder(blaetter)
+    ftexte = funktionen_je_blatt(blaetter)
     zeilen = []
     for kl in netz.klemmen:
         k = kl["obj"]
@@ -136,6 +145,7 @@ def klemmenplan(netz, blaetter, nummer, einbauorte=None):
             "per": wert_gesetzt(w.get("PER"), "PER"),
             "ort": _ort(nummer, kl["blatt"],
                         feld_an(felder.get(kl["blatt"], []), *_pos(k))),
+            "funktion": funktion_an(ftexte.get(kl["blatt"], []), *_pos(k)),
             "_blatt": kl["blatt"], "_pos": _pos(k), "_kl": kl})
     zeilen.sort(key=lambda r: (natuerlich(r["einbauort"]), r["leiste"] == "",
                                natuerlich(r["leiste"]),
