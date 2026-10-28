@@ -1842,7 +1842,7 @@ class CadApp(AendernMixin, Ansicht3DMixin, ToolbarDockMixin):
             return
         if not hasattr(self, "_toolbar_icons"):
             self._toolbar_icons = {}
-        self._toolbar_icons[key] = bild                  # keep a reference
+        self._toolbar_icons[(key, str(parent))] = bild                  # keep a reference
         b = ttk.Radiobutton(parent, image=bild, value=key, style="Icon.Toolbutton",
                             variable=self.aktives_werkzeug,
                             command=self._werkzeug_toolbar)
@@ -1867,7 +1867,7 @@ class CadApp(AendernMixin, Ansicht3DMixin, ToolbarDockMixin):
             return
         if not hasattr(self, "_toolbar_icons"):
             self._toolbar_icons = {}
-        self._toolbar_icons[key] = bild
+        self._toolbar_icons[(key, str(parent))] = bild
         b = ttk.Checkbutton(parent, image=bild, style="Icon.Toolbutton",
                             variable=var, command=befehl)
         b.pack(side=tk.LEFT, padx=1)
@@ -1891,7 +1891,7 @@ class CadApp(AendernMixin, Ansicht3DMixin, ToolbarDockMixin):
             return
         if not hasattr(self, "_toolbar_icons"):
             self._toolbar_icons = {}
-        self._toolbar_icons[key] = bild
+        self._toolbar_icons[(key, str(parent))] = bild
         b = ttk.Button(parent, image=bild, style="Icon.Toolbutton", command=befehl)
         b.pack(side=tk.LEFT, padx=1)
         self._wz_knoepfe["cmd:" + key] = b

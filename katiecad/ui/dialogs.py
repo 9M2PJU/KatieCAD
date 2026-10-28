@@ -10,6 +10,7 @@ NEW (electrical base): ProjektNeuDialog, AttributDefinitionDialog,
 """
 
 import json
+import math
 import os
 import sys
 import tkinter as tk
@@ -352,6 +353,8 @@ class PropertiesDialog(tk.Toplevel):
         if isinstance(element, Linie):
             for k in ("x1", "y1", "x2", "y2"):
                 add_geo(k.upper() + ":", k, getattr(element, k))
+            self._laenge_feld(f, row)
+            row += 1
         elif isinstance(element, Kreis):
             add_geo("Zentrum X:", "cx", element.cx)
             add_geo("Zentrum Y:", "cy", element.cy)
@@ -448,6 +451,50 @@ class PropertiesDialog(tk.Toplevel):
         ttk.Button(bf, text=tr("dlg.abbrechen"),
                    command=self.destroy).pack(side=tk.LEFT, padx=6)
         self.wait_window(self)
+
+    def _laenge_feld(self, f, row):
+        """Length of a line: editing it moves the end point (point 2, the 'right' end) along the
+        line; point 1 stays."""
+        g = self.geo_vars
+        self._l_var = tk.DoubleVar(value=math.hypot(g["x2"].get() - g["x1"].get(),
+                                                    g["y2"].get() - g["y1"].get()))
+        ttk.Label(f, text=tr("dlg.prop.laenge")).grid(row=row, column=0, sticky=tk.W, pady=3)
+        e = ttk.Entry(f, textvariable=self._l_var, width=15)
+        e.grid(row=row, column=1, sticky=tk.W, pady=3)
+        e.bind("<Return>", lambda ev: self._laenge_anwenden())
+        e.bind("<FocusOut>", lambda ev: self._laenge_anwenden())
+        for k in ("x1", "y1", "x2", "y2"):
+            g[k].trace_add("write", lambda *_: self._laenge_anzeigen())
+
+    def _laenge_anzeigen(self):
+        if getattr(self, "_sperre", False):
+            return
+        try:
+            g = self.geo_vars
+            self._sperre = True
+            self._l_var.set(round(math.hypot(g["x2"].get() - g["x1"].get(),
+                                             g["y2"].get() - g["y1"].get()), 6))
+        except Exception:
+            pass
+        finally:
+            self._sperre = False
+
+    def _laenge_anwenden(self):
+        if getattr(self, "_sperre", False):
+            return
+        try:
+            g = self.geo_vars
+            neu = abs(self._l_var.get())
+            x1, y1, x2, y2 = (g[k].get() for k in ("x1", "y1", "x2", "y2"))
+            d = math.hypot(x2 - x1, y2 - y1)
+            ux, uy = ((x2 - x1) / d, (y2 - y1) / d) if d > 1e-12 else (1.0, 0.0)
+            self._sperre = True
+            g["x2"].set(round(x1 + ux * neu, 6))
+            g["y2"].set(round(y1 + uy * neu, 6))
+        except Exception:
+            pass
+        finally:
+            self._sperre = False
 
     def _rechteck_groesse(self, f, row):
         """Width / height of a rectangle (derived from the corners). Editing them resizes the
