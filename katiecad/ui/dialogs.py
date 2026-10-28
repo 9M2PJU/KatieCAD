@@ -2025,7 +2025,7 @@ class DokumentationDialog(tk.Toplevel):
               "gezeichnet", "geprueft", "revision", "datum")
     STANDARD = ("deckblatt", "inhalt", "geraete", "klemmen", "kabel")
     TYPEN = STANDARD + ("verbindungen", "stueckliste", "querverweise",
-                        "potenziale", "stecker", "etiketten", "revisionen")
+                        "potenziale", "stecker", "etiketten", "revisionen", "sps")
 
     def __init__(self, parent, vorlagen, einst, daten, projektname,
                  vorlage_vorgabe=None):
