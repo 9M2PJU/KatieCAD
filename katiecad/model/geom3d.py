@@ -260,9 +260,10 @@ def triangulieren(pts):
     return out
 
 
-def prisma_netz(profil, z0, hoehe, rund=False, senkrechte=8):
+def prisma_netz(profil, z0, hoehe, rund=False, senkrechte=8, glatt=None):
     """Prism over the closed base polygon `profil` from z0 to z0 + hoehe
-    (hoehe may be negative). Round bodies draw only `senkrechte` vertical edges."""
+    (hoehe may be negative). Round bodies draw only `senkrechte` vertical edges;
+    `glatt[i]` True = profile point inside a rounded corner (no vertical edge)."""
     nz = Netz()
     n = len(profil)
     if n < 3:
@@ -276,9 +277,71 @@ def prisma_netz(profil, z0, hoehe, rund=False, senkrechte=8):
         nz.flaeche([ub[i], ub[j], ut[j], ut[i]])
     schritt = max(1, n // senkrechte) if rund else 1
     for i in range(0, n, schritt):
+        if glatt and i < len(glatt) and glatt[i]:
+            continue
         nz.kante(ub[i], ut[i])
     nz.flaeche(ub); nz.flaeche(ut)
     return nz
+
+
+def profil_abrunden(pts, r, n=6):
+    """Rounds all corners of the closed polygon `pts` with radius r (limited per corner
+    to half of the shorter neighbouring edge). Returns (points, glatt) where glatt[i] is
+    True for points inside an arc (tangent points and straight corners are False)."""
+    m = len(pts)
+    if m < 3 or r <= 0:
+        return [tuple(p) for p in pts], [False] * m
+    out, glatt = [], []
+    for i in range(m):
+        P = pts[i]; A = pts[i - 1]; B = pts[(i + 1) % m]
+        ux, uy = A[0] - P[0], A[1] - P[1]
+        wx, wy = B[0] - P[0], B[1] - P[1]
+        lu, lw = math.hypot(ux, uy), math.hypot(wx, wy)
+        if lu < 1e-9 or lw < 1e-9:
+            out.append(tuple(P)); glatt.append(False)
+            continue
+        ux, uy, wx, wy = ux / lu, uy / lu, wx / lw, wy / lw
+        cosf = max(-1.0, min(1.0, ux * wx + uy * wy))
+        phi = math.acos(cosf)
+        if phi < 1e-3 or phi > math.pi - 1e-3:               # degenerate / straight
+            out.append(tuple(P)); glatt.append(False)
+            continue
+        t = r / math.tan(phi / 2)
+        tmax = min(lu, lw) / 2
+        re = r
+        if t > tmax:
+            t = tmax
+            re = t * math.tan(phi / 2)
+        bx, by = ux + wx, uy + wy
+        bl = math.hypot(bx, by)
+        d = re / math.sin(phi / 2)
+        cx, cy = P[0] + bx / bl * d, P[1] + by / bl * d
+        t1 = (P[0] + ux * t, P[1] + uy * t)
+        t2 = (P[0] + wx * t, P[1] + wy * t)
+        a1 = math.atan2(t1[1] - cy, t1[0] - cx)
+        a2 = math.atan2(t2[1] - cy, t2[0] - cx)
+        da = (a2 - a1 + math.pi) % (2 * math.pi) - math.pi
+        for k in range(n + 1):
+            a = a1 + da * k / n
+            out.append((cx + re * math.cos(a), cy + re * math.sin(a)))
+            glatt.append(0 < k < n)
+    return out, glatt
+
+
+def v_rotieren(v, achse, winkel_deg):
+    """Rotates vector v about the axis direction `achse` (Rodrigues)."""
+    l = math.sqrt(sum(a * a for a in achse)) or 1.0
+    k = tuple(a / l for a in achse)
+    w = math.radians(winkel_deg)
+    c, s = math.cos(w), math.sin(w)
+    kv = k[0] * v[0] + k[1] * v[1] + k[2] * v[2]
+    kx = (k[1] * v[2] - k[2] * v[1], k[2] * v[0] - k[0] * v[2], k[0] * v[1] - k[1] * v[0])
+    return tuple(v[i] * c + kx[i] * s + k[i] * kv * (1 - c) for i in range(3))
+
+
+def punkt_rotieren(p, p0, achse, winkel_deg):
+    d = v_rotieren((p[0] - p0[0], p[1] - p0[1], p[2] - p0[2]), achse, winkel_deg)
+    return (p0[0] + d[0], p0[1] + d[1], p0[2] + d[2])
 
 
 def pyramide_netz(profil, z0, hoehe, spitze=None, rund=False, senkrechte=8):

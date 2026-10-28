@@ -18,8 +18,8 @@ from copy import deepcopy
 
 from katiecad.common.i18n import tr, SPRACHE
 from katiecad.model.geom2d import ellipse_punkte, spline_punkte
-from katiecad.model.geom3d import (prisma_netz, pyramide_netz, kugel_netz, kreis_profil,
-                                   rechteck_profil, netz_abbilden, ebene_punkt, BODEN_EBENE)
+from katiecad.model.geom3d import (profil_abrunden, v_rotieren, punkt_rotieren, prisma_netz, pyramide_netz, kugel_netz, kreis_profil,
+                                   rechteck_profil, netz_abbilden, ebene_punkt, ebene_basis, BODEN_EBENE)
 
 
 # ============================================================
@@ -612,6 +612,9 @@ BEFEHLE = {
     "EXTRUDIEREN": "3d:extrudieren", "EXT": "3d:extrudieren", "EXTRUDE": "3d:extrudieren",
     "LOCH": "3d:loch", "BOHRUNG": "3d:loch", "HOLE": "3d:loch",
     "3DMASS": "3d:mass", "MASSE": "3d:mass",
+    "3DDREHEN": "3d:drehen", "3DROTATE": "3d:drehen", "DREHEN3D": "3d:drehen",
+    "3DABRUNDEN": "3d:abrunden", "3DFILLET": "3d:abrunden",
+    "3DPIVOT": "3d:pivot", "MANIPVERSETZEN": "3d:pivot",
     "3DBLOCK": "3d:block", "3DAUFLOESEN": "3d:aufloesen",
     "AUSRICHTEN": "ausrichten:links", "ALIGN": "ausrichten:links",
     "AUSLINKS": "ausrichten:links", "AUSRECHTS": "ausrichten:rechts",
@@ -3721,8 +3724,9 @@ class Koerper3D(Element):
 
     def __init__(self, art="prisma", profil=None, z0=0.0, hoehe=10.0, spitze=None,
                  rund=False, kugel=None, bez="", loecher=None, ebene=None,
-                 ausschnitte=None, **kw):
+                 ausschnitte=None, glatt=None, **kw):
         super().__init__("koerper3d", **kw)
+        self.glatt = [bool(g) for g in glatt] if glatt else None
         self.art = art if art in self.ARTEN else "prisma"
         self.profil = [(float(p[0]), float(p[1])) for p in (profil or [])]
         self.z0, self.hoehe = float(z0), float(hoehe)
@@ -3749,7 +3753,7 @@ class Koerper3D(Element):
         if self.art == "pyramide":
             nz = pyramide_netz(self.profil, self.z0, self.hoehe, self.spitze, self.rund)
         else:
-            nz = prisma_netz(self.profil, self.z0, self.hoehe, self.rund)
+            nz = prisma_netz(self.profil, self.z0, self.hoehe, self.rund, glatt=self.glatt)
         return netz_abbilden(nz, self.ebene) if self.ebene else nz
 
     def _loch_netz(self, loch):
@@ -3823,7 +3827,13 @@ class Koerper3D(Element):
             for (x, y, r, _t) in self.loecher:
                 out.append(Kreis(x, y, r, **kw))
         alle = self.netze()
-        for nz in [alle[0]] + alle[1 + (0 if self.ebene else len(self.loecher)):]:
+        n_loch = 0 if self.ebene else len(self.loecher)
+        gestrichelt = dict(kw, linientyp="Strichlinie (verdeckt)")
+        netze = [(alle[0], kw)]
+        for a, nz in zip(self.ausschnitte, alle[1 + n_loch:]):
+            oben = ebene_basis(a["ebene"])[2][2] > 0.99          # opens to the top: visible
+            netze.append((nz, kw if oben else gestrichelt))
+        for nz, stil in netze:
             for (i, j) in nz.kanten:
                 a, b = nz.punkte[i], nz.punkte[j]
                 if math.hypot(a[0] - b[0], a[1] - b[1]) < 1e-9:
@@ -3833,7 +3843,7 @@ class Koerper3D(Element):
                 if key in gesehen:
                     continue
                 gesehen.add(key)
-                out.append(Linie(a[0], a[1], b[0], b[1], **kw))
+                out.append(Linie(a[0], a[1], b[0], b[1], **stil))
         return out
 
     # ---- transformations -------------------------------------------------
@@ -3913,6 +3923,42 @@ class Koerper3D(Element):
             a["ebene"] = _ebene_spiegeln(a["ebene"], ax, ay, bx, by)
             a["profil"] = [(x, -y) for (x, y) in a["profil"]]
 
+    def _ebene_aktivieren(self):
+        """Gives a body without work plane the ground plane (legacy vertical holes become
+        cut-outs) so that it can be rotated freely."""
+        if self.ebene or self.art == "kugel":
+            return
+        oben = max(self.z0, self.z0 + self.hoehe)
+        for (x, y, r, t) in self.loecher:
+            self.ausschnitte.append({"ebene": (0.0, 0.0, oben, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0),
+                                     "profil": kreis_profil(x, y, r, 24),
+                                     "tiefe": None if t is None else float(t), "rund": True})
+        self.loecher = []
+        self.ebene = BODEN_EBENE
+
+    def drehen3(self, p0, achse, winkel_deg):
+        """Rotates the body about the axis through p0 with direction `achse`."""
+        def ebene_rot(e):
+            o = punkt_rotieren(e[:3], p0, achse, winkel_deg)
+            u = v_rotieren(e[3:6], achse, winkel_deg)
+            v = v_rotieren(e[6:9], achse, winkel_deg)
+            return tuple(o) + tuple(u) + tuple(v)
+        if self.art == "kugel" and self.kugel:
+            c = punkt_rotieren(self.kugel[:3], p0, achse, winkel_deg)
+            self.kugel = (c[0], c[1], c[2], self.kugel[3])
+        else:
+            self._ebene_aktivieren()
+            self.ebene = ebene_rot(self.ebene)
+        for a in self.ausschnitte:
+            a["ebene"] = ebene_rot(a["ebene"])
+
+    def kanten_abrunden(self, r, n=6):
+        """Rounds the vertical edges (corners of the base polygon). True if done."""
+        if self.art != "prisma" or self.rund or len(self.profil) < 3 or r <= 0:
+            return False
+        self.profil, self.glatt = profil_abrunden(self.profil, r, n)
+        return True
+
     def hoehe_setzen(self, h):
         """Push/pull: new signed height (apex / top face moves)."""
         if self.art in ("prisma", "pyramide"):
@@ -3921,6 +3967,7 @@ class Koerper3D(Element):
     def to_dict(self):
         d = super().to_dict()
         d["profil"] = [list(p) for p in self.profil]
+        d["glatt"] = list(self.glatt) if self.glatt else None
         d["spitze"] = list(self.spitze) if self.spitze else None
         d["kugel"] = list(self.kugel) if self.kugel else None
         d["loecher"] = [list(l) for l in self.loecher]
@@ -3998,6 +4045,10 @@ class Gruppe3D(Element):
         for t in self.teile:
             t.drehen(cx, cy, winkel_deg)
 
+    def drehen3(self, p0, achse, winkel_deg):
+        for t in self.teile:
+            t.drehen3(p0, achse, winkel_deg)
+
     def skalieren(self, cx, cy, f):
         for t in self.teile:
             t.skalieren(cx, cy, f)
@@ -4074,6 +4125,12 @@ class Skizze3D(Element):
 
     def drehen(self, cx, cy, winkel_deg):
         self.ebene = _ebene_drehen(self.ebene, cx, cy, winkel_deg)
+
+    def drehen3(self, p0, achse, winkel_deg):
+        e = self.ebene
+        self.ebene = (tuple(punkt_rotieren(e[:3], p0, achse, winkel_deg))
+                      + tuple(v_rotieren(e[3:6], achse, winkel_deg))
+                      + tuple(v_rotieren(e[6:9], achse, winkel_deg)))
 
     def skalieren(self, cx, cy, f):
         self.ebene = _ebene_skalieren(self.ebene, cx, cy, f)
@@ -4176,6 +4233,11 @@ class Bemassung3D(Element):
         self.p1, self.p2 = r(self.p1), r(self.p2)
         vx, vy = punkte_drehen(self.versatz[0], self.versatz[1], 0.0, 0.0, winkel_deg)
         self.versatz = (vx, vy, self.versatz[2])
+
+    def drehen3(self, p0, achse, winkel_deg):
+        self.p1 = tuple(punkt_rotieren(self.p1, p0, achse, winkel_deg))
+        self.p2 = tuple(punkt_rotieren(self.p2, p0, achse, winkel_deg))
+        self.versatz = tuple(v_rotieren(self.versatz, achse, winkel_deg))
 
     def skalieren(self, cx, cy, f):
         def sk(p):

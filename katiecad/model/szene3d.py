@@ -101,6 +101,32 @@ def _abstand_zug(kamera, cx, cy, mx, my, zug, geschlossen):
     return best
 
 
+def auswahl_im_rahmen(elemente, kamera, cx, cy, rahmen, kreuzend):
+    """Elements inside (kreuzend=False) or touching (True) the screen rectangle
+    rahmen = (x1, y1, x2, y2) - same logic as the 2D selection window."""
+    x1, y1, x2, y2 = rahmen
+    out = []
+    for el in elemente:
+        pts = []
+        if ist_3d(el):
+            for nz in el.netze():
+                pts.extend(nz.punkte)
+        else:
+            for zug, _c in zuege3(el):
+                pts.extend(zug)
+        sp = [q for q in (kamera.proj(p, cx, cy) for p in pts) if q is not None]
+        if not sp:
+            continue
+        bx1, by1 = min(q[0] for q in sp), min(q[1] for q in sp)
+        bx2, by2 = max(q[0] for q in sp), max(q[1] for q in sp)
+        if kreuzend:
+            if bx2 >= x1 and bx1 <= x2 and by2 >= y1 and by1 <= y2:
+                out.append(el)
+        elif bx1 >= x1 and bx2 <= x2 and by1 >= y1 and by2 <= y2:
+            out.append(el)
+    return out
+
+
 def pick(elemente, kamera, cx, cy, mx, my, tol=8.0):
     """Object under the screen point: 3D bodies first, then 2D shapes."""
     best, bd = None, None
@@ -118,6 +144,21 @@ def pick(elemente, kamera, cx, cy, mx, my, tol=8.0):
             if d is not None and d <= tol and (bd is None or d < bd):
                 best, bd = el, d
     return best
+
+
+def drehen3d(auswahl, p0, achse, winkel_deg):
+    """Rotates the selection about the axis through p0. 3D objects turn about any axis,
+    2D shapes only about Z. Returns the number of rotated objects."""
+    n = 0
+    z_achse = abs(achse[0]) < 1e-9 and abs(achse[1]) < 1e-9
+    for el in auswahl:
+        if hasattr(el, "drehen3"):
+            el.drehen3(p0, achse, winkel_deg)
+            n += 1
+        elif z_achse and hasattr(el, "drehen"):
+            el.drehen(p0[0], p0[1], winkel_deg if achse[2] > 0 else -winkel_deg)
+            n += 1
+    return n
 
 
 def auswahl_zentrum3(auswahl):
@@ -436,9 +477,12 @@ def fang_punkt(elemente, kamera, cx, cy, mx, my, tol=12.0):
     return r[0] if r else None
 
 
-def host_finden(elemente, ebene):
-    """Body whose face lies in the work plane `ebene` (and contains its origin / sketch)."""
+def host_finden(elemente, ebene, punkt=None):
+    """Body whose face lies in the work plane `ebene`. With `punkt` (local plane point,
+    e.g. the sketch centre) the body whose face contains that point wins, so two bodies
+    with faces in the same plane are told apart; otherwise the first match."""
     u, v, w = G.ebene_basis(ebene)
+    erste = None
     for el in elemente:
         if not ist_3d(el):
             continue
@@ -457,14 +501,23 @@ def host_finden(elemente, ebene):
                     continue
                 if abs(G.v_dot(G.v_sub(tuple(ebene[:3]), tuple(e2[:3])), w2)) > 1e-3:
                     continue
-                return k
-    return None
+                if erste is None:
+                    erste = k
+                if punkt is None:
+                    return k
+                wp = G.ebene_punkt(ebene, punkt[0], punkt[1])
+                lok = [G.ebene_lokal(ebene, p) for p in pts]
+                if G.punkt_in_polygon(G.ebene_lokal(ebene, wp)[0], G.ebene_lokal(ebene, wp)[1],
+                                      [(q[0], q[1]) for q in lok]):
+                    return k
+    return erste
 
 
 def skizze_in_ausschnitt(elemente, skizze, tiefe=None):
     """Cuts the sketch into the body it lies on (hole / pocket); True if done."""
-    host = host_finden(elemente, skizze.ebene)
     prof = skizze.profil()
+    mitte = (sum(p[0] for p in prof) / len(prof), sum(p[1] for p in prof) / len(prof)) if prof else None
+    host = host_finden(elemente, skizze.ebene, mitte)
     if host is None or len(prof) < 3:
         return False
     host.ausschnitt_hinzufuegen(skizze.ebene, prof, tiefe, skizze.rund())
@@ -480,7 +533,9 @@ def extrusion_abschliessen(elemente, koerper):
     pocket of the body it was sitting on. True if converted."""
     if not isinstance(koerper, Koerper3D) or not koerper.ebene or koerper.hoehe >= -1e-9:
         return False
-    host = host_finden([e for e in elemente if e is not koerper], koerper.ebene)
+    pr = koerper.profil
+    mitte = (sum(p[0] for p in pr) / len(pr), sum(p[1] for p in pr) / len(pr)) if pr else None
+    host = host_finden([e for e in elemente if e is not koerper], koerper.ebene, mitte)
     if host is None:
         return False
     host.ausschnitt_hinzufuegen(koerper.ebene, koerper.profil, abs(koerper.hoehe), koerper.rund)
