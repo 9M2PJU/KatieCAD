@@ -14,6 +14,8 @@ KatieCAD brings everything you need for daily work into one tool: electrical dia
 
 ![Screenshot4](Screenshots/Screenshot4.png)
 
+![Screenshot5](Screenshots/Screenshot5.png)
+
 ## Features
 
 ### Electrical engineering
