@@ -599,6 +599,12 @@ BEFEHLE = {
     "NUMMERIEREN": "nummerieren", "AUTONUM": "nummerieren", "GERAETENUMMERN": "nummerieren",
     "QSELECT": "schnellauswahl", "SCHNELLAUSWAHL": "schnellauswahl", "QS": "schnellauswahl",
     "VERSATZ": "versatz", "OFFSET": "versatz", "O": "versatz",
+    "LAENGE": "laenge", "LÄNGE": "laenge", "LENGTHEN": "laenge", "LEN": "laenge",
+    "MANIP": "manip", "MANIPULATOR": "manip", "MP": "manip",
+    "AUSRICHTEN": "ausrichten:links", "ALIGN": "ausrichten:links",
+    "AUSLINKS": "ausrichten:links", "AUSRECHTS": "ausrichten:rechts",
+    "AUSOBEN": "ausrichten:oben", "AUSUNTEN": "ausrichten:unten",
+    "AUSMITTEH": "ausrichten:mitte_h", "AUSMITTEV": "ausrichten:mitte_v",
     "ABRUNDEN": "abrunden", "FILLET": "abrunden", "F": "abrunden",
     "FASE": "fase", "CHAMFER": "fase", "CHA": "fase",
     "ATTDEF": "attdef", "ATTRIBUT": "attdef", "ATTRIBUTDEFINITION": "attdef",
@@ -650,12 +656,38 @@ _HELV = [278, 278, 355, 556, 556, 889, 667, 191, 333, 333, 389, 584, 278, 333, 2
          556, 556, 333, 500, 278, 556, 500, 722, 500, 500, 500, 334, 260, 334, 584]
 
 
-def pdf_textbreite(s, schriftgroesse):
+_HELV_FETT = [278, 333, 474, 556, 556, 889, 722, 238, 333, 333, 389, 584, 278, 333, 278, 278,
+              556, 556, 556, 556, 556, 556, 556, 556, 556, 556, 333, 333, 584, 584, 584, 611,
+              975, 722, 722, 722, 722, 667, 611, 778, 722, 278, 556, 722, 611, 833, 722, 778,
+              667, 778, 722, 667, 611, 722, 667, 944, 667, 667, 611, 333, 278, 333, 584, 556,
+              333, 556, 611, 556, 611, 556, 333, 611, 611, 278, 278, 556, 278, 889, 611, 611,
+              611, 611, 389, 556, 333, 611, 556, 778, 556, 556, 500, 389, 280, 389, 584]
+
+FETT_MARKE = "|b"          # bold text: font name + marker ("Arial|b")
+
+
+def schrift_fett(s):
+    """True if the font string carries the bold marker."""
+    return str(s).endswith(FETT_MARKE)
+
+
+def schrift_name(s):
+    """Font name without the bold marker."""
+    s = str(s)
+    return s[:-len(FETT_MARKE)] if s.endswith(FETT_MARKE) else s
+
+
+def schrift_setzen(name, fett):
+    return schrift_name(name) + (FETT_MARKE if fett else "")
+
+
+def pdf_textbreite(s, schriftgroesse, fett=False):
+    tab = _HELV_FETT if fett else _HELV
     w = 0
     for ch in s:
         o = ord(ch)
         if 32 <= o <= 126:
-            w += _HELV[o - 32]
+            w += tab[o - 32]
         elif ch == "\u00d8":
             w += 778
         else:
@@ -723,7 +755,8 @@ class PdfSeite:
         o.append("Q")
         self._op(" ".join(o))
 
-    def text(self, x, y, inhalt, hoehe, winkel=0.0, farbe="#000000", mitte=False):
+    def text(self, x, y, inhalt, hoehe, winkel=0.0, farbe="#000000", mitte=False,
+             fett=False):
         fs = hoehe / CAD_VERSALHOEHE
         a = math.radians(winkel)
         ex, ey = (math.cos(a), math.sin(a)), (-math.sin(a), math.cos(a))
@@ -734,12 +767,12 @@ class PdfSeite:
             up = (n - 1 - i) * TEXT_ZEILE * hoehe
             ox, oy = x + ey[0] * up, y + ey[1] * up
             if mitte:
-                w = pdf_textbreite(z, fs)
+                w = pdf_textbreite(z, fs, fett)
                 ox -= ex[0] * w / 2 + ey[0] * hoehe / 2
                 oy -= ex[1] * w / 2 + ey[1] * hoehe / 2
             self._op(
-                "BT /F1 %.4f Tf %.4f %.4f %.4f rg %.6f %.6f %.6f %.6f %.4f %.4f Tm (%s) Tj ET"
-                % (fs, r, g, b, ex[0], ex[1], -ex[1], ex[0], ox, oy, _pdf_str(z)))
+                "BT /%s %.4f Tf %.4f %.4f %.4f rg %.6f %.6f %.6f %.6f %.4f %.4f Tm (%s) Tj ET"
+                % ("F2" if fett else "F1", fs, r, g, b, ex[0], ex[1], -ex[1], ex[0], ox, oy, _pdf_str(z)))
 
     def bild(self, x, y, breite, hoehe, daten, format, pw, ph):
         """Places an image (lower left corner x/y in mm)."""
@@ -788,7 +821,10 @@ def pdf_mehrseitig(seiten):
     objs[2] = ("<< /Type /Pages /Kids [%s] /Count %d >>" % (kids, n)).encode("latin-1")
     objs[3] = (b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica "
                b"/Encoding /WinAnsiEncoding >>")
-    naechste = 4 + 2 * n                    # first free object number (images)
+    objs[4 + 2 * n] = (b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold "
+                       b"/Encoding /WinAnsiEncoding >>")
+    fett_nr = 4 + 2 * n
+    naechste = 5 + 2 * n                    # first free object number (images)
     ocg = {}                                # layer name -> object number
     for sp in seiten:
         for nm in sp.ebenen:
@@ -811,7 +847,7 @@ def pdf_mehrseitig(seiten):
             for k, t in enumerate(teile):
                 objs[nr + k] = t
             xobj += "/%s %d 0 R " % (name, nr)
-        res = "/Font << /F1 3 0 R >>" + (" /XObject << %s>>" % xobj if xobj else "")
+        res = "/Font << /F1 3 0 R /F2 %d 0 R >>" % fett_nr + (" /XObject << %s>>" % xobj if xobj else "")
         if sp.ebenen:
             res += " /Properties << %s>>" % "".join(
                 "/OC%d %d 0 R " % (k + 1, ocg[nm]) for k, nm in enumerate(sp.ebenen))
@@ -1251,7 +1287,7 @@ class Text(Element):
         # "A" is wider than "1". A fixed width per character let texts
         # protrude beyond the insertion point.
         fs = self.hoehe / CAD_VERSALHOEHE
-        w = max(max(pdf_textbreite(z, fs) for z in zeilen),
+        w = max(max(pdf_textbreite(z, fs, schrift_fett(self.schriftart)) for z in zeilen),
                 TEXT_BREITE * self.hoehe)
         h = (len(zeilen) - 1) * TEXT_ZEILE * self.hoehe + 1.4 * self.hoehe
         return w, h
