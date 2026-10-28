@@ -51,6 +51,24 @@ sp, _o = S.lade_spalten("klemmen"); check(sp[-1].key == "funktion", "Spalte Funk
 check(not any(c.key == "funktion" for c in S._ohne_leere_einbauorte(S.lade_spalten("geraete")[0], [{"funktion": []}])), "leere Funktionsspalte entfaellt")
 check(any(c.key == "funktion" for c in S._ohne_leere_einbauorte(S.lade_spalten("geraete")[0], gl)), "Funktionsspalte bleibt mit Inhalt")
 
+# Klemmenplan: gleicher Funktionstext nur bei der ersten Klemme
+kls = [core.Klemme(50 + 5 * i, 20, werte={"IND": "X2", "NUM": str(i + 1), "TYP": "", "PER": ""}) for i in range(3)]
+blk = [(0, [t1, t2] + kls)]
+kp2 = D.klemmenplan(N.Netz.aufbauen(blk), blk, nr)
+check([bool(z["funktion"]) for z in kp2] == [True, False, False], f"Funktion nur bei erster Klemme: {[z['funktion'] for z in kp2]}")
+
+# Fettschrift
+check(core.schrift_fett("Arial|b") and not core.schrift_fett("Arial") and core.schrift_name("Arial|b") == "Arial", "Fett-Marker")
+tn, tb = core.Text(0, 0, "Hallo", 3.5, 0.0, "Arial"), core.Text(0, 0, "Hallo", 3.5, 0.0, "Arial|b")
+check(tb.masse()[0] > tn.masse()[0], "fetter Text ist breiter")
+sp = core.PdfSeite(100, 100); sp.text(1, 1, "x", 3.5, fett=True)
+check("/F2" in sp.ops[0], "PDF: Fettschrift nutzt F2")
+check(b"Helvetica-Bold" in core.pdf_mehrseitig([sp]), "PDF enthaelt Helvetica-Bold")
+import katiecad.model.eigenschaften as EG
+check(EG.gemeinsame([tb])["schriftart"] == "Arial fett", "Palette zeigt 'Arial fett'")
+EG.anwenden([tn], "schriftart", "Arial fett"); check(tn.schriftart == "Arial|b", "Palette setzt fett")
+EG.anwenden([tn], "schriftart", "Arial"); check(tn.schriftart == "Arial", "Palette entfernt fett")
+
 # Layer-Konstante
 check(core.FTEXT_LAYER == "F-Text" and core.FTEXT_LAYER in core.ELEKTRO_LAYER, "Layer F-Text")
 check(core.BEFEHLE["FTEXT"] == "tool:ftext", "Befehl FTEXT")
@@ -89,6 +107,18 @@ check("sps" in S.LISTEN and "sps" in S.TYPEN, "Typ sps registriert")
 tab = S.tabellen_fuer_export(bl2, nr)
 check("sps" in tab and len(tab["sps"][1]) == 8, "Export enthaelt SPS-Liste")
 check(S.lade_spalten("sps")[0][0].key == "station", "Spaltendefinition sps")
+# Querverweis "extern": verweist nirgendwohin
+def qv(x, art, ext):
+    return core.Querverweis(x, 140, "L1", art, 270, extern=ext)
+e1 = [core.Koordinatenfeld(0, 0, 287, 164, 6, 4), qv(40, "ankommend", True), qv(100, "ankommend", True)]
+e2 = [core.Koordinatenfeld(0, 0, 287, 164, 6, 4), qv(40, "ankommend", True), qv(100, "abgehend", False)]
+e3 = [core.Koordinatenfeld(0, 0, 287, 164, 6, 4), qv(40, "ankommend", False)]
+L.ziele_fuer_alle_blaetter({1: e1, 2: e2, 3: e3})
+check(all(q.ziel == [] for q in e1[1:] + [e2[1]]), "extern: kein Ziel")
+check(e2[2].ziel == [(3, "1/1")] or [z[0] for z in e2[2].ziel] == [3], f"normaler Verweis ignoriert externe: {e2[2].ziel}")
+check(e3[1].ziel and all(z[0] == 2 for z in e3[1].ziel), f"Gegenstueck zeigt nicht auf externe: {e3[1].ziel}")
+nn = N.Netz.aufbauen([(0, e1), (1, e2), (2, e3)])
+check(all(n_.partner == [] for n_ in nn.knoten if n_.art == "qv" and n_.qv_art == "extern"), "Netz: extern ohne Partner")
 de = set(katiecad_i18n.TEXTE["de"]); en = set(katiecad_i18n.TEXTE["en"])
 check(de == en, "i18n Paritaet %s" % (de ^ en))
 print(ok, "Checks bestanden")
