@@ -595,6 +595,9 @@ BEFEHLE = {
     "EIGENSCHAFTENUEBERTRAGEN": "matchprop", "EIGENSCHAFTENÜBERTRAGEN": "matchprop",
     "MESS": "messen", "MESSEN": "messen", "DI": "messen", "DIST": "messen",
     "DISTANZ": "messen", "MEASURE": "messen",
+    "NUMMERIEREN": "nummerieren", "AUTONUM": "nummerieren", "GERAETENUMMERN": "nummerieren",
+    "QSELECT": "schnellauswahl", "SCHNELLAUSWAHL": "schnellauswahl", "QS": "schnellauswahl",
+    "VERSATZ": "versatz", "OFFSET": "versatz", "O": "versatz",
     "ABRUNDEN": "abrunden", "FILLET": "abrunden", "F": "abrunden",
     "FASE": "fase", "CHAMFER": "fase", "CHA": "fase",
     "ATTDEF": "attdef", "ATTRIBUT": "attdef", "ATTRIBUTDEFINITION": "attdef",
@@ -617,6 +620,7 @@ BEFEHLE = {
     "DIMRADIUS":   "bem:radius", "DR": "bem:radius",
     "RADIUS":      "bem:radius", "RBEM": "bem:radius",
     "DIMDIAMETER": "bem:durchmesser", "DD": "bem:durchmesser",
+    "KETTE": "bem:kette", "KETTENBEM": "bem:kette", "DIMCONTINUE": "bem:kette",
     "WINKEL": "bem:winkel", "WINKELBEM": "bem:winkel", "ANGULAR": "bem:winkel",
     "WINKELLINIEN": "bem:winkel_linien",
     "DURCHMESSER": "bem:durchmesser", "DIA": "bem:durchmesser",
@@ -1081,8 +1085,22 @@ class Rechteck(Element):
             self.x2 += dx; self.y2 += dy
 
     def drehen(self, cx, cy, winkel_deg):
-        self.x1, self.y1 = punkte_drehen(self.x1, self.y1, cx, cy, winkel_deg)
-        self.x2, self.y2 = punkte_drehen(self.x2, self.y2, cx, cy, winkel_deg)
+        if abs(winkel_deg / 90.0 - round(winkel_deg / 90.0)) < 1e-9:
+            # multiples of 90 degrees: the rectangle stays axis-parallel
+            self.x1, self.y1 = punkte_drehen(self.x1, self.y1, cx, cy, winkel_deg)
+            self.x2, self.y2 = punkte_drehen(self.x2, self.y2, cx, cy, winkel_deg)
+            return
+        # any other angle: all four corners are rotated -> closed polyline
+        # (rotating only two corners deformed the rectangle)
+        pts = [punkte_drehen(x, y, cx, cy, winkel_deg) for (x, y) in
+               ((self.x1, self.y1), (self.x2, self.y1),
+                (self.x2, self.y2), (self.x1, self.y2))]
+        neu = Polylinie(pts, geschlossen=True, layer=self.layer,
+                        farbe=self.farbe, linientyp=self.linientyp,
+                        eig_farbe=self.eig_farbe, staerke=self.staerke)
+        self.__class__ = Polylinie
+        self.__dict__.clear()
+        self.__dict__.update(neu.__dict__)
 
 
 class Polylinie(Element):
