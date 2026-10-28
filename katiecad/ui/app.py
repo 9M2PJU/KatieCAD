@@ -64,7 +64,7 @@ from katiecad.model.core import (
     GRIFF_RADIUS, MIN_VP_GROESSE, PASTE_OFFSET_MM,
     TEXT_BREITE, TEXT_ZEILE, CAD_VERSALHOEHE, LW_PX_FAKTOR, BEM_RICHTUNGEN,
     BEFEHLE, PdfSeite, ist_dunkel,
-    E_DEVICES, E_LINES, E_CABLE, E_CLAMPS, E_PIN, ELEKTRO_LAYER,
+    E_DEVICES, E_LINES, E_CABLE, E_CLAMPS, E_PIN, ELEKTRO_LAYER, FTEXT_LAYER,
     Layer, Layout, Element, Linie, Kreis, Bogen, Rechteck, Polylinie, Text,
     Ellipse, Spline,
     Bemassung, Viewport, Schraffur, Bild, konturen_aus_elementen, bereich_an_punkt,
@@ -109,7 +109,7 @@ from types import SimpleNamespace
 ICON_ROT = "#ff4d4d"            # icon colour of the electrical tools
 
 ELEKTRO_WERKZEUGE = ("vpunkt", "verbindung", "leitung", "querverweis",
-                     "maske", "klemme", "koordinatenfeld", "kabel")
+                     "maske", "klemme", "koordinatenfeld", "kabel", "ftext")
 
 
 # ============================================================
@@ -132,6 +132,8 @@ def _style_setup(root):
                  foreground=FARBEN["text"], font=(UI_SCHRIFT, 9))
     st.configure("Title.TLabel", background=FARBEN["bg_mittel"],
                  foreground=FARBEN["cyan"], font=(UI_SCHRIFT, 9, "bold"))
+    st.configure("Elektro.TLabel", background=FARBEN["bg_mittel"],
+                 foreground=ICON_ROT, font=(UI_SCHRIFT, 9, "bold"))
     st.configure("Hint.TLabel", background=FARBEN["bg_mittel"],
                  foreground=FARBEN["cyan"], font=(UI_SCHRIFT, 9, "italic"))
 
@@ -1203,6 +1205,8 @@ class CadApp:
         m_bloecke.add_separator()
         m_bloecke.add_command(label=tr("menu.bloecke.speichern"),
                               command=self.block_speichern_datei)
+        m_bloecke.add_command(label=tr("menu.bloecke.laden"),
+                              command=self.block_laden_datei)
         m_bloecke.add_separator()
         m_bloecke.add_command(label=tr("menu.einfuegen.block_aufloesen"),
                               command=self.block_aufloesen)
@@ -1228,11 +1232,11 @@ class CadApp:
                               command=lambda: self._werkzeug_setzen("kabel"))
         m_elektro.add_command(label=tr("menu.elektro.koordinatenfeld"),
                               command=lambda: self._werkzeug_setzen("koordinatenfeld"))
+        m_elektro.add_command(label=tr("menu.elektro.ftext"),
+                              command=lambda: self._werkzeug_setzen("ftext"))
         m_elektro.add_separator()
         m_elektro.add_command(label=tr("menu.elektro.geraet_erzeugen"),
                               command=self.geraet_erzeugen)
-        m_elektro.add_command(label=tr("menu.elektro.geraet_laden"),
-                              command=self.block_einfuegen)
         menubar.add_cascade(label=tr("menu.elektro"), menu=m_elektro)
 
         # Language
@@ -1324,9 +1328,9 @@ class CadApp:
 
         ttk.Separator(tb, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=8)
         ttk.Label(tb, text=tr("menu.elektro") + ":",
-                  style="Title.TLabel").pack(side=tk.LEFT, padx=(0, 4))
+                  style="Elektro.TLabel").pack(side=tk.LEFT, padx=(0, 4))
         for key in ("vpunkt", "verbindung", "querverweis",
-                    "maske", "klemme", "kabel", "koordinatenfeld"):
+                    "maske", "klemme", "kabel", "koordinatenfeld", "ftext"):
             self._werkzeug_knopf(tb, key, ICON_ROT)
 
         # --- Toolbar 2 ---
@@ -1453,14 +1457,14 @@ class CadApp:
         self._tb3_anker = ttk.Frame(tb3, width=1)
         self._tb3_anker.pack(side=tk.LEFT)
         ttk.Separator(tb3, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=8)
-        ttk.Button(tb3, text=tr("tb.zoom_plus"), width=8,
-                   command=lambda: self._zoom(1.25)).pack(side=tk.LEFT, padx=2)
-        ttk.Button(tb3, text=tr("tb.zoom_minus"), width=8,
-                   command=lambda: self._zoom(0.8)).pack(side=tk.LEFT, padx=2)
-        ttk.Button(tb3, text=tr("tb.reset"), width=8,
-                   command=self._reset_view).pack(side=tk.LEFT, padx=2)
-        ttk.Button(tb3, text=tr("tb.zoom_grenzen"), width=14,
-                   command=self.zoom_grenzen).pack(side=tk.LEFT, padx=2)
+        self._befehl_knopf(tb3, "zoom_plus", FARBEN["cyan"],
+                           lambda: self._zoom(1.25), "tb.zoom_plus")
+        self._befehl_knopf(tb3, "zoom_minus", FARBEN["cyan"],
+                           lambda: self._zoom(0.8), "tb.zoom_minus")
+        self._befehl_knopf(tb3, "zoom_grenzen", FARBEN["cyan"],
+                           self.zoom_grenzen, "tb.zoom_grenzen")
+        self._befehl_knopf(tb3, "reset", FARBEN["cyan"],
+                           self._reset_view, "tb.reset")
 
         ttk.Separator(tb3, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=8)
         ttk.Label(tb3, text=tr("tb.hintergrund"), style="Title.TLabel").pack(side=tk.LEFT)
@@ -1733,9 +1737,9 @@ class CadApp:
         b.pack(side=tk.LEFT, padx=1)
         Tooltip(b, text)
 
-    def _befehl_knopf(self, parent, key, farbe, befehl):
+    def _befehl_knopf(self, parent, key, farbe, befehl, textkey=None):
         """Icon button that runs a command (no tool); text button without Pillow."""
-        text = tr(f"tb.wz.{key}")
+        text = tr(textkey or f"tb.wz.{key}")
         bild = None
         png = ICONS.icon_png(key, farbe) if PILLOW_VERFUEGBAR else None
         if png:
@@ -1836,7 +1840,7 @@ class CadApp:
         werkzeug = self.aktives_werkzeug.get()
         if werkzeug == "kreis":
             zeige(self.kreis_widgets)
-        elif werkzeug == "text":
+        elif werkzeug in ("text", "ftext"):
             zeige(self.text_widgets)
         elif werkzeug == "bogen":
             zeige(self.bogen_widgets)
@@ -3631,6 +3635,8 @@ class CadApp:
             self._bem_klick(pt)
         elif werkzeug == "text":
             self._text_einfuegen(x_mm, y_mm)
+        elif werkzeug == "ftext":
+            self._text_einfuegen(x_mm, y_mm, ftext=True)
         elif werkzeug == "stutzen":
             self._trim_klick(pt)
         elif werkzeug == "brechen":
@@ -4115,7 +4121,7 @@ class CadApp:
                     return el
         return None
 
-    def _text_einfuegen(self, x_mm, y_mm):
+    def _text_einfuegen(self, x_mm, y_mm, ftext=False):
         dlg = TextDialog(self.root, self)
         if not dlg.result:
             return
@@ -4128,6 +4134,10 @@ class CadApp:
         if "Schrift" in self.layers:
             daten["layer"] = "Schrift"
             daten["farbe"] = self.layers["Schrift"].farbe
+        if ftext:
+            self._elektro_layer(FTEXT_LAYER)
+            daten["layer"] = FTEXT_LAYER
+            daten["farbe"] = self.layers[FTEXT_LAYER].farbe
         daten["eig_farbe"] = True
         daten["staerke"] = None
         self._ziel_liste().append(
@@ -5434,6 +5444,8 @@ class CadApp:
         elif w == "text":
             h(text=("Einfügepunkt klicken, dann Text eingeben" if de
                     else "Click insertion point, then enter text"))
+        elif w == "ftext":
+            h(text=tr("msg.ftext.platzieren"))
         elif w == "stutzen":
             if self._trim_status == "grenzen":
                 h(text=tr("msg.stutzen.start"))
