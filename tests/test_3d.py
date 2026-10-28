@@ -183,4 +183,11 @@ for k in ("menu.ansicht.tb_werkzeug", "menu.ansicht.tb_elektro", "menu.ansicht.t
           "d3.modus.linie", "d3.msg.skizze_linie", "tb.wz.skizze_linie"):
     for T in (I.TEXTE["de"], I.TEXTE["en"]):
         check(k in T, k)
+_k0 = G.Kamera(yaw=0, pitch=0)
+_el0 = [core.quader(0, 0, 40, 100, 0, 20)]
+_q0 = _k0.proj((0, 0, 20), 400, 300)
+_f0 = S.flaeche_pick(_el0, _k0, 400, 300, _q0[0], _q0[1])
+check(_f0 is not None and abs(G.ebene_basis(_f0[1])[2][1]) > 0.99, "Fläche an Ecke in Frontansicht")
+check({"menu.ansicht.tb_vor", "menu.ansicht.tb_zurueck"} <= set(I.TEXTE["de"]) & set(I.TEXTE["en"]), "tb Reihenfolge i18n")
+check(callable(TD.ToolbarDockMixin.toolbar_vor) and callable(TD.ToolbarDockMixin.toolbar_verschieben), "tb Reihenfolge")
 print(f"test_3d - {ok} Checks bestanden")
