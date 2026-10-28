@@ -34,6 +34,8 @@
 - 3D-Objektfang mit **sichtbaren Markierungen** (Endpunkt, Mitte, Zentrum, Raster) beim Skizzieren und Bemaßen
 - 3D-Raster nutzt jetzt den Statusleisten-Schalter (Raster ein/aus, F7) und kann **punktiert** dargestellt werden
 - Fix: Ein schneller zweiter Klick wurde als Doppelklick gewertet und im Zeichenmodus/bei Verschieben/Manipulator verschluckt bzw. öffnete den Eigenschaften-Dialog
+- Fix: Flächenerkennung auch direkt auf Kanten/Ecken (Frontansicht: Linie exakt auf die Körperecke); Reihenfolge der Werkzeugleisten änderbar (Ansicht › Werkzeugleisten › Weiter nach vorn/hinten oder Griff auf eine andere Leiste ziehen)
+- Fix: Seitenleiste ließ sich in der 3D-Ansicht nach dem Ausblenden nicht mehr einblenden
 - Werkzeugleisten **je Fachbereich** (Werkzeug, Elektro, 3D) getrennt oben/unten/rechts andockbar, mit Zeilenumbruch bei schmalem Fenster
 - 3D im Layout-Viewport: Das 3D-Symbol schaltet im Layout den gewählten Viewport auf 3D (statt die Layout-Fläche zu ersetzen); aktivierbar, mit mittlerer Maustaste drehbar
 - Symbol-Werkzeugleiste lässt sich oben, unten oder rechts andocken (Griff ziehen oder Ansicht › Werkzeugleiste), Auswahl wird gespeichert

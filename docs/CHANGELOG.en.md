@@ -34,6 +34,8 @@
 - 3D object snap with **visible markers** (endpoint, midpoint, centre, grid) when sketching and dimensioning
 - The 3D grid now uses the status bar switch (grid on/off, F7) and can be shown **dotted**
 - Fix: a fast second click was treated as a double click and swallowed in drawing modes / move / manipulator, or opened the properties dialog
+- Fix: face detection also directly on edges/corners (front view: draw a line exactly on the body corner); toolbar order can be changed (View > Toolbars > Move forward/back, or drop a grip on another bar)
+- Fix: the side bar could not be shown again after hiding it in the 3D view
 - Toolbars **per department** (Tools, Electrical, 3D) can be docked separately at the top/bottom/right, wrapping into a new row in a narrow window
 - 3D in a layout viewport: the 3D icon in a layout switches the chosen viewport to 3D (instead of replacing the layout area); it can be activated and rotated with the middle mouse button
 - The symbol toolbar can be docked at the top, bottom or right (drag the grip or View > Toolbar), the choice is saved

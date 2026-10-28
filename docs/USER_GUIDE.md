@@ -124,7 +124,7 @@ line weight in the toolbar.
 - **3D block:** select several 3D bodies › icon "Make 3D block" (`3DBLOCK`); the block is selected and moved as one unit. It is for overview only and has no electrical function. "Dissolve 3D block" splits it again.
 - Everything stays a simple wireframe (no faces, no rendering, no hidden-line removal).
 
-**Placing the toolbars (View > Toolbars, or drag the grip ⋮⋮):** there is one bar each for **Tools**, **Electrical** and **3D**. Each can be docked separately at the top, bottom or right - drag the grip at the start of the bar to the desired window edge and release, it snaps there. At the top/bottom the bars sit side by side and wrap into a new row in a narrow window; at the right the symbols wrap into several columns. The choice is saved per bar.
+**Placing the toolbars (View > Toolbars, or drag the grip ⋮⋮):** there is one bar each for **Tools**, **Electrical** and **3D**. Each can be docked separately at the top, bottom or right - drag the grip at the start of the bar to the desired window edge and release, it snaps there. At the top/bottom the bars sit side by side and wrap into a new row in a narrow window; at the right the symbols wrap into several columns. The **order** is changed via View > Toolbars > "Move forward / back" or by dropping the grip on another bar (e.g. Electrical before Tools). The choice is saved per bar.
 
 **Quick select (Edit > Quick select, command `QS`):** selects all objects of one object type, layer, colour or line type. Several criteria apply together (AND). Optionally select everything except the matches or add to the current selection.
 
