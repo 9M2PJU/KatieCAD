@@ -529,3 +529,89 @@ def wuerfel_treffer(kamera, mx, my, groesse, px, py):
         if punkt_in_polygon(px, py, pts):
             return name
     return None
+
+
+# --------------------------------------------------------------------------
+# Work planes ("Ebene"): 9-tuple (ox, oy, oz,  ux, uy, uz,  vx, vy, vz);
+# the normal is w = u x v. Local (x, y, z) -> world  o + x u + y v + z w.
+# --------------------------------------------------------------------------
+BODEN_EBENE = (0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0)
+
+
+def ebene_basis(e):
+    u = (e[3], e[4], e[5]); v = (e[6], e[7], e[8])
+    return u, v, v_cross(u, v)
+
+
+def ebene_punkt(e, x, y, z=0.0):
+    u, v, w = ebene_basis(e)
+    return (e[0] + x * u[0] + y * v[0] + z * w[0],
+            e[1] + x * u[1] + y * v[1] + z * w[1],
+            e[2] + x * u[2] + y * v[2] + z * w[2])
+
+
+def ebene_lokal(e, p):
+    u, v, w = ebene_basis(e)
+    d = (p[0] - e[0], p[1] - e[1], p[2] - e[2])
+    return (v_dot(d, u), v_dot(d, v), v_dot(d, w))
+
+
+def netz_abbilden(nz, e):
+    """Copy of mesh `nz` (local coordinates) mapped into the world via plane `e`."""
+    out = Netz()
+    out.punkte = [ebene_punkt(e, *p) for p in nz.punkte]
+    out.kanten = list(nz.kanten)
+    out.flaechen = [list(f) for f in nz.flaechen]
+    return out
+
+
+def ebene_von_flaeche(pts, zentrum):
+    """Work plane of a planar face (list of 3D points); the normal points away
+    from `zentrum` (the centre of the body)."""
+    n = v_norm(_flaechen_normale(pts))
+    if v_len(n) < 1e-12:
+        return None
+    mitte = (sum(p[0] for p in pts) / len(pts), sum(p[1] for p in pts) / len(pts),
+             sum(p[2] for p in pts) / len(pts))
+    if v_dot(n, v_sub(mitte, zentrum)) < 0:
+        n = v_mul(n, -1.0)
+    # u: first edge of the face, made perpendicular to n
+    u = None
+    for i in range(len(pts)):
+        d = v_sub(pts[(i + 1) % len(pts)], pts[i])
+        d = v_sub(d, v_mul(n, v_dot(d, n)))
+        if v_len(d) > 1e-9:
+            u = v_norm(d)
+            o = pts[i]
+            break
+    if u is None:
+        return None
+    v = v_cross(n, u)
+    return (o[0], o[1], o[2], u[0], u[1], u[2], v[0], v[1], v[2])
+
+
+def strahl_auf_ebene(e, o, d):
+    """Local (x, y) where the ray o + t d (t > 0) meets the plane, or None."""
+    u, v, w = ebene_basis(e)
+    nenner = v_dot(d, w)
+    if abs(nenner) < 1e-9:
+        return None
+    t = v_dot(v_sub((e[0], e[1], e[2]), o), w) / nenner
+    if t <= 0:
+        return None
+    p = v_add(o, v_mul(d, t))
+    l = ebene_lokal(e, p)
+    return (l[0], l[1])
+
+
+def flaeche_treffer(nz, o, d):
+    """Nearest face of mesh `nz` hit by the ray -> (t, face_index) or None."""
+    best = None
+    for fi, fl in enumerate(nz.flaechen):
+        pts = [nz.punkte[i] for i in fl]
+        for (i, j, k) in triangulieren(pts):
+            t = _strahl_dreieck(o, d, (pts[i], pts[j], pts[k]))
+            if t is not None and t > 1e-6 and (best is None or t < best[0]):
+                best = (t, fi)
+    return best
+
