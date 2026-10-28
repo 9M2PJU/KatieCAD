@@ -605,6 +605,7 @@ BEFEHLE = {
     "MANIP": "manip", "MANIPULATOR": "manip", "MP": "manip",
     "3D": "3d:oeffnen", "3DANSICHT": "3d:oeffnen", "3DVIEW": "3d:oeffnen",
     "QUADER": "3d:neu:quader", "BOX": "3d:neu:quader",
+    "SCHRANK": "3d:neu:schrank", "CABINET": "3d:neu:schrank",
     "PYRAMIDE": "3d:neu:pyramide", "PYRAMID": "3d:neu:pyramide",
     "ZYLINDER": "3d:neu:zylinder", "CYLINDER": "3d:neu:zylinder",
     "KEGEL": "3d:neu:kegel", "CONE": "3d:neu:kegel",
