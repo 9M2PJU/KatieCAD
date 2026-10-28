@@ -1891,8 +1891,6 @@ class CadApp(AendernMixin, Ansicht3DMixin, ToolbarDockMixin):
         """Tool selection by the user: "Selection" clears the selection."""
         if self.aktives_werkzeug.get() == "auswahl":
             self.auswahl = []
-        if self.ansicht3d_aktiv() and self.aktives_werkzeug.get() != "auswahl":
-            self.ansicht3d_setzen(False)          # 2D tools work in the 2D view
         self._werkzeug_gewechselt()
 
     def _bem_art_starten(self, art):
@@ -2506,6 +2504,10 @@ class CadApp(AendernMixin, Ansicht3DMixin, ToolbarDockMixin):
         self.status.set("Zurück zur Auswahl." if de else "Back to selection.")
 
     def _werkzeug_gewechselt(self):
+        self._werkzeug_gewechselt_2d()
+        self.ansicht3d_werkzeug()           # in 3D: basic tools act on the work plane
+
+    def _werkzeug_gewechselt_2d(self):
         self._kabel_p1 = None
         self._leitung_beenden()
         self.letzter_punkt = None

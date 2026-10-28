@@ -23,6 +23,10 @@ from katiecad.model import geom3d as G
 from katiecad.model import szene3d as S
 from katiecad.ui.dialogs import _modal, _LayoutNameDialog
 
+# basic 2D tools of the toolbar -> their 3D counterparts (drawing on the work plane / 3D dimension)
+WERKZEUG_3D = {"linie": "linie", "polylinie": "poly", "kreis": "kreis", "rechteck": "rechteck",
+               "bemassung": "bem"}
+
 BTN_MITTE, BTN_RECHTS = ("3", "2") if __import__("sys").platform == "darwin" else ("2", "3")
 
 ACHSEN_FARBE = {"x": "#ff4d4d", "y": "#3ddc84", "z": "#4da6ff"}
@@ -152,6 +156,52 @@ class DrehDialog(tk.Toplevel):
         self.destroy()
 
 
+class AbrundDialog(tk.Toplevel):
+    """Radius + which edges to round. result = (radius, vertical, top, bottom)."""
+
+    def __init__(self, parent, einheit):
+        super().__init__(parent)
+        self.result = None
+        self.title(tr("d3.abrunden.titel"))
+        self.transient(parent)
+        self.configure(bg=FARBEN["bg_mittel"])
+        self.resizable(False, False)
+        f = ttk.Frame(self, padding=12)
+        f.pack(fill=tk.BOTH, expand=True)
+        ttk.Label(f, text=tr("d3.abrunden.radius") + f" ({einheit})").grid(row=0, column=0, sticky=tk.W)
+        self.radius = tk.StringVar(value="5")
+        e = ttk.Entry(f, textvariable=self.radius, width=10)
+        e.grid(row=0, column=1, padx=8, pady=3)
+        self.senkrecht = tk.BooleanVar(value=False)
+        self.oben = tk.BooleanVar(value=True)
+        self.unten = tk.BooleanVar(value=False)
+        for r, (var, key) in enumerate(((self.oben, "oben"), (self.unten, "unten"),
+                                        (self.senkrecht, "senkrecht")), start=1):
+            ttk.Checkbutton(f, text=tr("d3.abrunden." + key), variable=var
+                            ).grid(row=r, column=0, columnspan=2, sticky=tk.W, pady=2)
+        bt = ttk.Frame(f)
+        bt.grid(row=4, column=0, columnspan=2, pady=(10, 0))
+        ttk.Button(bt, text="OK", command=self._ok).pack(side=tk.LEFT, padx=6)
+        ttk.Button(bt, text=tr("dlg.abbrechen"), command=self.destroy).pack(side=tk.LEFT, padx=6)
+        self.bind("<Return>", lambda ev: self._ok())
+        self.bind("<Escape>", lambda ev: self.destroy())
+        e.focus_set()
+        _modal(self)
+
+    def _ok(self):
+        try:
+            r = float(self.radius.get().strip().replace(",", "."))
+            if r <= 0:
+                raise ValueError
+        except ValueError:
+            messagebox.showerror(tr("d3.titel"), tr("d3.msg.zahl"), parent=self)
+            return
+        if not (self.senkrecht.get() or self.oben.get() or self.unten.get()):
+            return
+        self.result = (r, bool(self.senkrecht.get()), bool(self.oben.get()), bool(self.unten.get()))
+        self.destroy()
+
+
 class MassDialog(tk.Toplevel):
     """Edit the dimensions of a body / sketch. result = {key: value} in display units."""
 
@@ -270,13 +320,8 @@ class Ansicht3D(tk.Frame):
         a._umschalt_knopf(bar, "hoehe3d", farbe, self.hoehe_var, lambda: None)
         ttk.Separator(bar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=8)
         a._befehl_knopf(bar, "flaeche3d", farbe, lambda: self.modus_setzen("flaeche"))
-        a._befehl_knopf(bar, "skizze_linie", farbe, lambda: self.modus_setzen("linie"))
-        a._befehl_knopf(bar, "skizze_kreis", farbe, lambda: self.modus_setzen("kreis"))
-        a._befehl_knopf(bar, "skizze_rechteck", farbe, lambda: self.modus_setzen("rechteck"))
-        a._befehl_knopf(bar, "skizze_poly", farbe, lambda: self.modus_setzen("poly"))
         a._befehl_knopf(bar, "ebene0", farbe, self.ebene_zuruecksetzen)
         ttk.Separator(bar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=8)
-        a._befehl_knopf(bar, "bem3d", farbe, lambda: self.modus_setzen("bem"))
         a._befehl_knopf(bar, "mass3d", farbe, self.massdialog)
         ttk.Separator(bar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=8)
         a._befehl_knopf(bar, "manip_pivot", farbe, lambda: self.modus_setzen("pivot"))
@@ -634,6 +679,10 @@ class Ansicht3D(tk.Frame):
                           font=(UI_SCHRIFT, 9, "bold"), tags="manip")
         if infos:
             p = next(iter(infos.values()))["von"]
+            hx, hy = p[0] + 18, p[1] + 18                  # pivot handle: click, then click the new origin
+            c.create_oval(hx - 6, hy - 6, hx + 6, hy + 6, outline=FARBEN["orange"], width=2, tags="manip")
+            c.create_line(hx - 3, hy, hx + 3, hy, fill=FARBEN["orange"], tags="manip")
+            c.create_line(hx, hy - 3, hx, hy + 3, fill=FARBEN["orange"], tags="manip")
             c.create_rectangle(p[0] - 5, p[1] - 5, p[0] + 5, p[1] + 5, fill=FARBEN["gelb"],
                                outline=FARBEN["bg_dunkel"], tags="manip")
 
@@ -662,6 +711,11 @@ class Ansicht3D(tk.Frame):
         self._modus = None
         self._skiz = None
         self.canvas.configure(cursor="crosshair")
+        try:                                  # the basic tool of the toolbar falls back to "Selection"
+            if self.app.aktives_werkzeug.get() in WERKZEUG_3D:
+                self.app.aktives_werkzeug.set("auswahl")
+        except Exception:
+            pass
 
     def _raster_fang(self):
         try:
@@ -969,6 +1023,11 @@ class Ansicht3D(tk.Frame):
             self._modus_klick(e)
             return
         infos = self._manip_infos()
+        if infos:
+            o = next(iter(infos.values()))["von"]
+            if abs(e.x - (o[0] + 18)) <= 8 and abs(e.y - (o[1] + 18)) <= 8:
+                self.modus_setzen("pivot")
+                return
         achse = S.manip_treffer(infos, e.x, e.y)
         if achse:
             self._drag = {"art": "manip", "achse": achse, "x": e.x, "y": e.y, "info": infos[achse],
@@ -1316,19 +1375,27 @@ class Ansicht3D(tk.Frame):
         self.zeichne()
 
     def abrunden_dialog(self):
-        """Round the vertical edges (corners of the base polygon) of the selected bodies."""
-        ziele = [k for x in self.app.auswahl if S.ist_3d(x) for k in x.koerper()
-                 if k.art == "prisma" and not k.rund]
+        """Round vertical edges and / or the top / bottom perimeter edges of the selected bodies."""
+        ziele = [k for x in self.app.auswahl if S.ist_3d(x) for k in x.koerper() if k.art == "prisma"]
         if not ziele:
             self.info_var.set(tr("d3.msg.nichts_abrundbar"))
             return
-        u = self.app.einheit.get()
-        r = frage_zahl(self.app.root, tr("d3.abrunden.titel"), tr("d3.abrunden.radius") + f" ({u})", "5")
-        if r is None or r <= 0:
+        dlg = AbrundDialog(self.app.root, self.app.einheit.get())
+        self.app.root.wait_window(dlg)
+        if not dlg.result:
             return
+        r, senkrecht, oben, unten = dlg.result
+        r *= self.app._einh_faktor()
         self.app._snapshot()
-        n = sum(1 for k in ziele if k.kanten_abrunden(r * self.app._einh_faktor()))
-        self.info_var.set(tr("d3.msg.abgerundet", n=n))
+        n = 0
+        for k in ziele:
+            ok = False
+            if senkrecht and not k.rund:
+                ok = k.kanten_abrunden(r) or ok
+            if oben or unten:
+                ok = k.kanten_oben_unten(r, oben, unten) or ok
+            n += 1 if ok else 0
+        self.info_var.set(tr("d3.msg.abgerundet", n=n) if n else tr("d3.msg.nichts_abrundbar"))
         self.app.redraw()
         self.zeichne()
 
@@ -1531,6 +1598,7 @@ class Ansicht3DMixin:
             w.pack(fill=tk.BOTH, expand=True, before=self.canvas)
             self.canvas.pack_forget()
             w.after(60, w.einpassen)
+            self.ansicht3d_werkzeug(beim_oeffnen=True)
         elif not an and w is not None:
             self.canvas.pack(fill=tk.BOTH, expand=True, before=w)
             self._ansicht3d = None
@@ -1544,6 +1612,26 @@ class Ansicht3DMixin:
             self.canvas.pack(fill=tk.BOTH, expand=True, before=w)
             self._ansicht3d = None
             w.destroy()
+
+    def ansicht3d_werkzeug(self, beim_oeffnen=False):
+        """Called when the tool changes (and when 3D opens): in 3D the basic tools Line,
+        Polyline, Circle, Rectangle and Dimension work on the work plane / as 3D
+        dimension; other 2D tools switch back to the 2D view."""
+        w = self._ansicht3d
+        if w is None or self._ist_layout():
+            return
+        wz = self.aktives_werkzeug.get()
+        if wz in WERKZEUG_3D:
+            w.modus_setzen(WERKZEUG_3D[wz])
+        elif wz == "auswahl":
+            if w._modus in WERKZEUG_3D.values():
+                w._modus_ende()
+                w.zeichne()
+        elif beim_oeffnen:
+            self.aktives_werkzeug.set("auswahl")      # opening 3D with a 2D-only tool: selection
+            self._werkzeug_gewechselt_2d()
+        else:
+            self.ansicht3d_setzen(False)
 
     def ansicht3d_oeffnen(self):
         self.ansicht3d_setzen(True)

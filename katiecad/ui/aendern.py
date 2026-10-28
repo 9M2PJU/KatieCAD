@@ -22,6 +22,7 @@ from katiecad.model.core import FARBEN, Linie, UI_SCHRIFT
 ARM_PX = 46            # length of a manipulator arm (pixels)
 TREFFER_PX = 7         # hit tolerance
 MITTE_PX = 6           # half size of the centre square
+PIVOT_DX = PIVOT_DY = 18   # pivot handle: offset from the manipulator origin (pixels)
 
 
 def _de():
@@ -273,6 +274,11 @@ class AendernMixin:
                          fill=gruen, outline=gruen, tags="manip")
         c.create_rectangle(px - MITTE_PX, py - MITTE_PX, px + MITTE_PX, py + MITTE_PX,
                            fill=gelb, outline=FARBEN["bg_dunkel"], tags="manip")
+        # pivot handle: click it, then click the new origin
+        hx, hy = px + PIVOT_DX, py + PIVOT_DY
+        c.create_oval(hx - 6, hy - 6, hx + 6, hy + 6, outline=FARBEN["orange"], width=2, tags="manip")
+        c.create_line(hx - 3, hy, hx + 3, hy, fill=FARBEN["orange"], tags="manip")
+        c.create_line(hx, hy - 3, hx, hy + 3, fill=FARBEN["orange"], tags="manip")
 
     def _manip_treffer(self, event):
         """'frei' (centre), 'x', 'y' or None for a click at event."""
@@ -283,6 +289,8 @@ class AendernMixin:
             return None
         px, py = self.mm_to_px(*z)
         dx, dy = event.x - px, event.y - py
+        if abs(dx - PIVOT_DX) <= 8 and abs(dy - PIVOT_DY) <= 8:
+            return "pivot"
         if abs(dx) <= MITTE_PX and abs(dy) <= MITTE_PX:
             return "frei"
         if abs(dy) <= TREFFER_PX and abs(dx) <= ARM_PX:
@@ -296,6 +304,9 @@ class AendernMixin:
         art = self._manip_treffer(event)
         if art is None:
             return False
+        if art == "pivot":
+            self.manipulator_versetzen()
+            return True
         z = self._manip_zentrum()
         self._op = {"typ": "move", "stufe": "ziel", "basis": z,
                     "objekte": list(self.auswahl),
