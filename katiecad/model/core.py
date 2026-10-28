@@ -590,6 +590,7 @@ BEFEHLE = {
     "PIN": "tool:vpunkt", "VERBINDUNG": "tool:verbindung",
     "MASKE": "tool:maske", "ELEKTROMASKE": "tool:maske",
     "KLEMME": "tool:klemme",
+    "FTEXT": "tool:ftext", "FUNKTIONSTEXT": "tool:ftext",
     "SUCHEN": "suchen", "FIND": "suchen", "ERSETZEN": "suchen", "SU": "suchen",
     "EU": "matchprop", "MA": "matchprop", "MATCHPROP": "matchprop",
     "EIGENSCHAFTENUEBERTRAGEN": "matchprop", "EIGENSCHAFTENÜBERTRAGEN": "matchprop",
@@ -848,12 +849,14 @@ def pdf_mehrseitig(seiten):
 # Layers that are created and used automatically for electrical objects
 E_DEVICES, E_LINES, E_CABLE, E_CLAMPS, E_PIN = (
     "E_DEVICES", "E_LINES", "E_CABLE", "E_CLAMPS", "E_PIN")
+FTEXT_LAYER = "F-Text"       # function texts (see electrical/funktion.py)
 ELEKTRO_LAYER = {            # name -> (colour, line weight)
     E_DEVICES: ("#c29bff", 0.35),
     E_LINES: ("#ff2d2d", 0.35),
     E_CABLE: ("#c29bff", 0.35),
     E_CLAMPS: ("#c29bff", 0.35),
     E_PIN: ("#c29bff", 0.35),
+    FTEXT_LAYER: ("#ff9f43", 0.35),
 }
 
 
