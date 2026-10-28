@@ -142,6 +142,68 @@ def _zeichne(name, d, c, f):
         d.rectangle([14 * f, 14 * f, 86 * f, 86 * f], outline=c, width=int(w * f))
         for p in (38, 62):
             L([(p, 14), (p, 86)], 4); L([(14, p), (86, p)], 4)
+    # ---- 3D
+    elif name in ("ansicht3d", "wuerfel"):
+        hx = [(50, 8), (88, 29), (88, 71), (50, 92), (12, 71), (12, 29), (50, 8)]
+        L(hx, 6)
+        if name == "wuerfel":
+            d.polygon([(50 * f, 8 * f), (88 * f, 29 * f), (50 * f, 50 * f), (12 * f, 29 * f)], fill=c)
+        L([(50, 50), (50, 92)], 5); L([(50, 50), (12, 29)], 5); L([(50, 50), (88, 29)], 5)
+    elif name == "k_quader":
+        d.rectangle([12 * f, 38 * f, 62 * f, 88 * f], outline=c, width=int(6 * f))
+        d.rectangle([34 * f, 14 * f, 88 * f, 64 * f], outline=c, width=int(5 * f))
+        L([(12, 38), (34, 14)], 5); L([(62, 38), (88, 14)], 5); L([(62, 88), (88, 64)], 5)
+    elif name == "k_zylinder":
+        d.ellipse([20 * f, 8 * f, 80 * f, 34 * f], outline=c, width=int(6 * f))
+        d.arc([20 * f, 62 * f, 80 * f, 90 * f], 0, 180, fill=c, width=int(6 * f))
+        L([(20, 21), (20, 76)], 6); L([(80, 21), (80, 76)], 6)
+    elif name == "k_kegel":
+        d.ellipse([14 * f, 62 * f, 86 * f, 90 * f], outline=c, width=int(6 * f))
+        L([(50, 8), (14, 76)], 6); L([(50, 8), (86, 76)], 6)
+    elif name == "k_pyramide":
+        L([(50, 8), (12, 72)], 6); L([(50, 8), (50, 90)], 5); L([(50, 8), (88, 66)], 6)
+        L([(12, 72), (50, 90), (88, 66)], 6); L([(12, 72), (56, 52), (88, 66)], 4)
+    elif name == "k_kugel":
+        d.ellipse([12 * f, 12 * f, 88 * f, 88 * f], outline=c, width=int(6 * f))
+        d.ellipse([12 * f, 38 * f, 88 * f, 62 * f], outline=c, width=int(4 * f))
+        d.ellipse([36 * f, 12 * f, 64 * f, 88 * f], outline=c, width=int(4 * f))
+    elif name == "extrudieren":
+        L([(10, 84), (58, 84), (90, 66), (42, 66), (10, 84)], 5)
+        L([(50, 58), (50, 18)], 6)
+        d.polygon([(50 * f, 6 * f), (34 * f, 26 * f), (66 * f, 26 * f)], fill=c)
+    elif name == "loch":
+        d.rectangle([10 * f, 24 * f, 90 * f, 84 * f], outline=c, width=int(6 * f))
+        d.ellipse([34 * f, 38 * f, 66 * f, 62 * f], outline=c, width=int(6 * f))
+        L([(34, 50), (34, 84)], 4); L([(66, 50), (66, 84)], 4)
+    elif name == "block3d":
+        for a, b in (((8, 8), (30, 8)), ((70, 8), (92, 8)), ((8, 92), (30, 92)), ((70, 92), (92, 92)),
+                     ((8, 8), (8, 30)), ((8, 70), (8, 92)), ((92, 8), (92, 30)), ((92, 70), (92, 92))):
+            L([a, b], 5)
+        d.rectangle([22 * f, 48 * f, 50 * f, 76 * f], outline=c, width=int(6 * f))
+        d.rectangle([48 * f, 24 * f, 76 * f, 52 * f], outline=c, width=int(6 * f))
+    elif name == "aufloesen3d":
+        d.rectangle([8 * f, 56 * f, 38 * f, 86 * f], outline=c, width=int(6 * f))
+        d.rectangle([62 * f, 12 * f, 92 * f, 42 * f], outline=c, width=int(6 * f))
+        L([(46, 56), (56, 46)], 5)
+        d.polygon([(60 * f, 42 * f), (46 * f, 44 * f), (58 * f, 56 * f)], fill=c)
+    elif name == "persp":
+        d.rectangle([6 * f, 14 * f, 94 * f, 86 * f], outline=c, width=int(5 * f))
+        d.rectangle([36 * f, 38 * f, 64 * f, 62 * f], outline=c, width=int(5 * f))
+        L([(6, 14), (36, 38)], 4); L([(94, 14), (64, 38)], 4)
+        L([(6, 86), (36, 62)], 4); L([(94, 86), (64, 62)], 4)
+    elif name == "einpassen3d":
+        for pts in (((10, 34), (10, 10), (34, 10)), ((66, 10), (90, 10), (90, 34)),
+                    ((10, 66), (10, 90), (34, 90)), ((66, 90), (90, 90), (90, 66))):
+            L(list(pts), 6)
+        d.rectangle([34 * f, 34 * f, 66 * f, 66 * f], outline=c, width=int(5 * f))
+    elif name == "iso3d":
+        L([(50, 58), (50, 10)], 6); L([(50, 58), (12, 82)], 6); L([(50, 58), (88, 82)], 6)
+        P(50, 58, 8)
+    elif name == "hoehe3d":
+        L([(50, 14), (50, 86)], 6)
+        d.polygon([(50 * f, 4 * f), (34 * f, 24 * f), (66 * f, 24 * f)], fill=c)
+        d.polygon([(50 * f, 96 * f), (34 * f, 76 * f), (66 * f, 76 * f)], fill=c)
+        L([(18, 50), (82, 50)], 4)
     else:
         d.ellipse([30 * f, 30 * f, 70 * f, 70 * f], outline=c, width=int(w * f))
 
@@ -150,7 +212,10 @@ NAMEN = ("auswahl", "linie", "polylinie", "kreis", "bogen", "ellipse", "spline",
          "rechteck", "text", "bemassung", "stutzen", "brechen",
          "vpunkt", "verbindung", "querverweis", "maske", "klemme", "kabel",
          "koordinatenfeld", "suchen", "zoom_plus", "zoom_minus",
-         "zoom_grenzen", "reset", "ftext", "laenge", "manip")
+         "zoom_grenzen", "reset", "ftext", "laenge", "manip",
+         "ansicht3d", "wuerfel", "k_quader", "k_zylinder", "k_kegel", "k_pyramide",
+         "k_kugel", "extrudieren", "loch", "block3d", "aufloesen3d", "persp",
+         "einpassen3d", "iso3d", "hoehe3d")
 
 
 def icon_png(name, farbe, groesse=26):
