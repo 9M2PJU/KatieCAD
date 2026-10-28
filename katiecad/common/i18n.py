@@ -736,7 +736,7 @@ TEXTE = {
         "vp.leiste.kein_layout_hinweis": "Bitte ein Layout öffnen, um die Viewport-Ansicht zu nutzen.",
         "vp.leiste.viewport_waehlen": "Bitte zuerst einen Viewport durch Doppelklick aktivieren.",
         "info.titel": "Info",
-        "info.untertitel": "Ein Open-Source-CAD-System für Elektrotechnik: Stromlaufpläne zeichnen, Projekte mit mehreren Blättern verwalten und Geräteliste, Klemmenplan und Kabelplan automatisch erzeugen, mit vollständigen 2D-Konstruktions- und Bemaßungsfunktionen, einfacher 3D-Modellierungen, sowie DXF- und PDF-Export.",
+        "info.untertitel": "Ein Open-Source-CAD-System für Elektrotechnik: Stromlaufpläne zeichnen, Projekte mit mehreren Blättern verwalten und Geräteliste, Klemmenplan und Kabelplan automatisch erzeugen, mit vollständigen 2D-Konstruktions- und Bemaßungsfunktionen, einfacher 3D-Modellierungen sowie DXF- und PDF-Export.",
         "info.gebaut_mit": "Entwickelt mit Python und ein wenig Hilfe von KI.",
         "info.copyright": "© 2026 Merecete",
         "dlg.layer.bereinigen": "Bereinigen",
