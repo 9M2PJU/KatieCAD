@@ -52,6 +52,8 @@ from katiecad.model.blocks import (block_speichern, block_laden,
                               vorschau_geometrie, standard_ordner, symbol_ordner)
 from katiecad.ui.menuleiste import MenuLeiste
 from katiecad.model import geom2d as G2
+from katiecad.model import auswahl as AUSW
+from katiecad.electrical import nummerierung as NUM
 from katiecad.model.geom2d import spline_punkte
 from katiecad.ui.sidebar import Seitenleiste
 from katiecad.ui.widgets import FlatButton, farb_swatch
@@ -85,7 +87,7 @@ from katiecad.ui.dialogs import (
     _BlockNameDialog, _BlockAuswahlDialog, BlockBrowserDialog,
     BlockSpeichernDialog,
     ProjektNeuDialog, AttributDefinitionDialog, BlockAttributeDialog,
-    SuchenErsetzenDialog, QuerverweisDialog, PruefungDialog, EigenschaftenPalette, VerbindungspunkteDialog, ProjektDruckDialog,
+    BauteilkatalogDialog, SchnellauswahlDialog, SuchenErsetzenDialog, QuerverweisDialog, PruefungDialog, EigenschaftenPalette, VerbindungspunkteDialog, ProjektDruckDialog,
     VerbindungspunktDialog, VerbindungDialog, FestMaskeDialog,
     KoordinatenfeldDialog,
     TitleBlockDialog, DokumentationDialog, ProjektEigenschaftenDialog,
@@ -403,6 +405,8 @@ class CadApp:
         self._prop_pick = None
         self._mess = None
         self._ecke = None
+        self._versatz = None
+        self._versatz_d = 10.0
         self._ecke_param = {"r": 5.0, "d1": 5.0, "d2": 5.0}
         self.messergebnis = ""
         self._letztes_fenster = None
@@ -879,6 +883,7 @@ class CadApp:
         self._pts = []
         self._bem_kreis = None
         self._wk_l1 = None
+        self._kette = None
         self._clear_temp()
 
     def _bogen_abbrechen(self):
@@ -1018,6 +1023,10 @@ class CadApp:
         m_projekt.add_command(label=tr("menu.datei.export_projekt_dxf"),
                               command=self.projekt_dxf_exportieren)
         m_projekt.add_separator()
+        m_projekt.add_command(label=tr("menu.projekt.nummerieren"),
+                              command=self.geraete_nummerieren)
+        m_projekt.add_command(label=tr("menu.projekt.bauteile"),
+                              command=self.bauteilkatalog)
         m_projekt.add_command(label=tr("menu.projekt.doku"),
                               command=self.dokumentation_erzeugen)
         m_projekt.add_command(label=tr("menu.projekt.doku_csv"),
@@ -1049,6 +1058,10 @@ class CadApp:
                             command=self.eigenschaften_uebertragen_start)
         m_bearb.add_command(label=tr("menu.bearbeiten.messen"),
                             command=self.messen_start)
+        m_bearb.add_command(label=tr("menu.bearbeiten.schnellauswahl"),
+                            command=self.schnellauswahl)
+        m_bearb.add_command(label=tr("menu.bearbeiten.versatz"),
+                            command=self.versatz_start)
         m_bearb.add_command(label=tr("menu.bearbeiten.abrunden"),
                             command=lambda: self.ecke_start("abrunden"))
         m_bearb.add_command(label=tr("menu.bearbeiten.fase"),
@@ -1112,6 +1125,8 @@ class CadApp:
                            command=lambda: self._bem_art_starten("radius"))
         m_einf.add_command(label=tr("menu.einfuegen.durchmesser"),
                            command=lambda: self._bem_art_starten("durchmesser"))
+        m_einf.add_command(label=tr("menu.einfuegen.kette"),
+                           command=lambda: self._bem_art_starten("kette"))
         m_einf.add_command(label=tr("menu.einfuegen.winkel"),
                            command=lambda: self._bem_art_starten("winkel"))
         m_einf.add_command(label=tr("menu.einfuegen.winkel_linien"),
@@ -1411,7 +1426,7 @@ class CadApp:
         self.cb_bem_art = ttk.Combobox(tb3, textvariable=self.bem_art,
                                        values=["auto", "horizontal", "vertikal",
                                                "ausgerichtet", "radius", "durchmesser",
-                                               "winkel", "winkel_linien"],
+                                               "winkel", "winkel_linien", "kette"],
                                        width=12, state="readonly")
         self.cb_bem_art.bind("<<ComboboxSelected>>",
                              lambda e: (self._bem_abbrechen(), self._update_eingabe_hinweis()))
@@ -1697,7 +1712,7 @@ class CadApp:
 
     def _bem_art_starten(self, art):
         """Activates the dimension tool with radius/diameter preselected."""
-        if art not in ("radius", "durchmesser", "winkel", "winkel_linien"):
+        if art not in ("radius", "durchmesser", "winkel", "winkel_linien", "kette"):
             return
         self.bem_art.set(art)
         self.aktives_werkzeug.set("bemassung")
@@ -1705,6 +1720,10 @@ class CadApp:
         de = SPRACHE["aktuell"] == "de"
         if art in ("winkel", "winkel_linien"):
             self.status.set(self._winkel_hinweis())
+            self._update_eingabe_hinweis()
+            return
+        if art == "kette":
+            self.status.set(self._kette_hinweis())
             self._update_eingabe_hinweis()
             return
         self.status.set(
@@ -2261,6 +2280,7 @@ class CadApp:
         self._eigenschaften_ende()
         self._mess_ende(leise=True)
         self._ecke_ende(leise=True)
+        self._versatz_ende(leise=True)
         self._bem_abbrechen()
         self._bogen_abbrechen()
         self._trim_abbrechen()
@@ -2299,6 +2319,7 @@ class CadApp:
         self.aktuelle_polylinie = []
         self._pts = []
         self._wk_l1 = None
+        self._kette = None
         self._op = None
         self._cmd_pending = None
         self._vp_fenster = None
@@ -2589,6 +2610,9 @@ class CadApp:
         if getattr(self, "_ecke", None) is not None:
             self._ecke_ende()
             return
+        if getattr(self, "_versatz", None) is not None:
+            self._versatz_ende()
+            return
         if self._op is not None:
             self._op_rechtsklick()
             return
@@ -2628,6 +2652,7 @@ class CadApp:
             self.letzter_punkt = None
             self._pts = []
             self._wk_l1 = None
+            self._kette = None
             self._clear_temp()
             self._eingabe_zuruecksetzen()
             self._update_eingabe_hinweis()
@@ -3414,6 +3439,9 @@ class CadApp:
             return
         if getattr(self, "_ecke", None) is not None:
             self._ecke_klick(event)
+            return
+        if getattr(self, "_versatz", None) is not None:
+            self._versatz_klick(event)
             return
         if self._block_erzeuge_auswahl is not None:
             x, y = self._eingabepunkt(event)
@@ -5339,7 +5367,9 @@ class CadApp:
                        ["Set start point", "Set point on arc", "Set end point"])
             h(text=txt[min(n, 2)])
         elif w == "bemassung":
-            if self.bem_art.get() in ("winkel", "winkel_linien"):
+            if self.bem_art.get() == "kette":
+                h(text=self._kette_hinweis())
+            elif self.bem_art.get() in ("winkel", "winkel_linien"):
                 h(text=self._winkel_hinweis())
             elif self.bem_art.get() in ("radius", "durchmesser"):
                 h(text=(("Kreis/Bogen anklicken" if n == 0
@@ -6066,7 +6096,7 @@ class CadApp:
                              dez=self._zahl(self.bem_dez, 2, ganz=True), **daten)
         if art in ("radius", "durchmesser"):
             richt = art
-        elif art == "auto":
+        elif art in ("auto", "kette"):
             richt = Bemassung.linear_richtung(pts[0], pts[1], m)
         else:
             richt = art
@@ -6138,10 +6168,84 @@ class CadApp:
         self.letzter_punkt = pt
         self.status.set(self._winkel_hinweis())
 
+    # ---- chain dimensions: further dimensions continue from the last point
+    def _kette_hinweis(self):
+        de = SPRACHE["aktuell"] == "de"
+        n = len(self._pts)
+        if getattr(self, "_kette", None) is not None:
+            return ("Kettenbemaßung: nächsten Messpunkt setzen "
+                    "(ESC / Rechtsklick = Ende)." if de else
+                    "Chain dimension: set the next point (ESC / right-click = end).")
+        if n == 0:
+            return ("Kettenbemaßung: 1. Messpunkt setzen." if de
+                    else "Chain dimension: set the 1st point.")
+        if n == 1:
+            return ("Kettenbemaßung: 2. Messpunkt setzen." if de
+                    else "Chain dimension: set the 2nd point.")
+        return ("Kettenbemaßung: Maßlinie positionieren, Klick = fertig." if de
+                else "Chain dimension: position the line, click = done.")
+
+    def _kette_element(self, p, q):
+        """Dimension between p and q on the line of the first dimension."""
+        K = self._kette
+        r = K["richtung"]
+        if r == "horizontal":
+            m = ((p[0] + q[0]) / 2, K["linie"])
+        elif r == "vertikal":
+            m = (K["linie"], (p[1] + q[1]) / 2)
+        else:
+            m = ((p[0] + q[0]) / 2 + K["n"][0] * K["abst"],
+                 (p[1] + q[1]) / 2 + K["n"][1] * K["abst"])
+        el = self._bem_element([p, q], m)
+        el.richtung = r
+        return el
+
+    def _kette_klick(self, pt):
+        de = SPRACHE["aktuell"] == "de"
+        K = getattr(self, "_kette", None)
+        n = len(self._pts)
+        if K is None:
+            if n == 0:
+                self._pts = [pt]
+            elif n == 1:
+                if math.hypot(pt[0] - self._pts[0][0], pt[1] - self._pts[0][1]) < 1e-9:
+                    return
+                self._pts.append(pt)
+            else:
+                p, q = self._pts[0], self._pts[1]
+                r = Bemassung.linear_richtung(p, q, pt)
+                L = math.hypot(q[0] - p[0], q[1] - p[1]) or 1.0
+                nrm = (-(q[1] - p[1]) / L, (q[0] - p[0]) / L)
+                mid = ((p[0] + q[0]) / 2, (p[1] + q[1]) / 2)
+                abst = (pt[0] - mid[0]) * nrm[0] + (pt[1] - mid[1]) * nrm[1]
+                self._kette = {"richtung": r, "n": nrm, "abst": abst,
+                               "linie": pt[1] if r == "horizontal" else pt[0],
+                               "letzter": q}
+                el = self._bem_element([p, q], pt)
+                self._snapshot()
+                self._ziel_liste().append(el)
+                self._pts = []
+                self.redraw()
+            self.letzter_punkt = pt
+            self.status.set(self._kette_hinweis())
+            return
+        q = K["letzter"]
+        if math.hypot(pt[0] - q[0], pt[1] - q[1]) < 1e-9:
+            return
+        self._snapshot()
+        self._ziel_liste().append(self._kette_element(q, pt))
+        K["letzter"] = pt
+        self.letzter_punkt = pt
+        self.redraw()
+        self.status.set(self._kette_hinweis())
+
     def _bem_klick(self, pt):
         art = self.bem_art.get()
         n = len(self._pts)
         de = SPRACHE["aktuell"] == "de"
+        if art == "kette":
+            self._kette_klick(pt)
+            return
         if art == "winkel_linien":
             if n >= 3:
                 self._bem_fertig(pt)
@@ -6334,6 +6438,18 @@ class CadApp:
                     a = math.radians(s + bogen_sweep(s, e) / 2)
                     label(cx + r * math.cos(a), cy + r * math.sin(a),
                           f"R {r / einh:.2f}  {bogen_sweep(s, e):.1f}°")
+        elif (w == "bemassung" and self.bem_art.get() == "kette"
+              and getattr(self, "_kette", None) is not None):
+            q = self._kette["letzter"]
+            if math.hypot(pt[0] - q[0], pt[1] - q[1]) > 1e-9:
+                zeige(self._kette_element(q, pt),
+                      {"farbe": FARBEN["gelb"], "w": 1, "dash": None})
+        elif (w == "bemassung" and self.bem_art.get() == "kette"
+              and len(self._pts) == 2):
+            zeige(self._bem_element(self._pts[:2], pt),
+                  {"farbe": FARBEN["gelb"], "w": 1, "dash": None})
+        elif (w == "bemassung" and self.bem_art.get() == "kette" and self._pts):
+            hilfslinie(self._pts[0], pt)
         elif w == "bemassung" and self._pts and self.bem_art.get() in (
                 "winkel", "winkel_linien"):
             p = self._pts
@@ -7179,6 +7295,12 @@ class CadApp:
             self.eigenschaften_uebertragen_start()
         elif cmd == "messen":
             self.messen_start()
+        elif cmd == "nummerieren":
+            self.geraete_nummerieren()
+        elif cmd == "schnellauswahl":
+            self.schnellauswahl()
+        elif cmd == "versatz":
+            self.versatz_start()
         elif cmd == "abrunden":
             self.ecke_start("abrunden")
         elif cmd == "fase":
@@ -9181,6 +9303,101 @@ class CadApp:
             indizes.append(i)
         return infos, indizes
 
+    def geraete_nummerieren(self):
+        """Gives devices with an incomplete designation ('-K', 'K?') the next
+        free number (-K1, -K2 ...); numbers continue after the highest one
+        in the whole project."""
+        de = SPRACHE["aktuell"] == "de"
+        if self._ist_layout():
+            self.status.set("Nummerieren gilt für die Zeichnung (Modell)." if de
+                            else "Numbering works on the drawing (model).")
+            return
+        p = self.projekt
+        nur_aktiv = True
+        if p is not None and len(p.blaetter) > 1:
+            a = messagebox.askyesnocancel(
+                "Geräte nummerieren" if de else "Number devices",
+                ("Ja = ganzes Projekt nummerieren\nNein = nur dieses Blatt\n\n"
+                 "Geräte ohne Nummer (z. B. „-K“) bekommen die nächste freie "
+                 "Nummer. Bereits vergebene Nummern bleiben unverändert."
+                 if de else
+                 "Yes = number the whole project\nNo = this sheet only\n\n"
+                 "Devices without a number (e.g. '-K') get the next free number. "
+                 "Numbers already assigned stay unchanged."),
+                parent=self.root)
+            if a is None:
+                return
+            nur_aktiv = not a
+        self._blatt_sichern()
+        aktiv = p.aktiv if p is not None else 0
+        daten = {}
+        blaetter = [(aktiv, self.elemente)]
+        for i, pfad, d in self._andere_blaetter_daten():
+            daten[i] = (pfad, d)
+            blaetter.append((i, d.get("elemente", [])))
+        blaetter.sort(key=lambda b: b[0])
+        aend, ohne = NUM.plan(blaetter, {aktiv} if nur_aktiv else None)
+        if not aend:
+            self.status.set((f"Keine Geräte zum Nummerieren gefunden "
+                             f"({ohne} ohne Kennzeichen-Präfix)." if de else
+                             f"No devices to number ({ohne} without a designation prefix).")
+                            if ohne else
+                            ("Keine Geräte zum Nummerieren gefunden." if de
+                             else "No devices to number."))
+            return
+        bsp = ", ".join(f"{a or '?'} → {n}" for _h, _k, a, n, _b in aend[:3])
+        if not messagebox.askyesno(
+                "Geräte nummerieren" if de else "Number devices",
+                (f"{len(aend)} Gerät(e) werden nummeriert, z. B. {bsp}."
+                 + (" Änderungen in anderen Blättern werden sofort gespeichert "
+                    "und lassen sich nicht rückgängig machen." if any(
+                        b != aktiv for *_x, b in aend) else "") + "\n\nFortfahren?")
+                if de else
+                (f"{len(aend)} device(s) will be numbered, e.g. {bsp}."
+                 + (" Changes in other sheets are saved immediately and cannot "
+                    "be undone." if any(b != aktiv for *_x, b in aend) else "")
+                 + "\n\nContinue?"), parent=self.root):
+            return
+        self._snapshot()
+        NUM.anwenden(aend)
+        for i in {b for *_x, b in aend if b != aktiv}:
+            try:
+                self._json_atomar_schreiben(daten[i][0], daten[i][1])
+            except OSError as ex:
+                messagebox.showerror("Geräte nummerieren" if de else "Number devices",
+                                     str(ex), parent=self.root)
+        self._qv_cache.clear()
+        self._ge_cache.clear()
+        self.redraw()
+        self.status.set(f"{len(aend)} Gerät(e) nummeriert." if de
+                        else f"{len(aend)} device(s) numbered.")
+
+    def bauteilkatalog(self):
+        """Parts catalogue (manufacturer / order number per TYP) of the project."""
+        p = self.projekt
+        if p is None:
+            self.status.set(tr("msg.projekt.kein_projekt"))
+            return
+        vorschlaege = []
+        try:
+            if self._blatt_sichern():
+                infos, _idx = self._zeichnungsblaetter_einlesen()
+                if infos is not None:
+                    bl = [(k, b.elemente) for k, b in enumerate(infos)]
+                    netz = SEI.netz_aufbauen(bl)
+                    vorschlaege = SEI.DL.typen_der_projekte(bl, lambda k: k + 1, netz)
+        except Exception:
+            import traceback
+            traceback.print_exc()
+        dlg = BauteilkatalogDialog(self.root, p.daten.get("bauteile", []), vorschlaege)
+        if dlg.result is None:
+            return
+        p.daten["bauteile"] = dlg.result
+        p.speichern()
+        de = SPRACHE["aktuell"] == "de"
+        self.status.set(f"Bauteilkatalog gespeichert ({len(dlg.result)} Einträge)." if de
+                        else f"Parts catalogue saved ({len(dlg.result)} entries).")
+
     def dokumentation_erzeugen(self):
         p = self.projekt
         if p is None:
@@ -9220,7 +9437,8 @@ class CadApp:
                 infos, p.name, p.daten, set(res["berichte"]), vorlage,
                 SPRACHE["aktuell"], SEI.spalten_ordner(programm, p.ordner),
                 klemmen_in_geraeteliste=res["klemmen_geraete"],
-                format=SEI.format_name(res.get("format")))
+                format=SEI.format_name(res.get("format")),
+                katalog=p.daten.get("bauteile", []))
             basis = self._leere_zeichnung_daten(einstellungen_uebernehmen=True)
             neu_aktiv = ANW.ins_projekt(p, vorne, hinten, basis,
                                         self._json_atomar_schreiben,
@@ -9259,7 +9477,8 @@ class CadApp:
                 lambda k: indizes[k] + 1,
                 SEI.spalten_ordner(programm, p.ordner),
                 bool(p.doku.get("klemmen_geraete", True)),
-                {k: b.einbauort for k, b in enumerate(infos)})
+                {k: b.einbauort for k, b in enumerate(infos)},
+                p.daten.get("bauteile", []), p.daten)
             namen = {t: tr("rep." + t) for t in tabellen}
             pfade = ANW.csv_exportieren(ziel, tabellen, namen)
         except OSError as e:
@@ -9847,6 +10066,12 @@ class CadApp:
             else ("FILLET" if self._ecke["art"] == "abrunden" else "CHAMFER")
         n = "erste" if self._ecke["l1"] is None else "zweite"
         n_en = "first" if self._ecke["l1"] is None else "second"
+        if self._ecke["l1"] is None:
+            return (f"{name}: erste Linie anklicken - oder Rechteck/Polylinie "
+                    f"(Ecke = nur diese Ecke, Kante = alle Ecken). ESC = beenden."
+                    if de else
+                    f"{name}: click the first line - or a rectangle/polyline "
+                    f"(corner = that corner only, edge = all corners). ESC = finish.")
         return (f"{name}: {n} Linie anklicken (ESC = beenden)." if de
                 else f"{name}: click the {n_en} line (ESC = finish).")
 
@@ -9898,15 +10123,186 @@ class CadApp:
             self._ziel_liste().append(neu)
         return neu if neu is not None else True
 
+    # --------------------------------------------------------
+    # Offset
+    # --------------------------------------------------------
+    def schnellauswahl(self):
+        """QSELECT: select all objects with given type/layer/colour/line type."""
+        de = SPRACHE["aktuell"] == "de"
+        liste = [e for e in self._aktuelle_elemente_liste() if self._element_sichtbar(e)]
+        if not liste:
+            self.status.set("Keine Objekte vorhanden." if de else "No objects.")
+            return
+        werte = {k: AUSW.vorhandene_werte(liste, k, self.layers)
+                 for k in ("typ", "layer", "farbe", "linientyp")}
+        dlg = SchnellauswahlDialog(self.root, werte)
+        if not dlg.result:
+            return
+        treffer = AUSW.schnellauswahl(liste, dlg.result["kriterien"], self.layers,
+                                      dlg.result["negiert"])
+        if dlg.result["hinzufuegen"]:
+            treffer = list(self.auswahl) + [e for e in treffer if e not in self.auswahl]
+        self.auswahl = treffer
+        self.redraw()
+        self.status.set(f"{len(treffer)} Objekt(e) ausgewählt." if de
+                        else f"{len(treffer)} object(s) selected.")
+
+    def versatz_start(self):
+        de = SPRACHE["aktuell"] == "de"
+        f, u = self._einh_faktor(), self.einheit.get()
+        d = simpledialog.askfloat("Versatz" if de else "Offset",
+                                  f"Abstand in {u}:" if de else f"Distance in {u}:",
+                                  initialvalue=self._versatz_d / f, minvalue=1e-6,
+                                  parent=self.root)
+        if d is None:
+            return
+        self._versatz_d = d * f
+        if self.aktives_werkzeug.get() != "auswahl":
+            self.aktives_werkzeug.set("auswahl")
+            self._werkzeug_gewechselt()
+        self._versatz = {"el": None}
+        self.status.set(self._versatz_hinweis())
+
+    def _versatz_hinweis(self):
+        de = SPRACHE["aktuell"] == "de"
+        if self._versatz["el"] is None:
+            return ("VERSATZ: Objekt anklicken (ESC = beenden)." if de
+                    else "OFFSET: click an object (ESC = finish).")
+        return ("VERSATZ: Seite anklicken, auf der die Kopie entstehen soll." if de
+                else "OFFSET: click the side where the copy is to be created.")
+
+    def _versatz_ende(self, leise=False):
+        if getattr(self, "_versatz", None) is not None:
+            self._versatz = None
+            if not leise:
+                de = SPRACHE["aktuell"] == "de"
+                self.status.set("Versatz beendet." if de else "Offset finished.")
+
+    def versatz_erzeugen(self, el, klick, d):
+        """-> new element (parallel copy of `el` at distance d on the side
+        of `klick`) or None."""
+        kw = dict(layer=el.layer, farbe=el.farbe, linientyp=el.linientyp,
+                  eig_farbe=el.eig_farbe, staerke=el.staerke)
+        if isinstance(el, Linie):
+            seite = 1 if G2._kreuz((el.x1, el.y1), (el.x2, el.y2), klick) >= 0 else -1
+            pts = G2.versatz_polylinie([(el.x1, el.y1), (el.x2, el.y2)], False, d, seite)
+            if pts is None:
+                return None
+            return Linie(pts[0][0], pts[0][1], pts[1][0], pts[1][1], **kw)
+        if isinstance(el, (Kreis, Bogen)):
+            aussen = math.hypot(klick[0] - el.cx, klick[1] - el.cy) > el.r
+            r = el.r + d if aussen else el.r - d
+            if r <= 1e-9:
+                return None
+            if isinstance(el, Kreis):
+                return Kreis(el.cx, el.cy, r, **kw)
+            return Bogen(el.cx, el.cy, r, el.start, el.ende, **kw)
+        if isinstance(el, Rechteck):
+            x0, x1 = sorted((el.x1, el.x2)); y0, y1 = sorted((el.y1, el.y2))
+            innen = x0 < klick[0] < x1 and y0 < klick[1] < y1
+            g = -d if innen else d
+            if x1 - x0 + 2 * g <= 1e-9 or y1 - y0 + 2 * g <= 1e-9:
+                return None
+            return Rechteck(x0 - g, y0 - g, x1 + g, y1 + g, **kw)
+        if isinstance(el, Polylinie):
+            seite = G2.seite_links(el.punkte, el.geschlossen, klick)
+            pts = G2.versatz_polylinie(el.punkte, el.geschlossen, d, seite)
+            if pts is None:
+                return None
+            return Polylinie(pts, geschlossen=el.geschlossen, **kw)
+        return None
+
+    def _versatz_klick(self, event):
+        de = SPRACHE["aktuell"] == "de"
+        x, y = self.px_to_mm(event.x, event.y)
+        V = self._versatz
+        if V["el"] is None:
+            el = self._element_unter_maus(x, y, 8 / self.view["zoom"])
+            if el is None:
+                return
+            if not isinstance(el, (Linie, Kreis, Bogen, Rechteck, Polylinie)):
+                self.status.set("Dieses Objekt lässt sich nicht versetzen." if de
+                                else "This object cannot be offset.")
+                return
+            V["el"] = el
+            self.auswahl = [el]
+            self.redraw()
+            self.status.set(self._versatz_hinweis())
+            return
+        pt = self._eingabepunkt(event)
+        neu = self.versatz_erzeugen(V["el"], pt, self._versatz_d)
+        if neu is None:
+            self.status.set("Versatz nicht möglich (Abstand zu groß?)." if de
+                            else "Offset not possible (distance too large?).")
+        else:
+            self._snapshot()
+            self._ziel_liste().append(neu)
+        V["el"] = None
+        self.auswahl = []
+        self.redraw()
+        if neu is not None:
+            self.status.set(self._versatz_hinweis())
+
+    def _ecke_polygon(self, el, x, y):
+        """Rectangle / polyline: click near a corner = only that corner,
+        click on an edge = all corners. The object becomes lines and arcs."""
+        de = SPRACHE["aktuell"] == "de"
+        if isinstance(el, Rechteck):
+            pts = [(el.x1, el.y1), (el.x2, el.y1), (el.x2, el.y2), (el.x1, el.y2)]
+            zu = True
+        else:
+            pts, zu = list(el.punkte), bool(el.geschlossen)
+        tol = 12 / self.view["zoom"]
+        nur, best = None, tol
+        for i, (px, py) in enumerate(pts):
+            d = math.hypot(px - x, py - y)
+            if d <= best:
+                nur, best = i, d
+        P = self._ecke_param
+        art = self._ecke["art"]
+        seg, anzahl = G2.ecken_runden(pts, zu, art, P["r"], P["d1"], P["d2"], nur)
+        if anzahl == 0:
+            self.status.set("Nicht möglich (Radius/Abstand zu groß, "
+                            "Ecke nicht wählbar oder Wert 0)." if de else
+                            "Not possible (radius/distance too large, corner "
+                            "not selectable or value 0).")
+            return
+        self._snapshot()
+        kw = dict(layer=el.layer, farbe=el.farbe, linientyp=el.linientyp,
+                  eig_farbe=el.eig_farbe, staerke=el.staerke)
+        neu = []
+        for sg in seg:
+            if sg[0] == "l":
+                neu.append(Linie(sg[1][0], sg[1][1], sg[2][0], sg[2][1], **kw))
+            else:
+                neu.append(Bogen(sg[1], sg[2], sg[3], sg[4], sg[5], **kw))
+        liste = self._ziel_liste()
+        if el in liste:
+            i = liste.index(el)
+            liste[i:i + 1] = neu
+        else:
+            liste.extend(neu)
+        self.auswahl = []
+        self.redraw()
+        self.status.set((f"{anzahl} Ecke(n) bearbeitet (Objekt ist jetzt in Linien "
+                         f"und Bögen aufgelöst)." if de else
+                         f"{anzahl} corner(s) processed (the object is now "
+                         f"split into lines and arcs)."))
+
     def _ecke_klick(self, event):
         de = SPRACHE["aktuell"] == "de"
         x, y = self.px_to_mm(event.x, event.y)
         el = self._element_unter_maus(x, y, 8 / self.view["zoom"])
-        if not isinstance(el, Linie):
-            self.status.set("Bitte eine Linie anklicken." if de
-                            else "Please click a line.")
-            return
         E = self._ecke
+        if (E["l1"] is None and isinstance(el, (Rechteck, Polylinie))
+                and not isinstance(el, (Ellipse, Spline))):
+            self._ecke_polygon(el, x, y)
+            return
+        if not isinstance(el, Linie):
+            self.status.set("Bitte eine Linie oder ein Rechteck/eine Polylinie "
+                            "anklicken." if de else
+                            "Please click a line, rectangle or polyline.")
+            return
         if E["l1"] is None:
             E["l1"] = el
             self.auswahl = [el]
