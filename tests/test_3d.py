@@ -43,6 +43,9 @@ neu = S.extrudieren(liste, [r], 15)
 check(len(neu) == 1 and isinstance(liste[0], Koerper3D) and abs(liste[0].hoehe - 15) < 1e-9, "extrudieren")
 # icons
 from katiecad.ui import icons as IC
+for n in ("raster3d", "flaeche3d", "skizze_kreis", "skizze_rechteck", "skizze_poly", "ebene0",
+          "bem3d", "mass3d"):
+    check(n in IC.NAMEN and (not IC.PIL_OK or IC.icon_png(n, "#c29bff")), "Icon " + n)
 for n in ("ansicht3d", "k_quader", "k_zylinder", "k_kegel", "k_pyramide", "k_kugel", "extrudieren",
           "loch", "block3d", "aufloesen3d", "wuerfel", "persp", "einpassen3d", "iso3d", "hoehe3d"):
     check(n in IC.NAMEN and (not IC.PIL_OK or IC.icon_png(n, "#c29bff")), "Icon " + n)
@@ -59,6 +62,70 @@ check(len(z2.loecher) == 1 and z2.loecher[0][3] is None, "Loch Round-Trip")
 z.loch_hinzufuegen(5, 0, 1, 4)
 nz = z.netze()[2]
 check(abs(nz.bbox()[5] - (2 + 20)) < 1e-6 and abs(nz.bbox()[2] - 18) < 1e-6, "Sackloch Tiefe")
+# work plane, sketch, bore, pocket
+box = core.quader(0, 0, 40, 30, 0, 20)
+szene = [box]
+nz = box.netz()
+oben = [f for f in nz.flaechen if all(abs(nz.punkte[i][2] - 20) < 1e-9 for i in f)][0]
+e = G.ebene_von_flaeche([nz.punkte[i] for i in oben], box.zentrum3())
+check(abs(G.ebene_basis(e)[2][2] - 1) < 1e-9 and abs(e[2] - 20) < 1e-9, "Ebene Oberseite")
+sk = core.Skizze3D("kreis", e, [20, 15, 5])
+szene.append(sk)
+check(S.host_finden(szene, e) is box, "Host gefunden")
+check(S.skizze_in_ausschnitt(szene, sk, None) and len(szene) == 1 and len(box.netze()) == 2, "Bohrung")
+check(abs(box.netze()[1].bbox()[2]) < 1e-6 and abs(box.netze()[1].bbox()[5] - 20) < 1e-6, "Bohrung durchgehend")
+b2 = Koerper3D(**{k: v for k, v in box.to_dict().items() if k != "typ"})
+check(len(b2.ausschnitte) == 1, "Ausschnitt Round-Trip")
+sk2 = core.Skizze3D("rechteck", e, [2, 2, 8, 8])
+szene.append(sk2)
+neu = S.extrudieren(szene, [sk2], -5)[0]
+check(S.extrusion_abschliessen(szene, neu) and len(box.ausschnitte) == 2, "Tasche")
+sk3 = core.Skizze3D("rechteck", e, [2, 2, 8, 8])
+neu = S.extrudieren([sk3], [sk3], 6)[0]
+check(abs(neu.bbox3()[5] - 26) < 1e-6, "Aufsatz nach oben")
+check(S.parameter_setzen(box, {"breite": 50, "hoehe": 10}) and abs(box.bbox3()[3] - 50) < 1e-6, "Massaenderung")
+kr = core.zylinder(0, 0, 10, 0, 5)
+S.parameter_setzen(kr, {"radius": 20})
+check(abs(kr.bbox3()[3] - 20) < 1e-6, "Radius aendern")
+sk4 = core.Skizze3D("kreis", e, [0, 0, 3]); S.parameter_setzen(sk4, {"radius": 7})
+check(sk4.daten[2] == 7, "Skizzenradius")
+bm = core.Bemassung3D((0, 0, 0), (30, 40, 0), (0, 0, 5))
+check(bm.wert_text() == "50.00" and len(S.zuege3(bm)) >= 3, "Bemassung3D")
+bm2 = a._dict_zu_element(bm.to_dict())
+check(isinstance(bm2, core.Bemassung3D) and bm2.p2 == (30.0, 40.0, 0.0), "Bemassung3D Round-Trip")
+sk5 = a._dict_zu_element(sk.to_dict())
+check(isinstance(sk5, core.Skizze3D) and sk5.daten == [20.0, 15.0, 5.0], "Skizze Round-Trip")
+# body with its own plane survives move / mirror
+pl = core.extrusion(sk3, 6)
+pl.verschieben(1, 2, 3); pl.drehen(0, 0, 90); pl.skalieren(0, 0, 2); pl.spiegeln(0, 0, 1, 0)
+check(pl.bbox3() is not None and len(pl.netze()) == 1, "Koerper mit Ebene transformieren")
+# viewport 3D
+vp = core.Viewport(10, 10, 120, 90)
+els = [core.quader(0, 0, 40, 30, 0, 20), core.Rechteck(0, 0, 40, 30)]
+S.vp_ansicht_setzen(vp, els, 45, 35.264)
+check(vp.ansicht3d and vp.zoom > 0, "Viewport 3D gesetzt")
+kam = S.vp_kamera(vp, vp.zoom)
+lin, txt = S.szene_segmente(els, kam, 0.0, 0.0)
+check(len(lin) >= 12, "Viewport Segmente")
+check(S.clip_segment(((-10, 5), (10, 5)), (0, 0, 5, 10)) == ((0.0, 5.0), (5.0, 5.0)), "Clip")
+check(S.clip_segment(((-10, 50), (10, 50)), (0, 0, 5, 10)) is None, "Clip aussen")
+vp2 = a._dict_zu_element(vp.to_dict())
+check(vp2.ansicht3d["yaw"] == 45.0, "Viewport Round-Trip")
+from katiecad.fileio import pdf as PDF
+class _L:
+    def __init__(s): s.farbe = "#000000"; s.staerke = 0.35; s.sichtbar = True
+seite = PDF.PdfSeite(297, 210)
+PDF._pdf_viewport(seite, vp, els + [core.Bemassung3D((0, 0, 0), (40, 0, 0), (0, 0, -5))],
+                  {"0": _L()}, False, True, 1.0, True)
+check(len(seite.to_bytes()) > 500, "PDF mit 3D-Viewport")
+# toolbar docking (pure helpers)
+from katiecad.ui import toolbar_dock as TD
+check(TD.ziel_position(0.95, 0.5) == "rechts" and TD.ziel_position(0.5, 0.9) == "unten"
+      and TD.ziel_position(0.5, 0.05) == "oben" and TD.ziel_position(0.5, 0.5, "unten") == "unten",
+      "Docking-Zielposition")
+check(TD.spalten_zeilen(50, 700) == 19 and TD.spalten_zeilen(50, 100) == 6, "Spaltenzahl")
+check({"menu.ansicht.tb", "menu.ansicht.tb_oben", "menu.ansicht.tb_unten",
+       "menu.ansicht.tb_rechts", "tb.griff"} <= set(I.TEXTE["de"]) & set(I.TEXTE["en"]), "Docking i18n")
 # menu / commands
 check(core.BEFEHLE.get("QUADER") == "3d:neu:quader" and core.BEFEHLE.get("3D") == "3d:oeffnen", "Befehle")
 # i18n keys used by the window exist in both languages
@@ -67,7 +134,7 @@ src = open(os.path.join(os.path.dirname(W.__file__), "ansicht3d.py"), encoding="
 src += open(os.path.join(os.path.dirname(A.__file__), "app.py"), encoding="utf-8").read()
 for spr in ("de", "en"):
     T = I.TEXTE[spr]
-    for key in [k for k in re.findall(r'tr\("(d3\.[a-z_.0-9]+|menu\.3d[a-z_.]*)"', src) if not k.endswith(".")]:
+    for key in [k for k in re.findall(r'tr\("(d3\.[a-z_.0-9]+|menu\.3d[a-z_.]*)"', src) if not k.endswith((".", "_"))]:
         check(key in T, f"{spr}: {key}")
     for art in W.PARAMETER:
         check("d3.neu." + art in T and "menu.3d." + art in T, art)
@@ -78,5 +145,16 @@ for spr in ("de", "en"):
         check("tb.wz." + n in T, "tooltip " + n)
     for f in G.WUERFEL_FLAECHEN:
         check("d3.ansicht." + f in T, f)
-    check("menu.3d.loch" in T and "d3.neu.loch" in T, "loch")
+    for n in ("iso_so", "iso_sw", "iso_no", "iso_nw", "oben", "vorne", "hinten", "links", "rechts", "unten"):
+        check("d3.vp." + n in T, "vp " + n)
+    for k in ("menue", "fenster", "aus", "nicht_aktivierbar"):
+        check("d3.vp." + k in T, "vp " + k)
+    check("menu.3d.loch" in T and "d3.neu.loch" in T and "menu.3d.mass" in T, "loch")
+    for m in W.Ansicht3D.MODI:
+        check("d3.modus." + m in T, "modus " + m)
+    for m in ("kreis", "rechteck", "poly"):
+        check("d3.msg.skizze_" + m in T, "skizze " + m)
+    for n in ("raster3d", "flaeche3d", "skizze_kreis", "skizze_rechteck", "skizze_poly", "ebene0",
+              "bem3d", "mass3d"):
+        check("tb.wz." + n in T, "tooltip " + n)
 print(f"test_3d - {ok} Checks bestanden")
