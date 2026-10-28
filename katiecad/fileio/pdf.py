@@ -182,6 +182,28 @@ def _pdf_element_roh(seite, el, tf, zs, farbig, layers, einh_faktor, dezimalkomm
                        fett=schrift_fett(fam))
 
 
+def _pdf_viewport_3d(seite, vp, elemente, layers, farbig, cxp, cyp):
+    """3D wireframe view of the model inside a viewport."""
+    from katiecad.model import szene3d as S
+
+    def sichtbar(el):
+        l = layers.get(el.layer)
+        return not (l and not l.sichtbar)
+
+    kam = S.vp_kamera(vp, vp.zoom)
+    linien, texte = S.szene_segmente(elemente, kam, 0.0, 0.0, sichtbar)
+    for el, ((x1, y1), (x2, y2)) in linien:
+        farbe = _pdf_farbe(el, layers, farbig)
+        w = _effektive_staerke_mm(el, layers)
+        dash = None
+        lt = LINIENTYPEN.get(el.linientyp, LINIENTYPEN["Volllinie (schmal)"])
+        if lt["dash"]:
+            dash = tuple(max(0.3, d * 0.45) for d in lt["dash"])
+        seite.linie([(cxp + x1, cyp - y1), (cxp + x2, cyp - y2)], w, farbe, dash)
+    for el, (x, y), text in texte:
+        seite.text(cxp + x, cyp - y, text, 2.5, 0.0, _pdf_farbe(el, layers, farbig), mitte=True)
+
+
 def _pdf_viewport(seite, vp, elemente, layers, farbig, rahmen,
                   einh_faktor, dezimalkomma):
     z = vp.zoom
@@ -192,6 +214,9 @@ def _pdf_viewport(seite, vp, elemente, layers, farbig, rahmen,
                 cyp + (my - vp.modell_zentrum_y) * z)
 
     seite.clip_start(vp.x, vp.y, vp.x + vp.breite, vp.y + vp.hoehe)
+    if getattr(vp, "ansicht3d", None):
+        _pdf_viewport_3d(seite, vp, elemente, layers, farbig, cxp, cyp)
+        elemente = []
     for me in elemente:
         l = layers.get(me.layer)
         if l and not l.sichtbar:
@@ -311,3 +336,4 @@ def pdf_senden(pfad, drucken):
              f"({ex}).\nDie PDF liegt hier:\n{pfad}" if de else
              f"The file could not be opened/printed automatically ({ex}).\n"
              f"The PDF is here:\n{pfad}"))
+
