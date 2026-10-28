@@ -200,16 +200,32 @@ class ToolbarDockMixin:
             return
         frei = self.root.winfo_width()
         frei = frei if frei > 300 else 1200
-        reihe, x, spalte = 0, 0, 0
+        # every row is its own frame: bars of different rows must not share grid columns
+        # (a wide bar of row 2 would otherwise push the bars of row 1 apart)
+        zeilen = [[]]
+        x = 0
         for name in namen:
-            tb = self._leiste(name)
-            w = tb.winfo_reqwidth()
+            w = self._leiste(name).winfo_reqwidth()
             if x and x + w > frei:
-                reihe, x, spalte = reihe + 1, 0, 0
-            tb.grid(in_=zone, row=reihe, column=spalte, sticky="nw")
-            tb.tkraise()                      # must lie above its zone, else it is hidden
+                zeilen.append([])
+                x = 0
+            zeilen[-1].append(name)
             x += w
-            spalte += 1
+        if not hasattr(self, "_zone_zeilen"):
+            self._zone_zeilen = {}
+        rahmen = self._zone_zeilen.setdefault(pos, [])
+        for r in rahmen[len(zeilen):]:
+            r.grid_forget()
+        for i, namen_z in enumerate(zeilen):
+            while len(rahmen) <= i:
+                rahmen.append(tk.Frame(zone, bd=0, highlightthickness=0))
+            zf = rahmen[i]
+            zf.grid(row=i, column=0, sticky="nw")
+            for name in namen_z:
+                tb = self._leiste(name)
+                tb.grid_forget()
+                tb.pack(in_=zf, side=tk.LEFT, anchor="nw")
+                tb.tkraise()                  # must lie above its zone, else it is hidden
 
     def _leiste_gitter(self, name, anzahl_rechts):
         tb = self._leiste(name)
@@ -276,3 +292,4 @@ class ToolbarDockMixin:
                         return
                 unter = getattr(unter, "master", None)
         griff.bind("<ButtonRelease-1>", los)
+
