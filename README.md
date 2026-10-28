@@ -2,9 +2,9 @@
 
 **KatieCAD is an open-source electrical CAD for switchgear construction, distribution boards and building installation – built with Python and Tkinter.**
 
-It covers the complete workflow of an electrical project: draw circuit diagrams across several sheets, connect devices with wires, let cross references and device designations be generated automatically, and produce the documentation (cover sheet, table of contents, device list, terminal plan, cable plan) at the push of a button. At the same time it is a full 2D CAD: you can draw freely without a project and create, save and reuse your own blocks.
+It covers the complete workflow of an electrical project: draw circuit diagrams across several sheets, connect devices with wires, let cross references and device designations be generated automatically, and produce the documentation (cover sheet, table of contents, device list, terminal plan, cable plan) at the push of a button. At the same time it is a full 2D CAD with simple 3D modelling: you can draw freely without a project, build bodies in 3D, create, save and reuse your own blocks, and print 2D and 3D views on the same sheet.
 
-KatieCAD is under active development. The electrical "intelligence" is growing with every release; further checks and reports will follow.
+KatieCAD brings everything you need for daily work into one tool: electrical diagrams with automatic documentation, a complete 2D CAD and simple 3D modelling – ready to use, free and open source.
 
 ![Screenshot1](Screenshots/Screenshot1.png)
 
@@ -26,15 +26,25 @@ KatieCAD is under active development. The electrical "intelligence" is growing w
 - **Documentation generator:** cover sheet, table of contents, device list, terminal plan, cable plan; customisable columns via `report_templates/`, CSV export and PDF output
 
 ### General CAD
-- **Drawing tools:** Line, Polyline, Circle, Arc, Rectangle, Text, Hatching
-- **Editing tools:** Move, Copy, Rotate, Stretch, Array, Trim, Break, Grip editing
-- **Object snap:** Endpoint, Midpoint, Center, Intersection, Quadrant, Perpendicular, Nearest
+- **Drawing tools:** Line, Polyline, Circle, Arc, Ellipse, Spline, Rectangle, Text, Hatching
+- **Editing tools:** Move, Copy, Rotate, Stretch, Array, Trim, Break, Fillet/Chamfer, Offset, Grip editing, selection windows (window / crossing)
+- **Object snap:** Endpoint, Midpoint, Center, Intersection, Quadrant, Perpendicular, Nearest; ortho mode and input line (`500,1000`, `@dx,dy`, `length<angle`)
 - **Layers & styles:** Layer management, line types, line weights, element colours
-- **Dimensions:** Linear, aligned, radius, diameter, decimal comma toggle
+- **Dimensions:** Linear, aligned, radius, diameter, decimal comma toggle; distance measuring
 - **Blocks with attributes:** create, save (`*.katieblock`) and reuse
 - **Layout view:** Paper space with viewports, standard scales, title block
 - **DXF import/export** (via `ezdxf`), **DWG import** (via `ezdwg`)
 - **Bilingual UI:** German and English (switchable at runtime)
+- **Freely dockable toolbars:** separate bars for tools, electrical and 3D – top, bottom or right, in any order
+
+### Simple 3D modelling
+- **3D view in the same window** (wireframe, orthographic or perspective) with view cube, orbit/pan/zoom and a grid on the work plane
+- **Bodies:** box, cylinder, cone, pyramid, sphere; sizes editable afterwards; pull up 2D shapes like in AutoCAD (extrude, bores and pockets)
+- **Drawing directly on faces** with the normal tools (Line, Polyline, Circle, Rectangle, Dimension, Text) – with highlighted faces, visible snap markers, ortho and typed values
+- **Rotate** about any axis, **round edges** (top, bottom, vertical), relocatable **manipulator** (pivot point)
+- **3D dimensions, 3D text and distance measuring** between any two points in space
+- **3D blocks** to group bodies; hidden cut-outs are shown dashed in the 2D view
+- **3D views in the layout:** show a viewport as a 3D view and print it to scale or export it as PDF
 
 ## Download
 
