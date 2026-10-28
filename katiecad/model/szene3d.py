@@ -9,7 +9,7 @@ and does the maths of the 3D manipulator (X/Y/Z arrows).
 import math
 
 from katiecad.model.core import (Koerper3D, Gruppe3D, Skizze3D, Bemassung3D, Linie, Rechteck,
-                                 Polylinie, Kreis, Bogen, ZUSAMMENGESETZT, bogen_punkte,
+                                 Polylinie, Kreis, Bogen, Ellipse, ZUSAMMENGESETZT, bogen_punkte,
                                  bogen_sweep, profil_aus_element, extrusion)
 from katiecad.model import geom3d as G
 
@@ -32,7 +32,7 @@ def zuege3(el):
     """3D polylines [(points, closed)] of every non-body element (2D shapes at z = 0)."""
     if isinstance(el, Skizze3D):
         pts = el.zug3()
-        return [(pts, True)] if len(pts) >= 2 else []
+        return [(pts, el.geschlossen())] if len(pts) >= 2 else []
     if isinstance(el, Bemassung3D):
         return [(z, False) for z in el.zuege3()]
     return [([(x, y, 0.0) for (x, y) in zug], closed) for zug, closed in flache_zuege(el)]
@@ -309,25 +309,104 @@ def punkt_auf_ebene(kamera, cx, cy, mx, my, ebene, raster=None):
     return p
 
 
-def fang_punkt(elemente, kamera, cx, cy, mx, my, tol=12.0):
-    """Nearest vertex of the scene (body corners, 2D end points) within `tol` pixels."""
-    best, bd = None, tol
-    kand = []
+def _zug_fang(zug, geschlossen, out):
+    """End points + edge midpoints of a short polyline (round shapes: nothing)."""
+    pts = list(zug)
+    if len(pts) > 24:
+        return
+    for p in pts:
+        out.append((p, "end"))
+    kanten = list(zip(pts, pts[1:])) + ([(pts[-1], pts[0])] if geschlossen and len(pts) > 2 else [])
+    for a, b in kanten:
+        out.append((((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2), "mitte"))
+
+
+def _kreis_fang(c, r, u, v, out):
+    out.append((c, "zentrum"))
+    for sx, sy in ((1, 0), (0, 1), (-1, 0), (0, -1)):
+        out.append(((c[0] + r * (sx * u[0] + sy * v[0]), c[1] + r * (sx * u[1] + sy * v[1]),
+                     c[2] + r * (sx * u[2] + sy * v[2])), "end"))
+
+
+def _el_fang(el, out):
+    if isinstance(el, Bemassung3D):
+        return
+    if isinstance(el, Skizze3D):
+        if el.form == "kreis" and len(el.daten) >= 3:
+            u, v, _w = G.ebene_basis(el.ebene)
+            c = G.ebene_punkt(el.ebene, el.daten[0], el.daten[1])
+            _kreis_fang(c, float(el.daten[2]), u, v, out)
+        else:
+            _zug_fang(el.zug3(), True, out)
+        return
+    if isinstance(el, Kreis):
+        _kreis_fang((el.cx, el.cy, 0.0), el.r, (1, 0, 0), (0, 1, 0), out)
+        return
+    if isinstance(el, Bogen):
+        out.append(((el.cx, el.cy, 0.0), "zentrum"))
+        bp = bogen_punkte(el.cx, el.cy, el.r, el.start, el.ende, 2)
+        for x, y in (bp[0], bp[-1]):
+            out.append(((x, y, 0.0), "end"))
+        return
+    if isinstance(el, Ellipse):
+        out.append(((el.cx, el.cy, 0.0), "zentrum"))
+        return
+    if isinstance(el, ZUSAMMENGESETZT):
+        for k in el.aufgeloest():
+            _el_fang(k, out)
+        return
+    for zug, closed in flache_zuege(el):
+        _zug_fang([(x, y, 0.0) for x, y in zug], closed, out)
+
+
+def fang_kandidaten(elemente):
+    """Snap candidates [(3D point, kind)] with kind end / mitte / zentrum."""
+    out = []
     for _el, nz in koerper_netze(elemente):
-        kand.extend(nz.punkte)
-    for el in elemente:
-        if ist_3d(el) or isinstance(el, Bemassung3D):
+        if len(nz.punkte) > 24:                       # round body: only the cap centres
+            zs = [p[2] for p in nz.punkte]
+            z0, z1 = min(zs), max(zs)
+            for zz in (z0, z1):
+                ring = [p for p in nz.punkte if abs(p[2] - zz) < 1e-6]
+                if ring:
+                    out.append(((sum(p[0] for p in ring) / len(ring),
+                                 sum(p[1] for p in ring) / len(ring), zz), "zentrum"))
             continue
-        for zug, _c in zuege3(el):
-            kand.extend(zug)
-    for p in kand:
+        for p in nz.punkte:
+            out.append((p, "end"))
+        for i, j in nz.kanten:
+            a, b = nz.punkte[i], nz.punkte[j]
+            out.append((((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2), "mitte"))
+    for el in elemente:
+        if not ist_3d(el):
+            _el_fang(el, out)
+    return out
+
+
+def fang_suche(elemente, kamera, cx, cy, mx, my, tol=12.0, filt=None):
+    """Nearest snap candidate within `tol` pixels -> (point, kind) or None.
+    Centres win over end points, end points over midpoints on a tie."""
+    rang = {"zentrum": 0, "end": 1, "mitte": 2}
+    best, bw = None, None
+    for p, art in fang_kandidaten(elemente):
+        if filt is not None and not filt(p):
+            continue
         q = kamera.proj(p, cx, cy)
         if q is None:
             continue
         d = math.hypot(q[0] - mx, q[1] - my)
-        if d < bd:
-            best, bd = p, d
+        if d > tol:
+            continue
+        w = (round(d / 4.0), rang.get(art, 3), d)
+        if bw is None or w < bw:
+            best, bw = (p, art), w
     return best
+
+
+def fang_punkt(elemente, kamera, cx, cy, mx, my, tol=12.0):
+    """Nearest snap point of the scene within `tol` pixels (point only)."""
+    r = fang_suche(elemente, kamera, cx, cy, mx, my, tol)
+    return r[0] if r else None
 
 
 def host_finden(elemente, ebene):
