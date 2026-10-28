@@ -30,6 +30,12 @@
 - Ausrichten (links, rechts, oben, unten, Mitte horizontal/vertikal) im Menü Bearbeiten
 - Manipulator (`MANIP`): Achsenkreuz an der Auswahl; Verschieben nur auf der gewählten Achse (Objektfang zählt nur in Achsrichtung), Abstand tippbar, freies Verschieben über das Quadrat
 - 3D-Drahtmodell in der Hauptansicht (Werkzeugleiste „3D:“ hinter Elektro mit Symbolen, Menü 3D, `3D`): Drehen (Mitteltaste), Verschieben (Strg+Mitteltaste), Zoom, Ansichtswürfel mit Richtungspfeilen, Perspektive, Raster ein/aus; Rechtsklick-Menü und Doppelklick (Eigenschaften, Maße, Layer ausblenden); Fläche als Arbeitsebene wählen und darauf Kreis/Rechteck/Polylinie zeichnen, hochziehen oder als Bohrung/Tasche in den Körper schneiden; 2D-Formen per Z-Pfeil hoch- oder runterziehen; Quader, Zylinder, Kegel, Pyramide, Kugel direkt erzeugen; Maße nachträglich ändern (`3DMASS`); 3D-Bemaßung aus jeder Ansicht; 3D-Ansicht in Layout-Viewports (auch im PDF); 3D-Manipulator (X/Y/Z); 3D-Blöcke; reines Drahtmodell (ohne verdeckte Kanten)
+- 3D, Runde 3: Beim Zeichnen mit Linie/Kreis/Rechteck/Polylinie wird die **Fläche unter dem Cursor automatisch erkannt** (blau hervorgehoben) und direkt darauf gezeichnet – Skizzen und Bemaßungen landen nicht mehr „im Raum“; neues Werkzeug **Linie** auf der Arbeitsebene (offene Skizze)
+- 3D-Objektfang mit **sichtbaren Markierungen** (Endpunkt, Mitte, Zentrum, Raster) beim Skizzieren und Bemaßen
+- 3D-Raster nutzt jetzt den Statusleisten-Schalter (Raster ein/aus, F7) und kann **punktiert** dargestellt werden
+- Fix: Ein schneller zweiter Klick wurde als Doppelklick gewertet und im Zeichenmodus/bei Verschieben/Manipulator verschluckt bzw. öffnete den Eigenschaften-Dialog
+- Werkzeugleisten **je Fachbereich** (Werkzeug, Elektro, 3D) getrennt oben/unten/rechts andockbar, mit Zeilenumbruch bei schmalem Fenster
+- 3D im Layout-Viewport: Das 3D-Symbol schaltet im Layout den gewählten Viewport auf 3D (statt die Layout-Fläche zu ersetzen); aktivierbar, mit mittlerer Maustaste drehbar
 - Symbol-Werkzeugleiste lässt sich oben, unten oder rechts andocken (Griff ziehen oder Ansicht › Werkzeugleiste), Auswahl wird gespeichert
 - Texte können **fett** sein (Textdialog, Eigenschaften, Eigenschaftenpalette „Arial fett“); auch im PDF (Helvetica-Bold)
 - Klemmenplan: gleicher Funktionstext erscheint nur bei der ersten Klemme einer Leiste

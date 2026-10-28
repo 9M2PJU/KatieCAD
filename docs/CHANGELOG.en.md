@@ -30,6 +30,12 @@
 - Align (left, right, top, bottom, centre horizontally/vertically) in the Edit menu
 - Manipulator (`MANIP`): axis cross on the selection; moves only along the chosen axis (object snap counts only along the axis), distance can be typed, free move via the square
 - 3D wireframe in the main view (toolbar group "3D:" after Electrical with icons, menu 3D, `3D`): orbit (middle button), pan (Ctrl+middle), zoom, view cube with direction arrows, perspective, grid on/off; right-click menu and double-click (properties, size, hide layer); pick a face as work plane and draw circle/rectangle/polyline on it, pull it up or cut it into the body as bore/pocket; pull 2D shapes up or down with the Z arrow; create box, cylinder, cone, pyramid, sphere directly; change size afterwards (`3DMASS`); 3D dimensions from any view; 3D view in layout viewports (also in the PDF); 3D manipulator (X/Y/Z); 3D blocks; plain wireframe (no hidden-line removal)
+- 3D, round 3: when drawing with Line/Circle/Rectangle/Polyline the **face under the cursor is detected automatically** (highlighted in blue) and drawn on directly - sketches and dimensions no longer end up "in space"; new **Line** tool on the work plane (open sketch)
+- 3D object snap with **visible markers** (endpoint, midpoint, centre, grid) when sketching and dimensioning
+- The 3D grid now uses the status bar switch (grid on/off, F7) and can be shown **dotted**
+- Fix: a fast second click was treated as a double click and swallowed in drawing modes / move / manipulator, or opened the properties dialog
+- Toolbars **per department** (Tools, Electrical, 3D) can be docked separately at the top/bottom/right, wrapping into a new row in a narrow window
+- 3D in a layout viewport: the 3D icon in a layout switches the chosen viewport to 3D (instead of replacing the layout area); it can be activated and rotated with the middle mouse button
 - The symbol toolbar can be docked at the top, bottom or right (drag the grip or View > Toolbar), the choice is saved
 - Text can be **bold** (text dialog, properties, properties palette "Arial fett"); also in the PDF (Helvetica-Bold)
 - Terminal diagram: the same function text appears only at the first terminal of a strip
