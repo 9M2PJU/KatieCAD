@@ -41,6 +41,24 @@ r = Rechteck(0, 0, 10, 10)
 liste = [r]
 neu = S.extrudieren(liste, [r], 15)
 check(len(neu) == 1 and isinstance(liste[0], Koerper3D) and abs(liste[0].hoehe - 15) < 1e-9, "extrudieren")
+# icons
+from katiecad.ui import icons as IC
+for n in ("ansicht3d", "k_quader", "k_zylinder", "k_kegel", "k_pyramide", "k_kugel", "extrudieren",
+          "loch", "block3d", "aufloesen3d", "wuerfel", "persp", "einpassen3d", "iso3d", "hoehe3d"):
+    check(n in IC.NAMEN and (not IC.PIL_OK or IC.icon_png(n, "#c29bff")), "Icon " + n)
+# holes
+z = core.zylinder(0, 0, 10, 0, 20)
+check(S.loch_ziele([z]) == [z], "Loch-Ziel")
+check(S.loch_setzen(z, 2, 0, 3, None), "Loch setzen")
+check(not S.loch_setzen(z, 50, 0, 3, None), "Loch ausserhalb")
+check(len(z.netze()) == 2 and len(z.aufgeloest()) > 2, "Loch im Netz/Plan")
+z.verschieben(5, 0, 2)
+check(abs(z.loecher[0][0] - 7) < 1e-9, "Loch verschiebt mit")
+z2 = a._dict_zu_element(z.to_dict())
+check(len(z2.loecher) == 1 and z2.loecher[0][3] is None, "Loch Round-Trip")
+z.loch_hinzufuegen(5, 0, 1, 4)
+nz = z.netze()[2]
+check(abs(nz.bbox()[5] - (2 + 20)) < 1e-6 and abs(nz.bbox()[2] - 18) < 1e-6, "Sackloch Tiefe")
 # menu / commands
 check(core.BEFEHLE.get("QUADER") == "3d:neu:quader" and core.BEFEHLE.get("3D") == "3d:oeffnen", "Befehle")
 # i18n keys used by the window exist in both languages
@@ -55,10 +73,10 @@ for spr in ("de", "en"):
         check("d3.neu." + art in T and "menu.3d." + art in T, art)
         for p in W.PARAMETER[art]:
             check("d3.dlg." + p in T, p)
-    for m in W.MODI:
-        check("d3.modus." + m in T, m)
+    for n in ("ansicht3d", "k_quader", "k_zylinder", "k_kegel", "k_pyramide", "k_kugel", "extrudieren",
+              "loch", "block3d", "aufloesen3d", "wuerfel", "persp", "einpassen3d", "iso3d", "hoehe3d"):
+        check("tb.wz." + n in T, "tooltip " + n)
     for f in G.WUERFEL_FLAECHEN:
         check("d3.ansicht." + f in T, f)
-    for n in ("iso_so", "oben", "vorne", "rechts"):
-        check("d3.v." + n in T, n)
+    check("menu.3d.loch" in T and "d3.neu.loch" in T, "loch")
 print(f"test_3d - {ok} Checks bestanden")
