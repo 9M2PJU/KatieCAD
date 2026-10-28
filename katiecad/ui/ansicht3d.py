@@ -17,7 +17,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 
 from katiecad.common.i18n import tr
-from katiecad.model.core import (FARBEN, UI_SCHRIFT, Koerper3D, Gruppe3D, Skizze3D, Bemassung3D, Viewport,
+from katiecad.model.core import (FARBEN, UI_SCHRIFT, Koerper3D, Gruppe3D, Skizze3D, Bemassung3D, Text3D, Viewport,
                                  quader, zylinder, kegel, pyramide, kugel)
 from katiecad.model import geom3d as G
 from katiecad.model import szene3d as S
@@ -25,7 +25,7 @@ from katiecad.ui.dialogs import _modal, _LayoutNameDialog
 
 # basic 2D tools of the toolbar -> their 3D counterparts (drawing on the work plane / 3D dimension)
 WERKZEUG_3D = {"linie": "linie", "polylinie": "poly", "kreis": "kreis", "rechteck": "rechteck",
-               "bemassung": "bem"}
+               "bemassung": "bem", "text": "text"}
 
 BTN_MITTE, BTN_RECHTS = ("3", "2") if __import__("sys").platform == "darwin" else ("2", "3")
 
@@ -273,7 +273,7 @@ def _vorzeichen(k):
 
 
 class Ansicht3D(tk.Frame):
-    MODI = ("flaeche", "linie", "kreis", "rechteck", "poly", "bem", "pivot")
+    MODI = ("flaeche", "linie", "kreis", "rechteck", "poly", "bem", "pivot", "text", "messen")
     SKIZZEN = ("linie", "kreis", "rechteck", "poly")
 
     def __init__(self, app):
@@ -290,6 +290,7 @@ class Ansicht3D(tk.Frame):
         self._achse = None
         self._modus = None
         self._skiz = None             # sketch / dimension in progress
+        self._messungen = []          # finished 3D distance measurements (mode "messen")
         self._maus = None
         self._hover = None
         self._manip_off = (0.0, 0.0, 0.0)          # manipulator origin relative to the centre
@@ -498,6 +499,16 @@ class Ansicht3D(tk.Frame):
                 self._polylinie(zug, farbe, br, geschlossen=geschlossen)
             if isinstance(el, Bemassung3D):
                 self._text3(el.text_pos3(), el.wert_text(), farbe)
+            elif isinstance(el, Text3D):
+                q = self.kamera.proj(el.p, *self._mitte())
+                if q is not None:
+                    px = max(6, int(round(el.hoehe * self.kamera.skala * 0.9)))
+                    self.canvas.create_text(q[0], q[1], text=el.inhalt, fill=farbe, anchor="sw",
+                                            font=(UI_SCHRIFT, px), tags="szene")
+        if self._modus == "messen" or self._messungen:
+            for (a, b, t) in self._messungen:
+                self._linie(a, b, FARBEN["gelb"], 1, (4, 3), "szene")
+                self._text3(G.v_mul(G.v_add(a, b), 0.5), t, FARBEN["gelb"])
         for el, nz in S.koerper_netze(elemente):
             farbe, br = self._farbe(el), self._breite(el)
             for (i, j) in nz.kanten:
@@ -694,6 +705,8 @@ class Ansicht3D(tk.Frame):
         return pl["ebene"] if pl else G.BODEN_EBENE
 
     def modus_setzen(self, modus):
+        if modus != "messen":
+            self._messungen = []
         self._skiz = None
         self._platz = None
         self._modus = modus
@@ -708,6 +721,7 @@ class Ansicht3D(tk.Frame):
         self.zeichne()
 
     def _modus_ende(self):
+        self._messungen = []
         self._modus = None
         self._skiz = None
         self.canvas.configure(cursor="crosshair")
@@ -778,7 +792,7 @@ class Ansicht3D(tk.Frame):
             return
         h = {"fang": None, "flaeche": None}
         erste = self._skiz is None
-        if m in ("bem", "pivot"):
+        if m in ("bem", "pivot", "text", "messen"):
             h["fang"] = self._fang_raum(e)
             fl = self._flaeche_unter(e) if self.zustand.get("auto", True) else None
             h["flaeche"] = fl[1] if fl else None
@@ -889,6 +903,23 @@ class Ansicht3D(tk.Frame):
             self._modus_ende()
             self.info_var.set(tr("d3.msg.pivot_ok"))
             self.zeichne()
+        elif m == "text":
+            p = self._raum_punkt(e)
+            if p is None:
+                self.info_var.set(tr("d3.msg.keine_ebene"))
+                return
+            self._text_setzen(p)
+        elif m == "messen":
+            p = self._raum_punkt(e)
+            if p is None:
+                self.info_var.set(tr("d3.msg.keine_ebene"))
+                return
+            sk = self._skiz
+            if sk is None:
+                self._skiz = {"form": "messen", "pts": [p]}
+                self.info_var.set(tr("d3.msg.mess_p2"))
+            elif G.v_len(G.v_sub(p, sk["pts"][0])) > 1e-9:
+                self._mess_fertig(sk["pts"][0], p)
         elif m == "bem":
             p = self._raum_punkt(e)
             if p is None:
@@ -905,6 +936,51 @@ class Ansicht3D(tk.Frame):
             else:
                 self._bem_fertig(self._bem_versatz(e, sk["pts"]))
             self.zeichne()
+
+    def _text_setzen(self, p):
+        from tkinter import simpledialog
+        t = simpledialog.askstring(tr("d3.text.titel"), tr("d3.text.frage"), parent=self.app.root)
+        if not t or not t.strip():
+            return
+        self.app._snapshot()
+        try:
+            h = float(self.app._zahl(getattr(self.app, "text_hoehe", None), 3.5)) or 3.5
+        except Exception:
+            h = 3.5
+        el = Text3D(p, t, h, **self._stil())
+        self.app.elemente.append(el)
+        self.app.auswahl = [el]
+        self.app.redraw()
+        self.info_var.set(tr("d3.msg.text_fertig"))
+
+    def text_bearbeiten(self, el):
+        from tkinter import simpledialog
+        t = simpledialog.askstring(tr("d3.text.titel"), tr("d3.text.frage"), parent=self.app.root,
+                                   initialvalue=el.inhalt)
+        if t is not None and t.strip():
+            self.app._snapshot()
+            el.inhalt = t
+            self.app.redraw()
+
+    def _mess_text3(self, p1, p2):
+        f = self.app._einh_faktor()
+        d = G.v_sub(p2, p1)
+        def z(v):
+            t = f"{abs(v) / f:.3f}"
+            return t.replace(".", ",") if self.app.dezimalkomma.get() else t
+        return (z(G.v_len(d)), z(d[0]), z(d[1]), z(d[2]))
+
+    def _mess_fertig(self, p1, p2):
+        a, dx, dy, dz = self._mess_text3(p1, p2)
+        self._messungen.append((p1, p2, a))
+        self._skiz = None
+        self.info_var.set(tr("d3.msg.mess_ok", a=a, dx=dx, dy=dy, dz=dz,
+                             einheit=self.app.einheit.get()))
+        try:
+            self.app.status.set(self.info_var.get())
+        except Exception:
+            pass
+        self.zeichne()
 
     def _bem_versatz(self, e, pts):
         """Offset vector of a dimension: mouse point in the plane through p1 that faces the camera."""
@@ -961,6 +1037,13 @@ class Ansicht3D(tk.Frame):
                 for (i, j) in nz.kanten:
                     self._linie(nz.punkte[i], nz.punkte[j], gelb, 1, (4, 3), "vorschau")
         if not sk or not self._maus:
+            return
+        if sk["form"] == "messen":
+            q = self._raum_punkt(self._maus)
+            if q:
+                self._linie(sk["pts"][0], q, gelb, 1, (4, 3), "vorschau")
+                self._text3(G.v_mul(G.v_add(sk["pts"][0], q), 0.5),
+                            self._mess_text3(sk["pts"][0], q)[0], gelb, "vorschau")
             return
         if sk["form"] == "bem":
             pts = sk["pts"]
@@ -1063,6 +1146,9 @@ class Ansicht3D(tk.Frame):
         if el is None:
             return
         self.app.auswahl = [el]
+        if isinstance(el, Text3D):
+            self.text_bearbeiten(el)
+            return
         if S.parameter(el):
             self.massdialog()
         else:
@@ -1590,6 +1676,7 @@ class Ansicht3DMixin:
             if self._ansicht3d is not None:
                 self._ansicht3d_aus_fenster()
             self._ansicht3d_im_layout(an)
+            self.werkzeuge_fuer_3d()
             return
         w = self._ansicht3d
         if an and w is None:
@@ -1605,6 +1692,7 @@ class Ansicht3DMixin:
             w.destroy()
             self.redraw()
         self._3d_var_holen().set(an)
+        self.werkzeuge_fuer_3d()
 
     def _ansicht3d_aus_fenster(self):
         w = self._ansicht3d
@@ -1627,11 +1715,24 @@ class Ansicht3DMixin:
             if w._modus in WERKZEUG_3D.values():
                 w._modus_ende()
                 w.zeichne()
-        elif beim_oeffnen:
-            self.aktives_werkzeug.set("auswahl")      # opening 3D with a 2D-only tool: selection
+        else:                                      # 2D-only tool: stays in 3D, just not available
+            self.aktives_werkzeug.set("auswahl")
             self._werkzeug_gewechselt_2d()
-        else:
-            self.ansicht3d_setzen(False)
+            if not beim_oeffnen:
+                self.status.set(tr("d3.msg.nur_2d"))
+
+    def werkzeuge_fuer_3d(self):
+        """Greys out the toolbar buttons that only work in 2D while the 3D view is shown."""
+        an = self.ansicht3d_aktiv() and not self._ist_layout()
+        for key, b in getattr(self, "_wz_knoepfe", {}).items():
+            if key in WERKZEUG_3D or key == "auswahl":
+                continue
+            if key.startswith("cmd:") and key != "cmd:laenge":
+                continue
+            try:
+                b.state(["disabled"] if an else ["!disabled"])
+            except Exception:
+                pass
 
     def ansicht3d_oeffnen(self):
         self.ansicht3d_setzen(True)

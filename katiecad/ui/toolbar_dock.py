@@ -34,9 +34,9 @@ def spalten_zeilen(anzahl, hoehe_px):
     return max(6, min(anzahl, int(hoehe_px // ZELLE_PX)))
 
 
-LEISTEN = ("werkzeug", "elektro", "3d")            # order inside a docking area
-LEISTEN_ATTR = {"werkzeug": "tb1", "elektro": "tbE", "3d": "tbD"}
-CONFIG_KEY = {"werkzeug": "toolbar_pos", "elektro": "toolbar_pos_elektro",
+LEISTEN = ("seitenleiste", "werkzeug", "elektro", "3d")            # order inside a docking area
+LEISTEN_ATTR = {"seitenleiste": "tbS", "werkzeug": "tb1", "elektro": "tbE", "3d": "tbD"}
+CONFIG_KEY = {"seitenleiste": "toolbar_pos_seitenleiste", "werkzeug": "toolbar_pos", "elektro": "toolbar_pos_elektro",
               "3d": "toolbar_pos_3d"}
 
 
@@ -53,8 +53,14 @@ class ToolbarDockMixin:
                 r = lade_konfiguration().get("toolbar_reihenfolge")
             except Exception:
                 r = None
-            ok = isinstance(r, list) and sorted(r) == sorted(LEISTEN)
-            self._tb_reihe = list(r) if ok else list(LEISTEN)
+            if isinstance(r, list) and all(n in LEISTEN for n in r) and len(set(r)) == len(r):
+                r = list(r)
+                for n in LEISTEN:                      # bars added in later versions: at their default place
+                    if n not in r:
+                        r.insert(min(LEISTEN.index(n), len(r)), n)
+                self._tb_reihe = r
+            else:
+                self._tb_reihe = list(LEISTEN)
         return self._tb_reihe
 
     def toolbar_verschieben(self, name, schritt):

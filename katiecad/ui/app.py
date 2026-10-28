@@ -74,7 +74,7 @@ from katiecad.model.core import (
     Bemassung, Viewport, Schraffur, Bild, konturen_aus_elementen, bereich_an_punkt,
     AttributDefinition, Leitung, Verbindungspunkt, Querverweis,
     Verbindung, ElektroMaske, Klemme, Kabel, Koordinatenfeld, ZUSAMMENGESETZT,
-    Koerper3D, Gruppe3D, Skizze3D, Bemassung3D,
+    Koerper3D, Gruppe3D, Skizze3D, Bemassung3D, Text3D,
     vp_tags_eindeutig, LEITUNG_FARBE, UI_SCHRIFT,
     BlockDefinition, BlockReferenz, BlockBibliothek,
     bogen_sweep, bogen_punkte, winkel_im_bogen, bogen_aus_3_punkten,
@@ -1207,7 +1207,7 @@ class CadApp(AendernMixin, Ansicht3DMixin, ToolbarDockMixin):
                        bg=FARBEN["bg_mittel"], fg=FARBEN["cyan"],
                        activebackground=FARBEN["cyan"],
                        activeforeground=FARBEN["bg_dunkel"])
-        for _name in ("werkzeug", "elektro", "3d"):
+        for _name in ("seitenleiste", "werkzeug", "elektro", "3d"):
             m_n = tk.Menu(m_tb, tearoff=0, bg=FARBEN["bg_mittel"], fg=FARBEN["cyan"],
                           activebackground=FARBEN["cyan"],
                           activeforeground=FARBEN["bg_dunkel"])
@@ -1387,7 +1387,8 @@ class CadApp(AendernMixin, Ansicht3DMixin, ToolbarDockMixin):
         self._toolbar_griff_binden(griff, name)
 
     def _build_toolbars(self):
-        for attr in ("tb1", "tbE", "tbD", "tb2", "tb3"):
+        self._wz_knoepfe = {}
+        for attr in ("tbS", "tb1", "tbE", "tbD", "tb2", "tb3"):
             if not hasattr(self, attr):
                 frm = ttk.Frame(self.root, padding=4)
                 frm.pack(side=tk.TOP, fill=tk.X)
@@ -1401,9 +1402,10 @@ class CadApp(AendernMixin, Ansicht3DMixin, ToolbarDockMixin):
 
         # --- Toolbar 1 ---
         tb = self.tb1
+        self._leisten_griff(self.tbS, "seitenleiste")
+        ttk.Button(self.tbS, text="\u2630", width=3,
+                   command=self.seitenleiste_umschalten).pack(side=tk.LEFT, padx=(0, 4))
         self._leisten_griff(tb, "werkzeug")
-        ttk.Button(tb, text="\u2630", width=3,
-                   command=self.seitenleiste_umschalten).pack(side=tk.LEFT, padx=(0, 8))
         ttk.Label(tb, text=tr("tb.werkzeug"), style="Title.TLabel").pack(side=tk.LEFT, padx=(0, 4))
         for key in ("auswahl", "linie", "polylinie", "kreis", "bogen",
                     "ellipse", "spline", "rechteck", "text", "bemassung",
@@ -1830,9 +1832,11 @@ class CadApp(AendernMixin, Ansicht3DMixin, ToolbarDockMixin):
             except tk.TclError:
                 bild = None
         if bild is None:
-            ttk.Radiobutton(parent, text=text, value=key,
-                            variable=self.aktives_werkzeug,
-                            command=self._werkzeug_toolbar).pack(side=tk.LEFT)
+            b = ttk.Radiobutton(parent, text=text, value=key,
+                                variable=self.aktives_werkzeug,
+                                command=self._werkzeug_toolbar)
+            b.pack(side=tk.LEFT)
+            self._wz_knoepfe[key] = b
             return
         if not hasattr(self, "_toolbar_icons"):
             self._toolbar_icons = {}
@@ -1841,6 +1845,7 @@ class CadApp(AendernMixin, Ansicht3DMixin, ToolbarDockMixin):
                             variable=self.aktives_werkzeug,
                             command=self._werkzeug_toolbar)
         b.pack(side=tk.LEFT, padx=1)
+        self._wz_knoepfe[key] = b
         Tooltip(b, text)
 
     def _umschalt_knopf(self, parent, key, farbe, var, befehl):
@@ -1878,13 +1883,16 @@ class CadApp(AendernMixin, Ansicht3DMixin, ToolbarDockMixin):
             except tk.TclError:
                 bild = None
         if bild is None:
-            ttk.Button(parent, text=text, command=befehl).pack(side=tk.LEFT, padx=1)
+            b = ttk.Button(parent, text=text, command=befehl)
+            b.pack(side=tk.LEFT, padx=1)
+            self._wz_knoepfe["cmd:" + key] = b
             return
         if not hasattr(self, "_toolbar_icons"):
             self._toolbar_icons = {}
         self._toolbar_icons[key] = bild
         b = ttk.Button(parent, image=bild, style="Icon.Toolbutton", command=befehl)
         b.pack(side=tk.LEFT, padx=1)
+        self._wz_knoepfe["cmd:" + key] = b
         Tooltip(b, text)
 
     def _werkzeug_toolbar(self):
@@ -5298,6 +5306,7 @@ class CadApp(AendernMixin, Ansicht3DMixin, ToolbarDockMixin):
             if typ == "gruppe3d":   return Gruppe3D(**d)
             if typ == "skizze3d":   return Skizze3D(**d)
             if typ == "bemassung3d": return Bemassung3D(**d)
+            if typ == "text3d":     return Text3D(**d)
             if typ == "block":
                 kinder_dicts = d.pop("elemente", [])
                 kinder = []
@@ -7593,8 +7602,14 @@ class CadApp(AendernMixin, Ansicht3DMixin, ToolbarDockMixin):
         self._zeichnen_werkzeug_anwenden(*pt)
         self.redraw()
 
+    NUR_2D_BEFEHLE = ("laenge", "abrunden", "fase", "versatz")
+
     def _befehl(self, cmd, arg=""):
         arg = arg.strip()
+        if self.ansicht3d_aktiv() and not self._ist_layout() and (
+                cmd in self.NUR_2D_BEFEHLE or cmd.startswith("ausrichten:")):
+            self.status.set(tr("d3.msg.nur_2d"))          # 2D-only: unavailable while 3D is shown
+            return
         if cmd in ("raster", "fang"):
             self._cmd_wert(cmd, arg)
         elif cmd in ("ofang", "ortho"):
@@ -10287,6 +10302,9 @@ class CadApp(AendernMixin, Ansicht3DMixin, ToolbarDockMixin):
     # --------------------------------------------------------
     def messen_start(self):
         """MESS: click two points - distance, dX, dY and angle."""
+        if self.ansicht3d_aktiv() and not self._ist_layout():
+            self._ansicht3d.modus_setzen("messen")         # 3D: distance of two space points
+            return
         de = SPRACHE["aktuell"] == "de"
         self._mess = {"p1": None, "p2": None}
         if self.aktives_werkzeug.get() != "auswahl":
