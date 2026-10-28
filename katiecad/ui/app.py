@@ -51,12 +51,13 @@ from katiecad.model.blocks import (block_speichern, block_laden,
                               vorschlag_dateiname, BlockDateiFehler,
                               vorschau_geometrie, standard_ordner, symbol_ordner)
 from katiecad.ui.menuleiste import MenuLeiste
+from katiecad.ui import icons as ICONS
 from katiecad.model import geom2d as G2
 from katiecad.model import auswahl as AUSW
 from katiecad.electrical import nummerierung as NUM
 from katiecad.model.geom2d import spline_punkte
 from katiecad.ui.sidebar import Seitenleiste
-from katiecad.ui.widgets import FlatButton, farb_swatch
+from katiecad.ui.widgets import FlatButton, farb_swatch, Tooltip
 from katiecad.model.core import (
     FARBEN, EINHEITEN, ZEICHNUNGSFORMATE, MASSSTAEBE, LINIENTYPEN,
     RASTER_GROESSEN, BG_PRESETS, SCHRIFTARTEN, LINIENSTAERKEN,
@@ -105,6 +106,8 @@ from katiecad.electrical.logic import (leitungen_automatisch, kabel_kreuzungen, 
                               verbindungen_bereinigen)
 from types import SimpleNamespace
 
+ICON_ROT = "#ff4d4d"            # icon colour of the electrical tools
+
 ELEKTRO_WERKZEUGE = ("vpunkt", "verbindung", "leitung", "querverweis",
                      "maske", "klemme", "koordinatenfeld", "kabel")
 
@@ -151,6 +154,14 @@ def _style_setup(root):
            background=[("active", FARBEN["bg_mittel"])],
            foreground=[("active", FARBEN["cyan"]),
                        ("selected", FARBEN["cyan"])])
+
+    # Toolbar icon buttons (image only; the selected tool has a lit background)
+    st.configure("Icon.Toolbutton", background=FARBEN["bg_mittel"], borderwidth=1,
+                 relief="flat", padding=3, focusthickness=0)
+    st.map("Icon.Toolbutton",
+           background=[("selected", FARBEN["cyan_dunkel"]),
+                       ("active", FARBEN["bg_hover"])],
+           bordercolor=[("selected", FARBEN["cyan"])])
 
     st.configure("TCheckbutton",
                  background=FARBEN["bg_mittel"],
@@ -1310,20 +1321,14 @@ class CadApp:
         for key in ("auswahl", "linie", "polylinie", "kreis", "bogen",
                     "ellipse", "spline", "rechteck", "text", "bemassung",
                     "stutzen", "brechen"):
-            ttk.Radiobutton(tb, text=tr(f"tb.wz.{key}"), value=key,
-                            variable=self.aktives_werkzeug,
-                            command=self._werkzeug_toolbar
-                            ).pack(side=tk.LEFT)
+            self._werkzeug_knopf(tb, key, FARBEN["cyan"])
 
         ttk.Separator(tb, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=8)
         ttk.Label(tb, text=tr("menu.elektro") + ":",
                   style="Title.TLabel").pack(side=tk.LEFT, padx=(0, 4))
         for key in ("vpunkt", "verbindung", "querverweis",
                     "maske", "klemme", "kabel", "koordinatenfeld"):
-            ttk.Radiobutton(tb, text=tr(f"tb.wz.{key}"), value=key,
-                            variable=self.aktives_werkzeug,
-                            command=self._werkzeug_toolbar
-                            ).pack(side=tk.LEFT)
+            self._werkzeug_knopf(tb, key, ICON_ROT)
 
         # --- Toolbar 2 ---
         tb2 = self.tb2
@@ -1703,6 +1708,31 @@ class CadApp:
     def _werkzeug_aus_menue(self, key):
         self.aktives_werkzeug.set(key)
         self._werkzeug_toolbar()
+
+    def _werkzeug_knopf(self, parent, key, farbe):
+        """Tool button with icon and tooltip (text button without Pillow)."""
+        text = tr(f"tb.wz.{key}")
+        bild = None
+        png = ICONS.icon_png(key, farbe) if PILLOW_VERFUEGBAR else None
+        if png:
+            try:
+                import base64
+                bild = tk.PhotoImage(data=base64.b64encode(png).decode("ascii"))
+            except tk.TclError:
+                bild = None
+        if bild is None:
+            ttk.Radiobutton(parent, text=text, value=key,
+                            variable=self.aktives_werkzeug,
+                            command=self._werkzeug_toolbar).pack(side=tk.LEFT)
+            return
+        if not hasattr(self, "_toolbar_icons"):
+            self._toolbar_icons = {}
+        self._toolbar_icons[key] = bild                  # keep a reference
+        b = ttk.Radiobutton(parent, image=bild, value=key, style="Icon.Toolbutton",
+                            variable=self.aktives_werkzeug,
+                            command=self._werkzeug_toolbar)
+        b.pack(side=tk.LEFT, padx=1)
+        Tooltip(b, text)
 
     def _werkzeug_toolbar(self):
         """Tool selection by the user: "Selection" clears the selection."""
