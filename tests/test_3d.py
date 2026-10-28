@@ -268,8 +268,12 @@ for k in ("menu.3d.schrank", "d3.neu.schrank", "d3.schrank.auswahl", "d3.schrank
     check(k in I.TEXTE["de"] and k in I.TEXTE["en"], k)
 _g2 = SCH.schrank_bauen(600, 1800, 300, 0, 0, 0, None, 0, True, True, True)
 _b2 = {t.bez: t.bbox3() for t in _g2.teile}
-check({"Tür", "Seitenwand links", "Seitenwand rechts"} <= set(_b2) and len(_g2.teile) == 4, "Schrank: Tür + Seitenwände")
+check({"Tür", "Seitenwand links", "Seitenwand rechts"} <= set(_b2) and len(_g2.teile) == 6, "Schrank: Tür + Seitenwände")
 check(_b2["Tür"][4] == SCH.TUER_DICKE and _b2["Seitenwand rechts"][3] == 600, "Tür/Seitenwand Lage")
 for k in ("d3.schrank.tuer", "d3.schrank.seite_l", "d3.schrank.seite_r"):
     check(k in I.TEXTE["de"] and k in I.TEXTE["en"], k)
+check({"Türgriff", "Schloss"} <= set(_b2), "Schrank: Türgriff + Schloss")
+check(_b2["Türgriff"][1] < 0 and _b2["Schloss"][1] < _b2["Türgriff"][1], "Griff ragt vor der Tür")
+_e = W.Ansicht3D._ecken_von([_g2])
+check(len(_e) == 8 and min(p[1] for p in _e) == 0.0, "Fangecken ohne Griff/Tür")
 print(f"test_3d - {ok} Checks bestanden")
