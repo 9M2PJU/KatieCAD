@@ -292,4 +292,3 @@ class ToolbarDockMixin:
                         return
                 unter = getattr(unter, "master", None)
         griff.bind("<ButtonRelease-1>", los)
-
