@@ -54,6 +54,7 @@ from katiecad.ui.menuleiste import MenuLeiste
 from katiecad.ui import icons as ICONS
 from katiecad.ui.ansicht3d import Ansicht3DMixin
 from katiecad.ui.aendern import AendernMixin
+from katiecad.ui.toolbar_dock import ToolbarDockMixin
 from katiecad.model import geom2d as G2
 from katiecad.model import auswahl as AUSW
 from katiecad.electrical import nummerierung as NUM
@@ -73,7 +74,7 @@ from katiecad.model.core import (
     Bemassung, Viewport, Schraffur, Bild, konturen_aus_elementen, bereich_an_punkt,
     AttributDefinition, Leitung, Verbindungspunkt, Querverweis,
     Verbindung, ElektroMaske, Klemme, Kabel, Koordinatenfeld, ZUSAMMENGESETZT,
-    Koerper3D, Gruppe3D,
+    Koerper3D, Gruppe3D, Skizze3D, Bemassung3D,
     vp_tags_eindeutig, LEITUNG_FARBE, UI_SCHRIFT,
     BlockDefinition, BlockReferenz, BlockBibliothek,
     bogen_sweep, bogen_punkte, winkel_im_bogen, bogen_aus_3_punkten,
@@ -233,7 +234,7 @@ def geraete_aus_blattdaten_liste(app, j):
     return app._geraete_blatt(p.blatt_pfad(j))
 
 
-class CadApp(AendernMixin, Ansicht3DMixin):
+class CadApp(AendernMixin, Ansicht3DMixin, ToolbarDockMixin):
     def __init__(self, root):
         self.root = root
         if _MAC:
@@ -561,6 +562,7 @@ class CadApp(AendernMixin, Ansicht3DMixin):
     def _retranslate_ui(self):
         self._build_menu()
         self._build_toolbars()
+        self._toolbar_anordnen()
         self._retranslate_eingabeleiste()
         self._retranslate_statusbar()
         self._aktualisiere_osnap_anzeige()
@@ -968,6 +970,8 @@ class CadApp(AendernMixin, Ansicht3DMixin):
         vor = (self.seitenleiste if self.seitenleiste.ist_sichtbar()
                else self.canvas)
         koord_bar.pack(side=tk.BOTTOM, fill=tk.X, before=vor)
+        self._koord_bar = koord_bar
+        self._toolbar_anordnen()
 
     def _build_menu(self):
         # Forces the dark colour for the menu
@@ -1193,6 +1197,14 @@ class CadApp(AendernMixin, Ansicht3DMixin):
         m_ansicht.add_separator()
         m_ansicht.add_command(label=tr("menu.ansicht.seitenleiste"),
                               command=self.seitenleiste_umschalten)
+        m_tb = tk.Menu(m_ansicht, tearoff=0,
+                       bg=FARBEN["bg_mittel"], fg=FARBEN["cyan"],
+                       activebackground=FARBEN["cyan"],
+                       activeforeground=FARBEN["bg_dunkel"])
+        for _pos in ("oben", "unten", "rechts"):
+            m_tb.add_command(label=tr("menu.ansicht.tb_" + _pos),
+                             command=lambda p=_pos: self.toolbar_position_setzen(p))
+        m_ansicht.add_cascade(label=tr("menu.ansicht.tb"), menu=m_tb)
         m_ansicht.add_command(label=tr("menu.ansicht.zoom_grenzen"),
                               command=self.zoom_grenzen)
         m_ansicht.add_separator()
@@ -1271,6 +1283,8 @@ class CadApp(AendernMixin, Ansicht3DMixin):
         m_3d.add_separator()
         m_3d.add_command(label=tr("menu.3d.loch"),
                          command=lambda: self.ansicht3d_befehl("loch"))
+        m_3d.add_command(label=tr("menu.3d.mass"),
+                         command=lambda: self.ansicht3d_befehl("mass"))
         m_3d.add_command(label=tr("menu.3d.extrudieren"),
                          command=lambda: self.ansicht3d_befehl("extrudieren"))
         m_3d.add_command(label=tr("menu.3d.block"),
@@ -1357,6 +1371,10 @@ class CadApp(AendernMixin, Ansicht3DMixin):
 
         # --- Toolbar 1 ---
         tb = self.tb1
+        griff = ttk.Label(tb, text="\u22ee\u22ee", style="Title.TLabel", cursor="fleur")
+        griff.pack(side=tk.LEFT, padx=(0, 4))
+        Tooltip(griff, tr("tb.griff"))
+        self._toolbar_griff_binden(griff)
         ttk.Button(tb, text="\u2630", width=3,
                    command=self.seitenleiste_umschalten).pack(side=tk.LEFT, padx=(0, 8))
         ttk.Label(tb, text=tr("tb.werkzeug"), style="Title.TLabel").pack(side=tk.LEFT, padx=(0, 4))
@@ -2827,6 +2845,15 @@ class CadApp(AendernMixin, Ansicht3DMixin):
                                 else "Align to selection"),
                          command=lambda: self._vp_an_objekt(vp))
         menu.add_separator()
+        m3 = tk.Menu(menu, **stil)
+        for nm in ("iso_so", "iso_sw", "iso_no", "iso_nw", "oben", "vorne", "hinten",
+                   "links", "rechts", "unten"):
+            m3.add_command(label=tr("d3.vp." + nm), command=lambda n=nm: self._vp_3d_ansicht(vp, n))
+        m3.add_separator()
+        m3.add_command(label=tr("d3.vp.fenster"), command=lambda: self._vp_3d_von_fenster(vp))
+        m3.add_command(label=tr("d3.vp.aus"), command=lambda: self._vp_3d_aus(vp))
+        menu.add_cascade(label=tr("d3.vp.menue"), menu=m3)
+        menu.add_separator()
         menu.add_command(label=("Eigenschaften..." if de else "Properties..."),
                          command=lambda: self._vp_eigenschaften(vp))
         menu.add_command(label=("Löschen" if de else "Delete"),
@@ -2837,6 +2864,9 @@ class CadApp(AendernMixin, Ansicht3DMixin):
             menu.grab_release()
 
     def _vp_aktivieren(self, vp):
+        if getattr(vp, "ansicht3d", None):
+            self.status.set(tr("d3.vp.nicht_aktivierbar"))
+            return
         if self._aktiver_viewport is not None:
             self._aktiver_viewport.aktiv = False
         vp.aktiv = True
@@ -4177,6 +4207,10 @@ class CadApp(AendernMixin, Ansicht3DMixin):
             return
         if not el:
             return
+        self._element_bearbeiten(el)
+
+    def _element_bearbeiten(self, el):
+        """Edit dialog of an element (double click in 2D and 3D)."""
         if isinstance(el, BlockReferenz) and el.attribut_definitionen():
             self.attribute_bearbeiten(el)
             return
@@ -4676,6 +4710,9 @@ class CadApp(AendernMixin, Ansicht3DMixin):
             return (vcx + (mx - vp.modell_zentrum_x) * skala,
                     vcy - (my - vp.modell_zentrum_y) * skala)
 
+        if getattr(vp, "ansicht3d", None):
+            self._zeichne_viewport_3d(vp, vcx, vcy, skala, clip)
+            return
         for me in self.elemente:
             l = self.layers.get(me.layer)
             if l and not l.sichtbar:
@@ -4687,6 +4724,53 @@ class CadApp(AendernMixin, Ansicht3DMixin):
                     max(ay, by) < clip[1] or min(ay, by) > clip[3]):
                 continue
             self._zeichne_element(me, tags=("layout",), tf=tf, skala=skala, clip=clip)
+
+    def _zeichne_viewport_3d(self, vp, vcx, vcy, skala, clip):
+        """3D wireframe of the model inside a layout viewport."""
+        from katiecad.model import szene3d as S3
+
+        def sichtbar(el):
+            l = self.layers.get(el.layer)
+            return not (l and not l.sichtbar)
+
+        kam = S3.vp_kamera(vp, skala)
+        linien, texte = S3.szene_segmente(self.elemente, kam, vcx, vcy, sichtbar)
+        for el, seg in linien:
+            seg = S3.clip_segment(seg, clip)
+            if seg is None:
+                continue
+            br = max(1, min(3, int(round((el.staerke or 0.35) * max(1.0, skala) * 2))))
+            self.canvas.create_line(seg[0][0], seg[0][1], seg[1][0], seg[1][1],
+                                    fill=self._effektive_zeichenfarbe(el), width=br,
+                                    tags=("layout",))
+        for el, (x, y), text in texte:
+            if clip[0] <= x <= clip[2] and clip[1] <= y <= clip[3]:
+                self.canvas.create_text(x, y, text=text, fill=self._effektive_zeichenfarbe(el),
+                                        font=(UI_SCHRIFT, max(6, int(2.5 * skala * 2.2))),
+                                        tags=("layout",))
+
+    def _vp_3d_ansicht(self, vp, name):
+        """Standard 3D view in a viewport (fits the model)."""
+        from katiecad.model import szene3d as S3
+        from katiecad.model.geom3d import ANSICHTEN
+        yaw, pitch = ANSICHTEN[name]
+        persp = bool(vp.ansicht3d and vp.ansicht3d.get("persp"))
+        self._snapshot()
+        S3.vp_ansicht_setzen(vp, self.elemente, yaw, pitch, persp)
+        self.redraw()
+
+    def _vp_3d_von_fenster(self, vp):
+        """Takes the camera of the 3D view for the viewport."""
+        from katiecad.model import szene3d as S3
+        k = self._3d_zustand()["kamera"]
+        self._snapshot()
+        S3.vp_ansicht_setzen(vp, self.elemente, k.yaw, k.pitch, k.perspektive)
+        self.redraw()
+
+    def _vp_3d_aus(self, vp):
+        self._snapshot()
+        vp.ansicht3d = None
+        self.redraw()
 
     def _attr_ausschluss(self, ref):
         """Tags that are not prompted for (title block: automatic fields)."""
@@ -5145,6 +5229,8 @@ class CadApp(AendernMixin, Ansicht3DMixin):
             if typ == "kabel":      return Kabel(**d)
             if typ == "koerper3d":  return Koerper3D(**d)
             if typ == "gruppe3d":   return Gruppe3D(**d)
+            if typ == "skizze3d":   return Skizze3D(**d)
+            if typ == "bemassung3d": return Bemassung3D(**d)
             if typ == "block":
                 kinder_dicts = d.pop("elemente", [])
                 kinder = []
@@ -10660,3 +10746,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
