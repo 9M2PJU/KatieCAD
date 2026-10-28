@@ -1293,7 +1293,7 @@ class CadApp(AendernMixin, Ansicht3DMixin, ToolbarDockMixin):
         m_3d.add_command(label=tr("menu.3d.oeffnen"),
                          command=self.ansicht3d_umschalten)
         m_3d.add_separator()
-        for _art in ("quader", "pyramide", "zylinder", "kegel", "kugel"):
+        for _art in ("quader", "pyramide", "zylinder", "kegel", "kugel", "schrank"):
             m_3d.add_command(label=tr("menu.3d." + _art),
                              command=lambda a=_art: self.ansicht3d_befehl("neu:" + a))
         m_3d.add_separator()
@@ -1429,7 +1429,8 @@ class CadApp(AendernMixin, Ansicht3DMixin, ToolbarDockMixin):
                   ).pack(side=tk.LEFT, padx=(0, 4))
         self._umschalt_knopf(tb, "ansicht3d", FARBEN["cyan"], self._3d_var,
                              lambda: self.ansicht3d_setzen(self._3d_var.get()))
-        for key, cmd in (("k_quader", "neu:quader"), ("k_zylinder", "neu:zylinder"),
+        for key, cmd in (("k_quader", "neu:quader"), ("k_schrank", "neu:schrank"),
+                         ("k_zylinder", "neu:zylinder"),
                          ("k_kegel", "neu:kegel"), ("k_pyramide", "neu:pyramide"),
                          ("k_kugel", "neu:kugel"), ("extrudieren", "extrudieren"),
                          ("loch", "loch"), ("drehen3d", "drehen"), ("abrunden3d", "abrunden"),

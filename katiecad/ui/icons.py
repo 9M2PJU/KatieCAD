@@ -153,6 +153,10 @@ def _zeichne(name, d, c, f):
         d.rectangle([12 * f, 38 * f, 62 * f, 88 * f], outline=c, width=int(6 * f))
         d.rectangle([34 * f, 14 * f, 88 * f, 64 * f], outline=c, width=int(5 * f))
         L([(12, 38), (34, 14)], 5); L([(62, 38), (88, 14)], 5); L([(62, 88), (88, 64)], 5)
+    elif name == "k_schrank":
+        d.rectangle([18 * f, 6 * f, 82 * f, 88 * f], outline=c, width=int(6 * f))
+        d.rectangle([28 * f, 16 * f, 72 * f, 70 * f], outline=c, width=int(4 * f))
+        L([(66, 40), (66, 54)], 6); L([(10, 94), (90, 94)], 6)
     elif name == "k_zylinder":
         d.ellipse([20 * f, 8 * f, 80 * f, 34 * f], outline=c, width=int(6 * f))
         d.arc([20 * f, 62 * f, 80 * f, 90 * f], 0, 180, fill=c, width=int(6 * f))
@@ -262,7 +266,7 @@ NAMEN = ("auswahl", "linie", "polylinie", "kreis", "bogen", "ellipse", "spline",
          "vpunkt", "verbindung", "querverweis", "maske", "klemme", "kabel",
          "koordinatenfeld", "suchen", "zoom_plus", "zoom_minus",
          "zoom_grenzen", "reset", "ftext", "laenge", "manip",
-         "ansicht3d", "wuerfel", "k_quader", "k_zylinder", "k_kegel", "k_pyramide",
+         "ansicht3d", "wuerfel", "k_quader", "k_schrank", "k_zylinder", "k_kegel", "k_pyramide",
          "k_kugel", "extrudieren", "loch", "block3d", "aufloesen3d", "persp",
          "einpassen3d", "iso3d", "hoehe3d", "raster3d", "flaeche3d", "skizze_kreis",
          "skizze_rechteck", "skizze_linie", "skizze_poly", "ebene0", "bem3d", "mass3d", "drehen3d", "abrunden3d", "manip_pivot")

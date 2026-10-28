@@ -21,6 +21,7 @@ from katiecad.model.core import (FARBEN, UI_SCHRIFT, Koerper3D, Gruppe3D, Skizze
                                  quader, zylinder, kegel, pyramide, kugel)
 from katiecad.model import geom3d as G
 from katiecad.model import szene3d as S
+from katiecad.model import schrank as SCHR
 from katiecad.ui.dialogs import _modal, _LayoutNameDialog
 
 # basic 2D tools of the toolbar -> their 3D counterparts (drawing on the work plane / 3D dimension)
@@ -54,7 +55,102 @@ def koerper_bauen(art, par, x, y, z):
         return pyramide(x, y, z, par["hoehe"], int(par["ecken"]), par["breite"], par["tiefe"])
     if art == "kugel":
         return kugel(x, y, z + par["radius"], par["radius"])
+    if art == "schrank":
+        platte = (par["pb"], par["ph"]) if par.get("platte") else None
+        return SCHR.schrank_bauen(par["breite"], par["hoehe"], par["tiefe"], x, y, z,
+                                  platte, par.get("sockel", 0.0))
     raise ValueError(art)
+
+
+class SchrankDialog(tk.Toplevel):
+    """Standard control cabinet: pick a size or enter free dimensions. result as in
+    Koerper3DDialog = (par, (x, y, z), mit_klick) in mm."""
+
+    def __init__(self, parent, faktor, einheit, ort):
+        super().__init__(parent)
+        self.result = None
+        self.f = faktor
+        self.title(tr("d3.neu.schrank"))
+        self.transient(parent)
+        self.configure(bg=FARBEN["bg_mittel"])
+        self.resizable(False, False)
+        f = ttk.Frame(self, padding=12)
+        f.pack(fill=tk.BOTH, expand=True)
+        self.vars = {}
+        r = 0
+        ttk.Label(f, text=tr("d3.schrank.auswahl")).grid(row=r, column=0, sticky=tk.W, pady=3)
+        frei = tr("d3.schrank.frei")
+        self._namen = [frei] + [SCHR.vorgabe_name(s) for s in SCHR.SCHRAENKE]
+        self.auswahl = tk.StringVar(value=self._namen[1])
+        cb = ttk.Combobox(f, textvariable=self.auswahl, values=self._namen, width=26,
+                          state="readonly")
+        cb.grid(row=r, column=1, padx=8, pady=3)
+        cb.bind("<<ComboboxSelected>>", lambda e: self._gewaehlt())
+        r += 1
+        felder = [("breite", tr("d3.dlg.breite"), 600), ("hoehe", tr("d3.dlg.hoehe"), 1800),
+                  ("tiefe", tr("d3.dlg.tiefe"), 300), ("pb", tr("d3.schrank.pb"), 499),
+                  ("ph", tr("d3.schrank.ph"), 1696),
+                  ("x", tr("d3.dlg.x"), ort[0] / faktor), ("y", tr("d3.dlg.y"), ort[1] / faktor),
+                  ("z", tr("d3.dlg.z"), 0.0)]
+        for key, text, wert in felder:
+            ttk.Label(f, text=text + f" ({einheit})").grid(row=r, column=0, sticky=tk.W, pady=3)
+            v = tk.StringVar(value="%g" % wert)
+            self.vars[key] = v
+            ttk.Entry(f, textvariable=v, width=12).grid(row=r, column=1, sticky=tk.W, padx=8, pady=3)
+            r += 1
+        self.platte = tk.BooleanVar(value=True)
+        ttk.Checkbutton(f, text=tr("d3.schrank.platte"), variable=self.platte
+                        ).grid(row=r, column=0, columnspan=2, sticky=tk.W, pady=3)
+        r += 1
+        ttk.Label(f, text=tr("d3.schrank.sockel")).grid(row=r, column=0, sticky=tk.W, pady=3)
+        self.sockel = tk.StringVar(value=tr("d3.schrank.ohne"))
+        ttk.Combobox(f, textvariable=self.sockel, width=12, state="readonly",
+                     values=[tr("d3.schrank.ohne")] + [f"{h} mm" for h in SCHR.SOCKEL_HOEHEN[1:]]
+                     ).grid(row=r, column=1, sticky=tk.W, padx=8, pady=3)
+        r += 1
+        self.klick = tk.BooleanVar(value=True)
+        ttk.Checkbutton(f, text=tr("d3.dlg.klick"), variable=self.klick
+                        ).grid(row=r, column=0, columnspan=2, sticky=tk.W, pady=6)
+        r += 1
+        bt = ttk.Frame(f)
+        bt.grid(row=r, column=0, columnspan=2, pady=(6, 0))
+        ttk.Button(bt, text="OK", command=self._ok).pack(side=tk.LEFT, padx=6)
+        ttk.Button(bt, text=tr("dlg.abbrechen"), command=self.destroy).pack(side=tk.LEFT, padx=6)
+        self.bind("<Return>", lambda e: self._ok())
+        self.bind("<Escape>", lambda e: self.destroy())
+        self._gewaehlt()
+        _modal(self)
+
+    def _setze(self, key, mm):
+        self.vars[key].set("%g" % round(mm / self.f, 3))
+
+    def _gewaehlt(self):
+        i = self._namen.index(self.auswahl.get())
+        if i == 0:
+            return                                    # free dimensions: keep the values
+        h, b, t, pb, ph = SCHR.SCHRAENKE[i - 1]
+        for key, v in (("breite", b), ("hoehe", h), ("tiefe", t), ("pb", pb), ("ph", ph)):
+            self._setze(key, v)
+
+    def _zahl(self, key):
+        return float(self.vars[key].get().strip().replace(",", "."))
+
+    def _ok(self):
+        try:
+            par = {k: self._zahl(k) * self.f for k in ("breite", "hoehe", "tiefe", "pb", "ph")}
+            if min(par.values()) <= 0:
+                raise ValueError
+            par["platte"] = 1 if self.platte.get() else 0
+            if par["platte"] and (par["pb"] >= par["breite"] or par["ph"] >= par["hoehe"]):
+                raise ValueError
+            sk = self.sockel.get()
+            par["sockel"] = float(sk.split()[0]) if sk[:1].isdigit() else 0.0
+            pos = (self._zahl("x") * self.f, self._zahl("y") * self.f, self._zahl("z") * self.f)
+        except ValueError:
+            messagebox.showerror(tr("d3.titel"), tr("d3.msg.zahl"), parent=self)
+            return
+        self.result = (par, pos, bool(self.klick.get()))
+        self.destroy()
 
 
 class Koerper3DDialog(tk.Toplevel):
@@ -1054,9 +1150,9 @@ class Ansicht3D(tk.Frame):
             p = self._bodenpunkt(pl["maus"], pl["z"])
             if p is not None:
                 body = koerper_bauen(pl["art"], pl["par"], p[0], p[1], pl["z"])
-                nz = body.netz()
-                for (i, j) in nz.kanten:
-                    self._linie(nz.punkte[i], nz.punkte[j], gelb, 1, (4, 3), "vorschau")
+                for nz in (body.netze() if hasattr(body, "netze") else [body.netz()]):
+                    for (i, j) in nz.kanten:
+                        self._linie(nz.punkte[i], nz.punkte[j], gelb, 1, (4, 3), "vorschau")
         if not sk or not self._maus:
             return
         if sk["form"] == "messen":
@@ -1433,8 +1529,12 @@ class Ansicht3D(tk.Frame):
     # ------------------------------------------------------------------
     def neuer_koerper(self, art):
         k = self.kamera
-        dlg = Koerper3DDialog(self.app.root, art, self.app._einh_faktor(), self.app.einheit.get(),
-                              (k.ziel[0], k.ziel[1]))
+        if art == "schrank":
+            dlg = SchrankDialog(self.app.root, self.app._einh_faktor(), self.app.einheit.get(),
+                                (k.ziel[0], k.ziel[1]))
+        else:
+            dlg = Koerper3DDialog(self.app.root, art, self.app._einh_faktor(),
+                                  self.app.einheit.get(), (k.ziel[0], k.ziel[1]))
         self.app.root.wait_window(dlg)
         if not dlg.result:
             return
@@ -1450,6 +1550,8 @@ class Ansicht3D(tk.Frame):
         body = koerper_bauen(art, par, pos[0], pos[1], pos[2])
         for key, v in self._stil().items():
             setattr(body, key, v)
+            for t in getattr(body, "teile", ()):                 # cabinet = block of several bodies
+                setattr(t, key, v)
         self.app._snapshot()
         self.app.elemente.append(body)
         self.app.auswahl = [body]
