@@ -52,6 +52,7 @@ from katiecad.model.blocks import (block_speichern, block_laden,
                               vorschau_geometrie, standard_ordner, symbol_ordner)
 from katiecad.ui.menuleiste import MenuLeiste
 from katiecad.ui import icons as ICONS
+from katiecad.ui.aendern import AendernMixin
 from katiecad.model import geom2d as G2
 from katiecad.model import auswahl as AUSW
 from katiecad.electrical import nummerierung as NUM
@@ -60,6 +61,7 @@ from katiecad.ui.sidebar import Seitenleiste
 from katiecad.ui.widgets import FlatButton, farb_swatch, Tooltip
 from katiecad.model.core import (
     FARBEN, EINHEITEN, ZEICHNUNGSFORMATE, MASSSTAEBE, LINIENTYPEN,
+    schrift_fett, schrift_name, schrift_setzen,
     RASTER_GROESSEN, BG_PRESETS, SCHRIFTARTEN, LINIENSTAERKEN,
     GRIFF_RADIUS, MIN_VP_GROESSE, PASTE_OFFSET_MM,
     TEXT_BREITE, TEXT_ZEILE, CAD_VERSALHOEHE, LW_PX_FAKTOR, BEM_RICHTUNGEN,
@@ -229,7 +231,7 @@ def geraete_aus_blattdaten_liste(app, j):
     return app._geraete_blatt(p.blatt_pfad(j))
 
 
-class CadApp:
+class CadApp(AendernMixin):
     def __init__(self, root):
         self.root = root
         if _MAC:
@@ -419,6 +421,8 @@ class CadApp:
         self._mess = None
         self._ecke = None
         self._versatz = None
+        self._laenge = None
+        self._manip_an = False
         self._versatz_d = 10.0
         self._ecke_param = {"r": 5.0, "d1": 5.0, "d2": 5.0}
         self.messergebnis = ""
@@ -1075,6 +1079,18 @@ class CadApp:
                             command=self.schnellauswahl)
         m_bearb.add_command(label=tr("menu.bearbeiten.versatz"),
                             command=self.versatz_start)
+        m_bearb.add_command(label=tr("menu.bearbeiten.laenge"),
+                            command=self.laenge_start)
+        m_bearb.add_command(label=tr("menu.bearbeiten.manip"),
+                            command=self.manipulator_umschalten)
+        m_ausr = tk.Menu(m_bearb, tearoff=0,
+                         bg=FARBEN["bg_mittel"], fg=FARBEN["cyan"],
+                         activebackground=FARBEN["cyan"],
+                         activeforeground=FARBEN["bg_dunkel"])
+        for k in ("links", "rechts", "oben", "unten", "mitte_h", "mitte_v"):
+            m_ausr.add_command(label=tr("menu.ausrichten." + k),
+                               command=lambda k=k: self.ausrichten(k))
+        m_bearb.add_cascade(label=tr("menu.bearbeiten.ausrichten"), menu=m_ausr)
         m_bearb.add_command(label=tr("menu.bearbeiten.abrunden"),
                             command=lambda: self.ecke_start("abrunden"))
         m_bearb.add_command(label=tr("menu.bearbeiten.fase"),
@@ -1191,12 +1207,10 @@ class CadApp:
                             activebackground=FARBEN["cyan"],
                             activeforeground=FARBEN["bg_dunkel"])
         m_bloecke.add_command(label=tr("menu.einfuegen.block_einfuegen"),
-                              command=self.block_einfuegen)
+                              command=self.block_einfuegen,
+                              accelerator="Strg+B" if SPRACHE["aktuell"] == "de" else "Ctrl+B")
         m_bloecke.add_command(label=tr("menu.einfuegen.block_erzeugen"),
                               command=self.block_erzeugen)
-        m_bloecke.add_command(label=tr("menu.einfuegen.block_liste"),
-                              command=self.block_liste,
-                              accelerator="Strg+B" if SPRACHE["aktuell"] == "de" else "Ctrl+B")
         m_bloecke.add_separator()
         m_bloecke.add_command(label=tr("menu.bloecke.attdef"),
                               command=self.attdef_erstellen)
@@ -1325,6 +1339,8 @@ class CadApp:
                     "stutzen", "brechen"):
             self._werkzeug_knopf(tb, key, FARBEN["cyan"])
         self._befehl_knopf(tb, "suchen", FARBEN["cyan"], self.suchen_ersetzen)
+        self._befehl_knopf(tb, "laenge", FARBEN["cyan"], self.laenge_start)
+        self._befehl_knopf(tb, "manip", FARBEN["cyan"], self.manipulator_umschalten)
 
         ttk.Separator(tb, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=8)
         ttk.Label(tb, text=tr("menu.elektro") + ":",
@@ -2335,6 +2351,7 @@ class CadApp:
         self._mess_ende(leise=True)
         self._ecke_ende(leise=True)
         self._versatz_ende(leise=True)
+        self._laenge_ende(leise=True)
         self._bem_abbrechen()
         self._bogen_abbrechen()
         self._trim_abbrechen()
@@ -2666,6 +2683,9 @@ class CadApp:
             return
         if getattr(self, "_versatz", None) is not None:
             self._versatz_ende()
+            return
+        if getattr(self, "_laenge", None) is not None:
+            self._laenge_ende()
             return
         if self._op is not None:
             self._op_rechtsklick()
@@ -3084,6 +3104,9 @@ class CadApp:
         if getattr(self, "_mess", None) is not None:
             self._mess_bewegt(event)
             return
+        if getattr(self, "_laenge", None) is not None:
+            self._laenge_bewegt(event)
+            return
         if self._attdef_wartend is not None:
             pt = self._eingabepunkt(event)
             self.status.set(
@@ -3441,6 +3464,7 @@ class CadApp:
         self.canvas.tag_lower("auswahl_highlight")
         for el in self.auswahl:
             self._zeichne_griffe(el)
+        self._manip_zeichnen()
 
     def _zeichne_griffe(self, el):
         c = self.canvas
@@ -3497,6 +3521,9 @@ class CadApp:
         if getattr(self, "_versatz", None) is not None:
             self._versatz_klick(event)
             return
+        if getattr(self, "_laenge", None) is not None:
+            self._laenge_klick(event)
+            return
         if self._block_erzeuge_auswahl is not None:
             x, y = self._eingabepunkt(event)
             self._block_erzeugen_fertig((x, y))
@@ -3543,6 +3570,8 @@ class CadApp:
             self.entry_eingabe.focus_set()
             return
         if kind == "vp":
+            return
+        if self._manip_klick(event):
             return
         el_griff, gid = self._griff_unter_maus(event)
         if el_griff is not None:
@@ -4128,7 +4157,8 @@ class CadApp:
         inhalt, hoehe, winkel, schriftart, einfuegepunkt = dlg.result
         self.text_hoehe.set(hoehe)
         self.text_winkel.set(winkel)
-        self.text_schriftart.set(schriftart)
+        self.text_schriftart.set(schrift_name(schriftart))
+        self.text_fett = schrift_fett(schriftart)
         self._snapshot()
         daten = self._layer_daten()
         if "Schrift" in self.layers:
@@ -5939,7 +5969,8 @@ class CadApp:
         key = (fam, px)
         f = self._font_cache.get(key)
         if f is None:
-            f = tkfont.Font(family=fam, size=-int(px))
+            f = tkfont.Font(family=schrift_name(fam), size=-int(px),
+                            weight="bold" if schrift_fett(fam) else "normal")
             self._font_cache[key] = f
         return f
 
@@ -6890,6 +6921,7 @@ class CadApp:
         op = self._op
         if op is None:
             return
+        pt = self._op_achse(pt)
         de = SPRACHE["aktuell"] == "de"
         if op["typ"] == "stretch":
             if op["stufe"] == "basis":
@@ -7152,6 +7184,15 @@ class CadApp:
         op = self._op
         if op is None or op["stufe"] != "ziel":
             return
+        pt = self._op_achse(pt)
+        if op.get("achse"):
+            bx, by = self.mm_to_px(*op["basis"])
+            if op["achse"] == "x":
+                self.canvas.create_line(0, by, self.canvas.winfo_width(), by,
+                                        fill=FARBEN["gelb"], dash=(2, 4), tags="vorschau")
+            else:
+                self.canvas.create_line(bx, 0, bx, self.canvas.winfo_height(),
+                                        fill=FARBEN["gelb"], dash=(2, 4), tags="vorschau")
         tf, sk = self._ctx_zu_px, self._ctx_skala()
         stil = {"farbe": FARBEN["gruen"], "w": 1, "dash": (4, 3)}
         einh = self._einh_faktor()
@@ -7274,6 +7315,8 @@ class CadApp:
                 self._op_klick(self._parse_punkt_eingabe(
                     text, op["basis"][0], op["basis"][1], einh))
                 return
+        if self._manip_eingabe(text, einh):
+            return
         if op["stufe"] == "basis":
             pt = self._parse_xy(text, einh)
             self._op_klick(pt)
@@ -7363,6 +7406,12 @@ class CadApp:
             self.schnellauswahl()
         elif cmd == "versatz":
             self.versatz_start()
+        elif cmd == "laenge":
+            self.laenge_start()
+        elif cmd == "manip":
+            self.manipulator_umschalten()
+        elif cmd.startswith("ausrichten:"):
+            self.ausrichten(cmd.split(":", 1)[1])
         elif cmd == "abrunden":
             self.ecke_start("abrunden")
         elif cmd == "fase":
