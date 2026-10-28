@@ -198,6 +198,11 @@ def _zeichne(name, d, c, f):
     elif name == "skizze_rechteck":
         L([(8, 78), (30, 52), (92, 52), (70, 78), (8, 78)], 4)
         d.rectangle([34 * f, 14 * f, 74 * f, 46 * f], outline=c, width=int(6 * f))
+    elif name == "skizze_linie":
+        L([(8, 78), (30, 52), (92, 52), (70, 78), (8, 78)], 4)
+        L([(30, 46), (74, 14)], 7)
+        d.ellipse([24 * f, 40 * f, 36 * f, 52 * f], fill=c)
+        d.ellipse([68 * f, 8 * f, 80 * f, 20 * f], fill=c)
     elif name == "skizze_poly":
         L([(8, 78), (30, 52), (92, 52), (70, 78), (8, 78)], 4)
         L([(30, 46), (46, 12), (74, 30), (62, 46), (30, 46)], 6)
@@ -247,7 +252,7 @@ NAMEN = ("auswahl", "linie", "polylinie", "kreis", "bogen", "ellipse", "spline",
          "ansicht3d", "wuerfel", "k_quader", "k_zylinder", "k_kegel", "k_pyramide",
          "k_kugel", "extrudieren", "loch", "block3d", "aufloesen3d", "persp",
          "einpassen3d", "iso3d", "hoehe3d", "raster3d", "flaeche3d", "skizze_kreis",
-         "skizze_rechteck", "skizze_poly", "ebene0", "bem3d", "mass3d")
+         "skizze_rechteck", "skizze_linie", "skizze_poly", "ebene0", "bem3d", "mass3d")
 
 
 def icon_png(name, farbe, groesse=26):
