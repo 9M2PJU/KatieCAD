@@ -39,7 +39,7 @@ def platte_vorschlag(breite, hoehe):
 
 
 def schrank_bauen(breite, hoehe, tiefe, x=0.0, y=0.0, z=0.0, platte=None, sockel=0.0,
-                  tuer=False, seite_l=False, seite_r=False):
+                  tuer=False, seite_l=False, seite_r=False, griff_links=False):
     """Cabinet as a 3D block. Front towards -Y, rear wall at y + depth.
     platte = (width, height) of the mounting plate or None; sockel = plinth height (0 = none).
     (x, y, z) is the base corner of the whole block (floor level)."""
@@ -57,11 +57,15 @@ def schrank_bauen(breite, hoehe, tiefe, x=0.0, y=0.0, z=0.0, platte=None, sockel
     if tuer:                       # door: thin panel on the front face (inside the cabinet depth)
         teile.append(_bez(quader(x + SPALT, y, x + breite - SPALT, y + TUER_DICKE,
                                  z0 + SPALT, hoehe - 2 * SPALT), "Tür"))
-    if tuer:                       # rectangular handle plate with square lock insert, right side
+    if tuer:                       # rectangular handle plate with square lock insert, right (default) or left
         gb = min(40.0, breite * 0.15)
         gh = min(120.0, hoehe * 0.3)
-        gx2 = x + breite - SPALT - 20.0
-        gx1 = max(x + SPALT + 5.0, gx2 - gb)
+        if griff_links:
+            gx1 = x + SPALT + 20.0
+            gx2 = min(x + breite - SPALT - 5.0, gx1 + gb)
+        else:
+            gx2 = x + breite - SPALT - 20.0
+            gx1 = max(x + SPALT + 5.0, gx2 - gb)
         gz = z0 + min(hoehe * 0.55, hoehe - gh - 20.0) - gh / 2.0
         teile.append(_bez(quader(gx1, y - GRIFF_DICKE, gx2, y, gz, gh), "Türgriff"))
         sq = min(24.0, gb * 0.6)
