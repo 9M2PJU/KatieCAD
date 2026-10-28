@@ -125,6 +125,25 @@
         "sichtbar": false
       },
       {
+        "typ": "attdef",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": null,
+        "x": -10.0,
+        "y": 5.0,
+        "inhalt": "<STATION>",
+        "hoehe": 2.0,
+        "winkel": 0.0,
+        "schriftart": "Arial",
+        "einfuegepunkt": "unten_links",
+        "tag": "STATION",
+        "prompt": "Steuerung / Station",
+        "wert": "",
+        "sichtbar": false
+      },
+      {
         "typ": "maske",
         "layer": "0",
         "farbe": "#c29bff",
