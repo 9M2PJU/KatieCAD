@@ -13,7 +13,7 @@ from tkinter import messagebox
 
 from katiecad.model.core import (
     ZEICHNUNGSFORMATE, MASSSTAEBE, LINIENTYPEN, PdfSeite,
-    Text, Bemassung, Viewport,
+    Text, Bemassung, Viewport, schrift_fett,
     Linie, Rechteck, Polylinie, Kreis, Bogen,
     BlockReferenz, Schraffur, Bild, Querverweis, Verbindungspunkt,
     Verbindung, ElektroMaske, Klemme, Koordinatenfeld, Kabel,
@@ -178,7 +178,8 @@ def _pdf_element_roh(seite, el, tf, zs, farbig, layers, einh_faktor, dezimalkomm
             baseline_x = ux_mm + 0.3 * hoehe * ey[0]
             baseline_y = uy_mm + 0.3 * hoehe * ey[1]
             ox, oy = tf(baseline_x, baseline_y)
-            seite.text(ox, oy, inhalt, hoehe * zs, winkel, farbe, mitte=False)
+            seite.text(ox, oy, inhalt, hoehe * zs, winkel, farbe, mitte=False,
+                       fett=schrift_fett(fam))
 
 
 def _pdf_viewport(seite, vp, elemente, layers, farbig, rahmen,
