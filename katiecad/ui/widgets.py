@@ -99,3 +99,50 @@ def farb_swatch(parent, farbe, command, width=4):
                    highlightbackground=FARBEN["cyan"])
     lbl.bind("<Button-1>", lambda e: command())
     return lbl
+
+
+class Tooltip:
+    """Small help text below a widget after the mouse rested on it."""
+
+    def __init__(self, widget, text, verzoegerung=500):
+        self.widget, self.text, self.verz = widget, text, verzoegerung
+        self._id = None
+        self._fenster = None
+        widget.bind("<Enter>", self._planen, add="+")
+        widget.bind("<Leave>", self._weg, add="+")
+        widget.bind("<ButtonPress>", self._weg, add="+")
+
+    def _planen(self, _e=None):
+        self._weg()
+        self._id = self.widget.after(self.verz, self._zeigen)
+
+    def _zeigen(self):
+        self._id = None
+        if self._fenster is not None or not self.text:
+            return
+        try:
+            x = self.widget.winfo_rootx() + 4
+            y = self.widget.winfo_rooty() + self.widget.winfo_height() + 4
+            w = tk.Toplevel(self.widget)
+            w.wm_overrideredirect(True)
+            w.wm_geometry("+%d+%d" % (x, y))
+            tk.Label(w, text=self.text, bg=FARBEN["bg_hell"], fg=FARBEN["text_hell"],
+                     bd=0, padx=7, pady=3, highlightthickness=1,
+                     highlightbackground=FARBEN["cyan_dunkel"]).pack()
+            self._fenster = w
+        except tk.TclError:
+            self._fenster = None
+
+    def _weg(self, _e=None):
+        if self._id is not None:
+            try:
+                self.widget.after_cancel(self._id)
+            except tk.TclError:
+                pass
+            self._id = None
+        if self._fenster is not None:
+            try:
+                self._fenster.destroy()
+            except tk.TclError:
+                pass
+            self._fenster = None
