@@ -190,4 +190,48 @@ _f0 = S.flaeche_pick(_el0, _k0, 400, 300, _q0[0], _q0[1])
 check(_f0 is not None and abs(G.ebene_basis(_f0[1])[2][1]) > 0.99, "Fläche an Ecke in Frontansicht")
 check({"menu.ansicht.tb_vor", "menu.ansicht.tb_zurueck"} <= set(I.TEXTE["de"]) & set(I.TEXTE["en"]), "tb Reihenfolge i18n")
 check(callable(TD.ToolbarDockMixin.toolbar_vor) and callable(TD.ToolbarDockMixin.toolbar_verschieben), "tb Reihenfolge")
+
+# ---- round 4: rotate, round edges, dashed cut-outs, selection window, host by position ----
+_k = core.quader(0, 0, 40, 30, 0, 20)
+_k.loch_hinzufuegen(20, 15, 4, None)
+_k.drehen3((20, 15, 10), (1, 0, 0), 90)
+_b = _k.bbox3()
+check(abs(_b[2] - -5) < 1e-6 and abs(_b[5] - 25) < 1e-6 and len(_k.loecher) == 0 and len(_k.ausschnitte) == 1,
+      "3D drehen um X (Loch wird Ausschnitt)")
+_g = core.Gruppe3D([core.quader(0, 0, 10, 10, 0, 10), core.quader(20, 0, 30, 10, 0, 10)])
+check(S.drehen3d([_g], (0, 0, 0), (0, 0, 1), 90) == 1 and abs(_g.bbox3()[0] - -10) < 1e-6, "Gruppe drehen um Z")
+check(S.drehen3d([Rechteck(0, 0, 10, 10)], (0, 0, 0), (1, 0, 0), 90) == 0, "2D nur um Z drehbar")
+_r = core.quader(0, 0, 40, 30, 0, 20)
+check(_r.kanten_abrunden(5) and sum(_r.glatt) == 20 and len(_r.profil) == 28, "Kanten abrunden")
+_d = _r.to_dict(); _d.pop("typ", None)
+check(core.Koerper3D(**_d).glatt == _r.glatt, "glatt Round-Trip")
+check(not core.zylinder(0, 0, 10, 10, 20).kanten_abrunden(2), "Zylinder nicht abrundbar")
+_p, _gl = G.profil_abrunden([(0, 0), (10, 0), (10, 10), (0, 10)], 100)
+check(len(_p) == 28, "Radius wird begrenzt")
+_h = core.quader(0, 0, 40, 30, 0, 20)
+_h.ausschnitt_hinzufuegen((10, 0, 20, 1, 0, 0, 0, 0, 1), [(0, 0), (5, 0), (5, 5)], None, False)
+_typen = {l.linientyp for l in _h.aufgeloest()}
+check("Strichlinie (verdeckt)" in _typen, "Durchbruch an Seitenfläche in 2D gestrichelt")
+_h2 = core.quader(0, 0, 40, 30, 0, 20)
+_h2.ausschnitt_hinzufuegen((10, 10, 20, 1, 0, 0, 0, 1, 0), [(0, 0), (5, 0), (5, 5)], None, False)
+check("Strichlinie (verdeckt)" not in {l.linientyp for l in _h2.aufgeloest()}, "Durchbruch von oben bleibt voll")
+_ka = G.Kamera(yaw=-45.0, pitch=35.264)
+_els = [core.quader(0, 0, 10, 10, 0, 10), core.quader(100, 0, 110, 10, 0, 10)]
+_pp = [_ka.proj(p, 0, 0) for p in ((0, 0, 0), (10, 10, 10), (10, 0, 0), (0, 10, 10))]
+_rect = (min(q[0] for q in _pp) - 2, min(q[1] for q in _pp) - 2, max(q[0] for q in _pp) + 2, max(q[1] for q in _pp) + 2)
+check(S.auswahl_im_rahmen(_els, _ka, 0, 0, _rect, False) == [_els[0]], "Rahmen komplett")
+check(S.auswahl_im_rahmen(_els, _ka, 0, 0, _rect, True) == [_els[0]], "Rahmen berührt")
+_a = core.quader(0, 0, 40, 30, 0, 10); _b2 = core.quader(60, 0, 100, 30, 0, 10)
+_sk = core.Skizze3D("kreis", (0, 0, 10, 1, 0, 0, 0, 1, 0), [80, 15, 5])
+S.skizze_in_ausschnitt([_a, _b2, _sk], _sk, None)
+check(len(_a.ausschnitte) == 0 and len(_b2.ausschnitte) == 1, "Loch im richtigen Körper bei gleicher Ebene")
+for k in ("tb.wz.drehen3d", "tb.wz.abrunden3d", "tb.wz.manip_pivot", "menu.3d.drehen", "menu.3d.abrunden",
+          "menu.3d.pivot", "menu.3d.pivot_zentrum", "menu.bearbeiten.manip_pivot", "menu.bearbeiten.manip_zentrum",
+          "msg.manip.pivot", "msg.manip.pivot_ok", "msg.manip.pivot_zentriert", "d3.modus.pivot", "d3.msg.pivot_ok",
+          "d3.drehen.titel", "d3.drehen.achse", "d3.drehen.winkel", "d3.msg.gedreht", "d3.msg.nichts_drehbar",
+          "d3.abrunden.titel", "d3.abrunden.radius", "d3.msg.abgerundet", "d3.msg.nichts_abrundbar",
+          "d3.msg.markiert"):
+    check(k in I.TEXTE["de"] and k in I.TEXTE["en"], k)
+check(core.BEFEHLE.get("3DDREHEN") == "3d:drehen" and core.BEFEHLE.get("3DABRUNDEN") == "3d:abrunden"
+      and core.BEFEHLE.get("3DPIVOT") == "3d:pivot", "Befehle drehen/abrunden/pivot")
 print(f"test_3d - {ok} Checks bestanden")
