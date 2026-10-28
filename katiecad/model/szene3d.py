@@ -221,3 +221,29 @@ def extrudieren(elemente, ziele, hoehe, z0=0.0, original_behalten=False):
             elemente.append(k)
         neu.append(k)
     return neu
+
+
+# --------------------------------------------------------------------------
+# Holes (bores)
+# --------------------------------------------------------------------------
+def loch_ziele(auswahl):
+    """Prism bodies of the selection (also inside 3D blocks) that can get a hole."""
+    out = []
+    for el in auswahl:
+        if ist_3d(el):
+            out.extend(k for k in el.koerper() if k.art == "prisma")
+    return out
+
+
+def loch_oben_z(koerper):
+    return max(koerper.z0, koerper.z0 + koerper.hoehe)
+
+
+def loch_setzen(koerper, x, y, r, tiefe=None):
+    """Adds a hole; False if the centre lies outside the base polygon."""
+    if koerper.art != "prisma" or r <= 0:
+        return False
+    if koerper.profil and not G.punkt_in_polygon(x, y, koerper.profil):
+        return False
+    koerper.loch_hinzufuegen(x, y, r, tiefe)
+    return True
