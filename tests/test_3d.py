@@ -176,7 +176,7 @@ _ln.spiegeln(0, 0, 1, 0)
 check(_ln.daten == [0, 0, 30, -40], "Linie spiegeln")
 _d = core.Skizze3D("linie", G.BODEN_EBENE, [1, 2, 3, 4]).to_dict(); _d.pop("typ", None)
 check(core.Skizze3D(**_d).daten == [1, 2, 3, 4] and core.Skizze3D(**_d).form == "linie", "Linie Round-Trip")
-check(TD.LEISTEN == ("seitenleiste", "werkzeug", "elektro", "3d") and set(TD.CONFIG_KEY) == set(TD.LEISTEN),
+check(TD.LEISTEN == ("werkzeug", "elektro", "3d") and set(TD.CONFIG_KEY) == set(TD.LEISTEN),
       "drei Werkzeugleisten")
 for k in ("menu.ansicht.tb_werkzeug", "menu.ansicht.tb_elektro", "menu.ansicht.tb_3d", "d3.vp.waehlen",
           "d3.vp.an", "d3.fang.end", "d3.fang.mitte", "d3.fang.zentrum", "d3.fang.raster",
@@ -249,6 +249,8 @@ _td = _t.to_dict(); _td.pop("typ", None)
 check(core.Text3D(**_td).p == (1.0, 2.0, 3.0) and _t.aufgeloest()[0].inhalt == "Hallo", "Text3D Round-Trip/2D-Text")
 _t.verschieben(1, 1, 1); check(_t.p == (2.0, 3.0, 4.0), "Text3D verschieben")
 check(isinstance(_t, S.RAUM_TYPEN) and S.ist_3d(_t) is False, "Text3D ist Raumelement")
-for k in ("d3.modus.text", "d3.modus.messen", "d3.msg.mess_ok", "d3.msg.nur_2d", "menu.ansicht.tb_seitenleiste"):
+for k in ("d3.modus.text", "d3.modus.messen", "d3.msg.mess_ok", "d3.msg.nur_2d"):
+    check(k in I.TEXTE["de"] and k in I.TEXTE["en"], k)
+for k in ("dlg.prop.breite", "dlg.prop.hoehe", "dlg.prop.anker", "dlg.prop.anker_ecke", "dlg.prop.anker_mitte"):
     check(k in I.TEXTE["de"] and k in I.TEXTE["en"], k)
 print(f"test_3d - {ok} Checks bestanden")
