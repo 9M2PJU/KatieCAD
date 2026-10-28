@@ -59,7 +59,8 @@ def koerper_bauen(art, par, x, y, z):
         platte = (par["pb"], par["ph"]) if par.get("platte") else None
         return SCHR.schrank_bauen(par["breite"], par["hoehe"], par["tiefe"], x, y, z,
                                   platte, par.get("sockel", 0.0), bool(par.get("tuer")),
-                                  bool(par.get("seite_l")), bool(par.get("seite_r")))
+                                  bool(par.get("seite_l")), bool(par.get("seite_r")),
+                                  bool(par.get("griff_links")))
     raise ValueError(art)
 
 
@@ -108,6 +109,12 @@ class SchrankDialog(tk.Toplevel):
             ttk.Checkbutton(f, text=tr("d3.schrank." + key), variable=var
                             ).grid(row=r, column=0, columnspan=2, sticky=tk.W, pady=2)
             r += 1
+        ttk.Label(f, text=tr("d3.schrank.griff")).grid(row=r, column=0, sticky=tk.W, pady=3)
+        self.griff = tk.StringVar(value=tr("d3.schrank.rechts"))
+        ttk.Combobox(f, textvariable=self.griff, width=12, state="readonly",
+                     values=[tr("d3.schrank.rechts"), tr("d3.schrank.links")]
+                     ).grid(row=r, column=1, sticky=tk.W, padx=8, pady=3)
+        r += 1
         ttk.Label(f, text=tr("d3.schrank.sockel")).grid(row=r, column=0, sticky=tk.W, pady=3)
         self.sockel = tk.StringVar(value=tr("d3.schrank.ohne"))
         ttk.Combobox(f, textvariable=self.sockel, width=12, state="readonly",
@@ -148,6 +155,7 @@ class SchrankDialog(tk.Toplevel):
                 raise ValueError
             par["platte"] = 1 if self.platte.get() else 0
             par["tuer"] = 1 if self.tuer.get() else 0
+            par["griff_links"] = 1 if self.griff.get() == tr("d3.schrank.links") else 0
             par["seite_l"] = 1 if self.seite_l.get() else 0
             par["seite_r"] = 1 if self.seite_r.get() else 0
             if par["platte"] and (par["pb"] >= par["breite"] or par["ph"] >= par["hoehe"]):
