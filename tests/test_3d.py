@@ -157,4 +157,30 @@ for spr in ("de", "en"):
     for n in ("raster3d", "flaeche3d", "skizze_kreis", "skizze_rechteck", "skizze_poly", "ebene0",
               "bem3d", "mass3d"):
         check("tb.wz." + n in T, "tooltip " + n)
+
+# ---- snap candidates, line sketch, toolbars per department (v1.1.0, round 3) ----
+from katiecad.model.core import Kreis as _Kr, Linie as _Li
+_kand = S.fang_kandidaten([core.quader(0, 0, 40, 30, 0, 20), _Kr(5, 5, 3), _Li(0, 0, 10, 0)])
+_arten = {a for _p, a in _kand}
+check(_arten == {"end", "mitte", "zentrum"}, "Fangarten end/mitte/zentrum")
+check(any(a == "zentrum" and p == (5.0, 5.0, 0.0) for p, a in _kand), "Kreis-Zentrum als Fangpunkt")
+check(any(a == "mitte" and p == (20.0, 0.0, 0.0) for p, a in _kand), "Kantenmitte als Fangpunkt")
+_kam = G.Kamera(yaw=-45.0, pitch=35.264)
+_q = _kam.proj((40.0, 0.0, 20.0), 400, 300)
+_r = S.fang_suche([core.quader(0, 0, 40, 30, 0, 20)], _kam, 400, 300, _q[0] + 3, _q[1] + 2)
+check(_r is not None and _r[1] == "end" and _r[0] == (40.0, 0.0, 20.0), "fang_suche Ecke")
+_ln = core.Skizze3D("linie", G.BODEN_EBENE, [0, 0, 30, 40])
+check(len(_ln.profil()) == 2 and not _ln.geschlossen() and not S.extrudierbar(_ln), "Linien-Skizze")
+check(len(_ln.aufgeloest()) == 1 and S.zuege3(_ln)[0][1] is False, "Linie offen")
+_ln.spiegeln(0, 0, 1, 0)
+check(_ln.daten == [0, 0, 30, -40], "Linie spiegeln")
+_d = core.Skizze3D("linie", G.BODEN_EBENE, [1, 2, 3, 4]).to_dict(); _d.pop("typ", None)
+check(core.Skizze3D(**_d).daten == [1, 2, 3, 4] and core.Skizze3D(**_d).form == "linie", "Linie Round-Trip")
+check(TD.LEISTEN == ("werkzeug", "elektro", "3d") and set(TD.CONFIG_KEY) == set(TD.LEISTEN),
+      "drei Werkzeugleisten")
+for k in ("menu.ansicht.tb_werkzeug", "menu.ansicht.tb_elektro", "menu.ansicht.tb_3d", "d3.vp.waehlen",
+          "d3.vp.an", "d3.fang.end", "d3.fang.mitte", "d3.fang.zentrum", "d3.fang.raster",
+          "d3.modus.linie", "d3.msg.skizze_linie", "tb.wz.skizze_linie"):
+    for T in (I.TEXTE["de"], I.TEXTE["en"]):
+        check(k in T, k)
 print(f"test_3d - {ok} Checks bestanden")
