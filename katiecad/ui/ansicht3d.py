@@ -17,7 +17,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 
 from katiecad.common.i18n import tr
-from katiecad.model.core import (FARBEN, UI_SCHRIFT, Koerper3D, Gruppe3D, Skizze3D, Bemassung3D,
+from katiecad.model.core import (FARBEN, UI_SCHRIFT, Koerper3D, Gruppe3D, Skizze3D, Bemassung3D, Viewport,
                                  quader, zylinder, kegel, pyramide, kugel)
 from katiecad.model import geom3d as G
 from katiecad.model import szene3d as S
@@ -182,7 +182,8 @@ def _vorzeichen(k):
 
 
 class Ansicht3D(tk.Frame):
-    MODI = ("flaeche", "kreis", "rechteck", "poly", "bem")
+    MODI = ("flaeche", "linie", "kreis", "rechteck", "poly", "bem")
+    SKIZZEN = ("linie", "kreis", "rechteck", "poly")
 
     def __init__(self, app):
         super().__init__(app.root, bg=FARBEN["bg_mittel"])
@@ -199,6 +200,7 @@ class Ansicht3D(tk.Frame):
         self._modus = None
         self._skiz = None             # sketch / dimension in progress
         self._maus = None
+        self._hover = None
         self._spaeter_id = None
         self.wert_var = tk.StringVar()
         self.info_var = _Info(app)
@@ -225,6 +227,7 @@ class Ansicht3D(tk.Frame):
         a._umschalt_knopf(bar, "hoehe3d", farbe, self.hoehe_var, lambda: None)
         ttk.Separator(bar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=8)
         a._befehl_knopf(bar, "flaeche3d", farbe, lambda: self.modus_setzen("flaeche"))
+        a._befehl_knopf(bar, "skizze_linie", farbe, lambda: self.modus_setzen("linie"))
         a._befehl_knopf(bar, "skizze_kreis", farbe, lambda: self.modus_setzen("kreis"))
         a._befehl_knopf(bar, "skizze_rechteck", farbe, lambda: self.modus_setzen("rechteck"))
         a._befehl_knopf(bar, "skizze_poly", farbe, lambda: self.modus_setzen("poly"))
@@ -342,6 +345,18 @@ class Ansicht3D(tk.Frame):
             kw["dash"] = dash
         self.canvas.create_line(seg[0][0], seg[0][1], seg[1][0], seg[1][1], **kw)
 
+    def _punktiert(self):
+        try:
+            return bool(self.app.raster_punktiert.get())
+        except Exception:
+            return False
+
+    def _punkt(self, p, farbe, tag="szene"):
+        q = self.kamera.proj(p, *self._mitte())
+        if q is not None:
+            self.canvas.create_rectangle(q[0] - 1, q[1] - 1, q[0] + 1, q[1] + 1, fill=farbe,
+                                         outline=farbe, tags=tag)
+
     def _polylinie(self, pts, farbe, breite=1, dash=None, tag="szene", geschlossen=False):
         pts = list(pts) + ([pts[0]] if geschlossen and len(pts) > 2 else [])
         for a, b in zip(pts, pts[1:]):
@@ -401,6 +416,7 @@ class Ansicht3D(tk.Frame):
         if self.wuerfel_var.get():
             self._wuerfel_zeichnen()
         self._manip_zeichnen()
+        self._hover_zeichnen()
 
     def _achsenkreuz(self):
         L = 60.0 / self.kamera.skala
@@ -424,12 +440,17 @@ class Ansicht3D(tk.Frame):
         farbe = "#2a2140"
         i0, i1 = int(math.floor((gx - radius) / schritt)), int(math.ceil((gx + radius) / schritt))
         j0, j1 = int(math.floor((gy - radius) / schritt)), int(math.ceil((gy + radius) / schritt))
-        for i in range(i0, i1 + 1):
-            self._linie((i * schritt, j0 * schritt, 0.0), (i * schritt, j1 * schritt, 0.0), farbe,
-                        1, None, "boden")
-        for j in range(j0, j1 + 1):
-            self._linie((i0 * schritt, j * schritt, 0.0), (i1 * schritt, j * schritt, 0.0), farbe,
-                        1, None, "boden")
+        if self._punktiert():
+            for i in range(i0, i1 + 1):
+                for j in range(j0, j1 + 1):
+                    self._punkt((i * schritt, j * schritt, 0.0), "#5b4a8a", "boden")
+        else:
+            for i in range(i0, i1 + 1):
+                self._linie((i * schritt, j0 * schritt, 0.0), (i * schritt, j1 * schritt, 0.0),
+                            farbe, 1, None, "boden")
+            for j in range(j0, j1 + 1):
+                self._linie((i0 * schritt, j * schritt, 0.0), (i1 * schritt, j * schritt, 0.0),
+                            farbe, 1, None, "boden")
         self._achsenkreuz()
 
     def _ebene_zeichnen(self):
@@ -448,12 +469,17 @@ class Ansicht3D(tk.Frame):
                 r *= 2
             i0, i1 = int(math.floor(min(xs) / r)), int(math.ceil(max(xs) / r))
             j0, j1 = int(math.floor(min(ys) / r)), int(math.ceil(max(ys) / r))
-            for i in range(i0, i1 + 1):
-                self._linie(G.ebene_punkt(e, i * r, j0 * r), G.ebene_punkt(e, i * r, j1 * r),
-                            "#6b5a1f", 1, (2, 3), "ebene")
-            for j in range(j0, j1 + 1):
-                self._linie(G.ebene_punkt(e, i0 * r, j * r), G.ebene_punkt(e, i1 * r, j * r),
-                            "#6b5a1f", 1, (2, 3), "ebene")
+            if self._punktiert():
+                for i in range(i0, i1 + 1):
+                    for j in range(j0, j1 + 1):
+                        self._punkt(G.ebene_punkt(e, i * r, j * r), "#a8923a", "ebene")
+            else:
+                for i in range(i0, i1 + 1):
+                    self._linie(G.ebene_punkt(e, i * r, j0 * r), G.ebene_punkt(e, i * r, j1 * r),
+                                "#6b5a1f", 1, (2, 3), "ebene")
+                for j in range(j0, j1 + 1):
+                    self._linie(G.ebene_punkt(e, i0 * r, j * r), G.ebene_punkt(e, i1 * r, j * r),
+                                "#6b5a1f", 1, (2, 3), "ebene")
         L = 14.0 / self.kamera.skala
         o = tuple(e[:3])
         self._linie(o, G.ebene_punkt(e, L, 0), ACHSEN_FARBE["x"], 2, None, "ebene")
@@ -564,6 +590,7 @@ class Ansicht3D(tk.Frame):
 
     def ebene_zuruecksetzen(self):
         self.zustand["plane"] = None
+        self.zustand["auto"] = False
         self.info_var.set(tr("d3.msg.ebene_boden"))
         self.zeichne()
 
@@ -580,27 +607,109 @@ class Ansicht3D(tk.Frame):
             pass
         return None
 
-    def _lokal_punkt(self, e):
-        """Local point on the work plane under the mouse (vertex snap, then grid)."""
-        el = self._ebene()
-        mx, my = self._mitte()
-        fp = S.fang_punkt([x for x in self.app.elemente if self._sichtbar(x)], self.kamera,
-                          mx, my, e.x, e.y)
-        if fp is not None:
-            l = G.ebene_lokal(el, fp)
-            if abs(l[2]) < 1e-3:
-                return (l[0], l[1])
-        return S.punkt_auf_ebene(self.kamera, mx, my, e.x, e.y, el, self._raster_fang())
+    def _sichtbare(self):
+        return [x for x in self.app.elemente if self._sichtbar(x)]
 
-    def _raum_punkt(self, e):
-        """3D point for dimensions: vertex snap, else the work plane."""
+    def _flaeche_unter(self, e):
+        """Face of a body under the mouse -> (ebene, pts) or None."""
+        r = S.flaeche_pick(self._sichtbare(), self.kamera, *self._mitte(), e.x, e.y)
+        return (r[1], r[2]) if r else None
+
+    def _fang_ebene(self, e, ebene):
+        """Snap in the plane `ebene` -> ((x, y), kind, 3D point) or None."""
         mx, my = self._mitte()
-        fp = S.fang_punkt([x for x in self.app.elemente if self._sichtbar(x)], self.kamera,
-                          mx, my, e.x, e.y)
+
+        def in_ebene(p):
+            return abs(G.ebene_lokal(ebene, p)[2]) < 1e-3
+
+        fp = S.fang_suche(self._sichtbare(), self.kamera, mx, my, e.x, e.y, 12.0, in_ebene)
+        if fp is not None:
+            l = G.ebene_lokal(ebene, fp[0])
+            return (l[0], l[1]), fp[1], fp[0]
+        p = S.punkt_auf_ebene(self.kamera, mx, my, e.x, e.y, ebene, self._raster_fang())
+        if p is None:
+            return None
+        return p, "raster", G.ebene_punkt(ebene, p[0], p[1])
+
+    def _fang_raum(self, e):
+        """(3D point, kind) for dimensions: object snap anywhere, else the face under the
+        mouse, else the work plane."""
+        mx, my = self._mitte()
+        fp = S.fang_suche(self._sichtbare(), self.kamera, mx, my, e.x, e.y)
         if fp is not None:
             return fp
-        l = S.punkt_auf_ebene(self.kamera, mx, my, e.x, e.y, self._ebene(), self._raster_fang())
-        return G.ebene_punkt(self._ebene(), l[0], l[1]) if l else None
+        fl = self._flaeche_unter(e) if self.zustand.get("auto", True) else None
+        ebene = fl[0] if fl else self._ebene()
+        r = self._fang_ebene(e, ebene)
+        return (r[2], r[1]) if r else None
+
+    def _lokal_punkt(self, e, ebene=None):
+        """Local point on the work plane under the mouse (object snap, then grid)."""
+        r = self._fang_ebene(e, ebene or self._ebene())
+        return r[0] if r else None
+
+    def _raum_punkt(self, e):
+        r = self._fang_raum(e)
+        return r[0] if r else None
+
+    def _hover_berechnen(self):
+        """Face highlight + snap marker under the mouse (drawing modes only)."""
+        e, m = self._maus, self._modus
+        self._hover = None
+        if e is None or m not in self.MODI:
+            return
+        h = {"fang": None, "flaeche": None}
+        erste = self._skiz is None
+        if m == "bem":
+            h["fang"] = self._fang_raum(e)
+            fl = self._flaeche_unter(e) if self.zustand.get("auto", True) else None
+            h["flaeche"] = fl[1] if fl else None
+        elif m == "flaeche":
+            fl = self._flaeche_unter(e)
+            h["flaeche"] = fl[1] if fl else None
+        else:
+            ebene = self._ebene()
+            if erste and self.zustand.get("auto", True):
+                fl = self._flaeche_unter(e)
+                if fl:
+                    ebene = fl[0]
+                    h["flaeche"] = fl[1]
+            r = self._fang_ebene(e, ebene)
+            if r:
+                h["fang"] = (r[2], r[1])
+        self._hover = h
+
+    def _hover_zeichnen(self):
+        c = self.canvas
+        c.delete("hover")
+        self._hover_berechnen()
+        h = self._hover
+        if not h:
+            return
+        if h["flaeche"]:
+            self._polylinie(h["flaeche"], FARBEN["cyan"], 3, None, "hover", True)
+        if h["fang"]:
+            p, art = h["fang"]
+            q = self.kamera.proj(p, *self._mitte())
+            if q is None:
+                return
+            x, y = q[0], q[1]
+            f = FARBEN["gelb"]
+            if art == "end":
+                c.create_rectangle(x - 5, y - 5, x + 5, y + 5, outline=f, width=2, tags="hover")
+            elif art == "mitte":
+                c.create_polygon(x, y - 6, x - 6, y + 5, x + 6, y + 5, outline=f, fill="",
+                                 width=2, tags="hover")
+            elif art == "zentrum":
+                c.create_oval(x - 6, y - 6, x + 6, y + 6, outline=f, width=2, tags="hover")
+                c.create_line(x - 9, y, x + 9, y, fill=f, tags="hover")
+                c.create_line(x, y - 9, x, y + 9, fill=f, tags="hover")
+            else:
+                f = FARBEN["cyan"]
+                c.create_line(x - 5, y, x + 5, y, fill=f, width=2, tags="hover")
+                c.create_line(x, y - 5, x, y + 5, fill=f, width=2, tags="hover")
+            c.create_text(x + 10, y - 12, text=tr("d3.fang." + art), fill=f, anchor="w",
+                          font=(UI_SCHRIFT, 8), tags="hover")
 
     def _stil(self):
         try:
@@ -621,15 +730,20 @@ class Ansicht3D(tk.Frame):
                 return
             _k, ebene, pts = r
             self.zustand["plane"] = {"ebene": ebene, "pts": pts}
+            self.zustand["auto"] = True
             self._modus_ende()
             self.info_var.set(tr("d3.msg.ebene_gesetzt"))
             self.zeichne()
-        elif m in ("kreis", "rechteck", "poly"):
+        elif m in self.SKIZZEN:
+            sk = self._skiz
+            if sk is None and self.zustand.get("auto", True):
+                fl = self._flaeche_unter(e)           # draw directly on the face under the mouse
+                if fl:
+                    self.zustand["plane"] = {"ebene": fl[0], "pts": fl[1]}
             p = self._lokal_punkt(e)
             if p is None:
                 self.info_var.set(tr("d3.msg.keine_ebene"))
                 return
-            sk = self._skiz
             if sk is None:
                 self._skiz = {"form": m, "pts": [p], "maus": p}
                 self.info_var.set(tr("d3.msg.skizze_" + m))
@@ -637,9 +751,11 @@ class Ansicht3D(tk.Frame):
                 r = math.hypot(p[0] - sk["pts"][0][0], p[1] - sk["pts"][0][1])
                 if r > 1e-6:
                     self._skizze_fertig("kreis", [sk["pts"][0][0], sk["pts"][0][1], r])
-            elif m == "rechteck":
+            elif m in ("rechteck", "linie"):
                 q = sk["pts"][0]
-                if abs(p[0] - q[0]) > 1e-6 and abs(p[1] - q[1]) > 1e-6:
+                if m == "linie" and math.hypot(p[0] - q[0], p[1] - q[1]) > 1e-6:
+                    self._skizze_fertig("linie", [q[0], q[1], p[0], p[1]])
+                elif m == "rechteck" and abs(p[0] - q[0]) > 1e-6 and abs(p[1] - q[1]) > 1e-6:
                     self._skizze_fertig("rechteck", [q[0], q[1], p[0], p[1]])
             else:
                 sk["pts"].append(p)
@@ -739,6 +855,9 @@ class Ansicht3D(tk.Frame):
             r = math.hypot(p[0] - q0[0], p[1] - q0[1])
             prof = G.kreis_profil(q0[0], q0[1], r, 32)
             self._polylinie([G.ebene_punkt(e, x, y) for x, y in prof], gelb, 1, (4, 3), "vorschau", True)
+        elif sk["form"] == "linie":
+            self._linie(G.ebene_punkt(e, q0[0], q0[1]), G.ebene_punkt(e, p[0], p[1]), gelb, 1,
+                        (4, 3), "vorschau")
         elif sk["form"] == "rechteck":
             prof = G.rechteck_profil(q0[0], q0[1], p[0], p[1])
             self._polylinie([G.ebene_punkt(e, x, y) for x, y in prof], gelb, 1, (4, 3), "vorschau", True)
@@ -798,6 +917,9 @@ class Ansicht3D(tk.Frame):
 
     def on_doppel(self, e):
         if self._modus or self._platz is not None:
+            # Tk reports a fast second click as <Double-Button-1> and would not call
+            # on_klick: in drawing modes it must still count as an ordinary click.
+            self.on_klick(e)
             return
         el = S.pick([x for x in self.app.elemente if self._sichtbar(x)], self.kamera,
                     *self._mitte(), e.x, e.y)
@@ -863,6 +985,8 @@ class Ansicht3D(tk.Frame):
             self.zeichne()
         elif self._skiz is not None:
             self.zeichne()
+        elif self._modus in self.MODI:
+            self._hover_zeichnen()
 
     def _extrusion_abschliessen(self, koerper):
         """Bodies pulled downwards into the body below become pockets."""
@@ -922,7 +1046,7 @@ class Ansicht3D(tk.Frame):
         if not text:
             return
         sk = self._skiz
-        if sk and sk["form"] in ("kreis", "rechteck"):
+        if sk and sk["form"] in ("kreis", "rechteck", "linie"):
             self._skizze_wert(text, sk)
             return
         try:
@@ -961,6 +1085,13 @@ class Ansicht3D(tk.Frame):
         self.wert_var.set("")
         if sk["form"] == "kreis":
             self._skizze_fertig("kreis", [q[0], q[1], zahlen[0]])
+        elif sk["form"] == "linie":
+            m = (self._lokal_punkt(self._maus) if self._maus is not None else None) or (q[0] + 1, q[1])
+            dx, dy = m[0] - q[0], m[1] - q[1]
+            n = math.hypot(dx, dy) or 1.0
+            if n < 1e-9:
+                dx, dy, n = 1.0, 0.0, 1.0
+            self._skizze_fertig("linie", [q[0], q[1], q[0] + dx / n * zahlen[0], q[1] + dy / n * zahlen[0]])
         else:
             w = zahlen[0]
             h = zahlen[1] if len(zahlen) > 1 else zahlen[0]
@@ -1189,7 +1320,7 @@ class Ansicht3DMixin:
             self._3d_state = {"kamera": G.Kamera(), "wuerfel": tk.BooleanVar(value=True),
                               "persp": tk.BooleanVar(value=False),
                               "hoehe": tk.BooleanVar(value=False),
-                              "raster": tk.BooleanVar(value=True), "plane": None}
+                              "raster": self.raster_sichtbar, "plane": None, "auto": True}
         return self._3d_state
 
     def _3d_var_holen(self):
@@ -1203,8 +1334,39 @@ class Ansicht3DMixin:
     def ansicht3d_umschalten(self):
         self.ansicht3d_setzen(not self.ansicht3d_aktiv())
 
+    def _vp_fuer_3d(self):
+        """Viewport that the 3D switch affects in a layout: active, selected, or the only one."""
+        if self._aktiver_viewport is not None:
+            return self._aktiver_viewport
+        vps = [x for x in self.layout_elemente if isinstance(x, Viewport)]
+        sel = [x for x in vps if x in self.auswahl]
+        if sel:
+            return sel[0]
+        return vps[0] if len(vps) == 1 else None
+
+    def _ansicht3d_im_layout(self, an):
+        """In a layout the 3D switch turns the chosen viewport 3D (iso view) or back to 2D."""
+        vp = self._vp_fuer_3d()
+        if vp is None:
+            self.status.set(tr("d3.vp.waehlen"))
+            self._3d_var_holen().set(bool(getattr(self._vp_fuer_3d(), "ansicht3d", None)))
+            return
+        self._snapshot()
+        if an and not vp.ansicht3d:
+            S.vp_ansicht_setzen(vp, self.elemente, -45.0, 35.264, False)
+            self.status.set(tr("d3.vp.an"))
+        elif not an:
+            vp.ansicht3d = None
+        self._3d_var_holen().set(bool(vp.ansicht3d))
+        self.redraw()
+
     def ansicht3d_setzen(self, an):
         an = bool(an)
+        if self._ist_layout():
+            if self._ansicht3d is not None:
+                self._ansicht3d_aus_fenster()
+            self._ansicht3d_im_layout(an)
+            return
         w = self._ansicht3d
         if an and w is None:
             w = Ansicht3D(self)
@@ -1218,6 +1380,13 @@ class Ansicht3DMixin:
             w.destroy()
             self.redraw()
         self._3d_var_holen().set(an)
+
+    def _ansicht3d_aus_fenster(self):
+        w = self._ansicht3d
+        if w is not None:
+            self.canvas.pack(fill=tk.BOTH, expand=True, before=w)
+            self._ansicht3d = None
+            w.destroy()
 
     def ansicht3d_oeffnen(self):
         self.ansicht3d_setzen(True)
