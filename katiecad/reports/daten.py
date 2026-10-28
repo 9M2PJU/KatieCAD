@@ -152,7 +152,14 @@ def klemmenplan(netz, blaetter, nummer, einbauorte=None):
                                natuerlich(r["num"]) if r["num"] else (),
                                r["_blatt"], -r["_pos"][1], r["_pos"][0]))
     _bruecken(netz, zeilen)
+    # The function text is shown only at the first terminal of a run with the same text
+    letzte = {}
     for z in zeilen:
+        schl = z["_gk"]
+        if z["funktion"] and letzte.get(schl) == z["funktion"]:
+            z["funktion"] = []
+        elif z["funktion"] or schl not in letzte:
+            letzte[schl] = z["funktion"] or letzte.get(schl)
         z.pop("_kl", None)
     return zeilen
 
