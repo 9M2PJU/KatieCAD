@@ -154,3 +154,166 @@ def winkel_zwischen(c, p, q):
     a = math.degrees(math.atan2(p[1] - c[1], p[0] - c[0])) % 360.0
     b = math.degrees(math.atan2(q[1] - c[1], q[0] - c[0])) % 360.0
     return (a, b) if (b - a) % 360.0 <= 180.0 else (b, a)
+
+
+def ecken_runden(punkte, geschlossen, art, r=0.0, d1=0.0, d2=None, nur=None):
+    """Fillets or chamfers the corners of a polygon / polyline.
+
+    art: "abrunden" (radius r) or "fase" (distances d1, d2).
+    nur: index of the only corner to treat (None = all possible corners;
+    the end points of an open polyline are never treated).
+    -> (segmente, anzahl): segmente = [("l", p, q) | ("b", cx, cy, r, w0, w1)]
+    in drawing order, anzahl = number of treated corners."""
+    if d2 is None:
+        d2 = d1
+    n = len(punkte)
+    ecken = {}                                   # idx -> (t_in, t_out, daten)
+    for i in range(n):
+        if not geschlossen and (i == 0 or i == n - 1):
+            continue
+        if nur is not None and i != nur:
+            continue
+        v, a, b = punkte[i], punkte[i - 1], punkte[(i + 1) % n]
+        u1 = _einheit((a[0] - v[0], a[1] - v[1]))
+        u2 = _einheit((b[0] - v[0], b[1] - v[1]))
+        cosw = max(-1.0, min(1.0, u1[0] * u2[0] + u1[1] * u2[1]))
+        ang = math.acos(cosw)
+        if ang < 1e-6 or abs(ang - math.pi) < 1e-6:
+            continue
+        if art == "abrunden":
+            if r <= 0:
+                continue
+            t = r / math.tan(ang / 2.0)
+            ecken[i] = (t, t, (u1, u2, ang))
+        else:
+            if d1 <= 0 and d2 <= 0:
+                continue
+            ecken[i] = (d1, d2, (u1, u2, ang))
+    # drop corners that do not fit on their edges
+    geaendert = True
+    while geaendert:
+        geaendert = False
+        for i in list(ecken):
+            j = (i + 1) % n
+            if (not geschlossen and i == n - 1):
+                continue
+            L = math.hypot(punkte[j][0] - punkte[i][0], punkte[j][1] - punkte[i][1])
+            ta = ecken[i][1]
+            tb = ecken[j][0] if j in ecken else 0.0
+            if ta + tb > L + 1e-9:
+                for k in (i, j):
+                    if k in ecken:
+                        del ecken[k]
+                geaendert = True
+                break
+        # the incoming side of a corner must also fit the previous edge
+        # (handled by the loop above, which looks at every edge)
+    seg = []
+    kanten = range(n) if geschlossen else range(n - 1)
+    for i in kanten:
+        j = (i + 1) % n
+        p, q = punkte[i], punkte[j]
+        L = math.hypot(q[0] - p[0], q[1] - p[1])
+        ux, uy = ((q[0] - p[0]) / L, (q[1] - p[1]) / L) if L > 1e-12 else (0, 0)
+        a = p
+        if i in ecken:
+            a = (p[0] + ux * ecken[i][1], p[1] + uy * ecken[i][1])
+        b = q
+        if j in ecken:
+            b = (q[0] - ux * ecken[j][0], q[1] - uy * ecken[j][0])
+        if math.hypot(b[0] - a[0], b[1] - a[1]) > 1e-9:
+            seg.append(("l", a, b))
+        if j in ecken and (geschlossen or j < n - 1):
+            v = punkte[j]
+            t_in, t_out, (u1, u2, ang) = ecken[j]
+            p1 = (v[0] + u1[0] * t_in, v[1] + u1[1] * t_in)
+            p2 = (v[0] + u2[0] * t_out, v[1] + u2[1] * t_out)
+            if art == "abrunden":
+                bis = _einheit((u1[0] + u2[0], u1[1] + u2[1]))
+                dm = r / math.sin(ang / 2.0)
+                m = (v[0] + bis[0] * dm, v[1] + bis[1] * dm)
+                w0 = math.degrees(math.atan2(p1[1] - m[1], p1[0] - m[0])) % 360.0
+                w1 = math.degrees(math.atan2(p2[1] - m[1], p2[0] - m[0])) % 360.0
+                if (w1 - w0) % 360.0 > 180.0:
+                    w0, w1 = w1, w0
+                seg.append(("b", m[0], m[1], r, w0, w1))
+            else:
+                seg.append(("l", p1, p2))
+    return seg, len(ecken)
+
+
+def _kreuz(a, b, p):
+    return (b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0])
+
+
+def _abstand_strecke(a, b, p):
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    L2 = dx * dx + dy * dy
+    t = 0.0 if L2 < 1e-18 else max(0.0, min(1.0, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L2))
+    return math.hypot(p[0] - (a[0] + t * dx), p[1] - (a[1] + t * dy))
+
+
+def seite_links(punkte, geschlossen, klick):
+    """+1 if `klick` lies left of the nearest edge of the polyline, else -1."""
+    n = len(punkte)
+    kanten = range(n) if geschlossen else range(n - 1)
+    best, vz = None, 1
+    for i in kanten:
+        a, b = punkte[i], punkte[(i + 1) % n]
+        d = _abstand_strecke(a, b, klick)
+        if best is None or d < best:
+            best = d
+            vz = 1 if _kreuz(a, b, klick) >= 0 else -1
+    return vz
+
+
+def versatz_polylinie(punkte, geschlossen, abstand, seite=1):
+    """Parallel polyline at `abstand` (>0) to the left (seite=+1) or right
+    (seite=-1) with mitred corners. -> list of points or None if the result
+    degenerates (an edge reverses or collapses)."""
+    pts = [tuple(p) for p in punkte]
+    # remove duplicate neighbours
+    sauber = []
+    for p in pts:
+        if not sauber or math.hypot(p[0] - sauber[-1][0], p[1] - sauber[-1][1]) > 1e-9:
+            sauber.append(p)
+    if geschlossen and len(sauber) > 1 and math.hypot(
+            sauber[0][0] - sauber[-1][0], sauber[0][1] - sauber[-1][1]) < 1e-9:
+        sauber.pop()
+    pts = sauber
+    n = len(pts)
+    if n < 2 or (geschlossen and n < 3):
+        return None
+    d = abstand * seite
+    kanten = []
+    rng = range(n) if geschlossen else range(n - 1)
+    for i in rng:
+        a, b = pts[i], pts[(i + 1) % n]
+        e = _einheit((b[0] - a[0], b[1] - a[1]))
+        nx, ny = -e[1] * d, e[0] * d
+        kanten.append(((a[0] + nx, a[1] + ny), (b[0] + nx, b[1] + ny)))
+    m = len(kanten)
+    ecken = []
+    if not geschlossen:
+        ecken.append(kanten[0][0])
+    idx = range(m) if geschlossen else range(1, m)
+    for i in idx:
+        k0, k1 = kanten[i - 1], kanten[i]
+        s = schnitt_geraden(k0[0], k0[1], k1[0], k1[1])
+        if s is None:
+            s = k1[0]
+        ecken.append(s)
+    if not geschlossen:
+        ecken.append(kanten[-1][1])
+    # for closed polygons ecken[i] belongs to vertex i (edge i-1 -> edge i)
+    # check: every new edge keeps its direction
+    for i in range(m):
+        if geschlossen:
+            a, b = ecken[i], ecken[(i + 1) % n]
+        else:
+            a, b = ecken[i], ecken[i + 1]
+        ka = kanten[i]
+        if ((b[0] - a[0]) * (ka[1][0] - ka[0][0])
+                + (b[1] - a[1]) * (ka[1][1] - ka[0][1])) <= 0:
+            return None
+    return ecken
