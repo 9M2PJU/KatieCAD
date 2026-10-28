@@ -610,6 +610,7 @@ BEFEHLE = {
     "KEGEL": "3d:neu:kegel", "CONE": "3d:neu:kegel",
     "KUGEL": "3d:neu:kugel", "SPHERE": "3d:neu:kugel",
     "EXTRUDIEREN": "3d:extrudieren", "EXT": "3d:extrudieren", "EXTRUDE": "3d:extrudieren",
+    "LOCH": "3d:loch", "BOHRUNG": "3d:loch", "HOLE": "3d:loch",
     "3DBLOCK": "3d:block", "3DAUFLOESEN": "3d:aufloesen",
     "AUSRICHTEN": "ausrichten:links", "ALIGN": "ausrichten:links",
     "AUSLINKS": "ausrichten:links", "AUSRECHTS": "ausrichten:rechts",
@@ -3682,7 +3683,7 @@ class Koerper3D(Element):
     ARTEN = ("prisma", "pyramide", "kugel")
 
     def __init__(self, art="prisma", profil=None, z0=0.0, hoehe=10.0, spitze=None,
-                 rund=False, kugel=None, bez="", **kw):
+                 rund=False, kugel=None, bez="", loecher=None, **kw):
         super().__init__("koerper3d", **kw)
         self.art = art if art in self.ARTEN else "prisma"
         self.profil = [(float(p[0]), float(p[1])) for p in (profil or [])]
@@ -3691,6 +3692,9 @@ class Koerper3D(Element):
         self.rund = bool(rund)
         self.kugel = None if kugel is None else tuple(float(v) for v in kugel)
         self.bez = bez
+        # holes (bores): (x, y, radius, depth); depth None = through all
+        self.loecher = [(float(l[0]), float(l[1]), float(l[2]),
+                         None if l[3] is None else float(l[3])) for l in (loecher or [])]
 
     # ---- geometry ---------------------------------------------------------
     def netz(self):
@@ -3700,8 +3704,22 @@ class Koerper3D(Element):
             return pyramide_netz(self.profil, self.z0, self.hoehe, self.spitze, self.rund)
         return prisma_netz(self.profil, self.z0, self.hoehe, self.rund)
 
+    def _loch_netz(self, loch):
+        x, y, r, tiefe = loch
+        oben = max(self.z0, self.z0 + self.hoehe)
+        unten = min(self.z0, self.z0 + self.hoehe)
+        h = (oben - unten) if tiefe is None else min(abs(tiefe), oben - unten)
+        return prisma_netz(kreis_profil(x, y, r, 24), oben - h, h, True)
+
     def netze(self):
-        return [self.netz()]
+        out = [self.netz()]
+        if self.art == "prisma":
+            out.extend(self._loch_netz(l) for l in self.loecher)
+        return out
+
+    def loch_hinzufuegen(self, x, y, r, tiefe=None):
+        self.loecher.append((float(x), float(y), float(r),
+                             None if tiefe is None else abs(float(tiefe))))
 
     def koerper(self):
         return [self]
@@ -3733,6 +3751,9 @@ class Koerper3D(Element):
         if self.art == "kugel" and self.kugel:
             return [Kreis(self.kugel[0], self.kugel[1], self.kugel[3], **kw)]
         out, gesehen = [], set()
+        if self.art == "prisma":
+            for (x, y, r, _t) in self.loecher:
+                out.append(Kreis(x, y, r, **kw))
         nz = self.netz()
         for (i, j) in nz.kanten:
             a, b = nz.punkte[i], nz.punkte[j]
@@ -3755,8 +3776,11 @@ class Koerper3D(Element):
             self.kugel = (self.kugel[0] + dx, self.kugel[1] + dy, self.kugel[2] + dz,
                           self.kugel[3])
         self.z0 += dz
+        self.loecher = [(x + dx, y + dy, r, t) for (x, y, r, t) in self.loecher]
 
     def drehen(self, cx, cy, winkel_deg):
+        self.loecher = [punkte_drehen(x, y, cx, cy, winkel_deg) + (r, t)
+                        for (x, y, r, t) in self.loecher]
         self.profil = [punkte_drehen(x, y, cx, cy, winkel_deg) for (x, y) in self.profil]
         if self.spitze:
             self.spitze = punkte_drehen(self.spitze[0], self.spitze[1], cx, cy, winkel_deg)
@@ -3773,8 +3797,12 @@ class Koerper3D(Element):
             self.kugel = (x, y, self.kugel[2] * f, self.kugel[3] * f)
         self.z0 *= f
         self.hoehe *= f
+        self.loecher = [_skal_pt(x, y, cx, cy, f) + (r * f, None if t is None else t * f)
+                        for (x, y, r, t) in self.loecher]
 
     def spiegeln(self, ax, ay, bx, by):
+        self.loecher = [punkt_spiegeln(x, y, ax, ay, bx, by) + (r, t)
+                        for (x, y, r, t) in self.loecher]
         self.profil = [punkt_spiegeln(x, y, ax, ay, bx, by) for (x, y) in self.profil]
         if self.spitze:
             self.spitze = punkt_spiegeln(self.spitze[0], self.spitze[1], ax, ay, bx, by)
@@ -3792,6 +3820,7 @@ class Koerper3D(Element):
         d["profil"] = [list(p) for p in self.profil]
         d["spitze"] = list(self.spitze) if self.spitze else None
         d["kugel"] = list(self.kugel) if self.kugel else None
+        d["loecher"] = [list(l) for l in self.loecher]
         return d
 
 
@@ -4184,4 +4213,3 @@ _inst(_FestMaske, skalieren=_sk_pos, spiegeln=_sp_pos)
 _inst(Kabel, skalieren=_sk_kabel, spiegeln=_sp_kabel)
 _inst(Koordinatenfeld, skalieren=_sk_kf, spiegeln=_sp_kf)
 _inst(Bild, skalieren=_sk_kf, spiegeln=_sp_kf)
-
