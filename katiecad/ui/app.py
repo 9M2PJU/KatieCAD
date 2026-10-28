@@ -426,6 +426,7 @@ class CadApp(AendernMixin, Ansicht3DMixin):
         self._laenge = None
         self._manip_an = False
         self._manip_var = tk.BooleanVar(value=False)
+        self._3d_var = tk.BooleanVar(value=False)
         self._versatz_d = 10.0
         self._ecke_param = {"r": 5.0, "d1": 5.0, "d2": 5.0}
         self.messergebnis = ""
@@ -1262,12 +1263,14 @@ class CadApp(AendernMixin, Ansicht3DMixin):
                        activebackground=FARBEN["cyan"],
                        activeforeground=FARBEN["bg_dunkel"])
         m_3d.add_command(label=tr("menu.3d.oeffnen"),
-                         command=lambda: self.ansicht3d_befehl("3d"))
+                         command=self.ansicht3d_umschalten)
         m_3d.add_separator()
         for _art in ("quader", "pyramide", "zylinder", "kegel", "kugel"):
             m_3d.add_command(label=tr("menu.3d." + _art),
                              command=lambda a=_art: self.ansicht3d_befehl("neu:" + a))
         m_3d.add_separator()
+        m_3d.add_command(label=tr("menu.3d.loch"),
+                         command=lambda: self.ansicht3d_befehl("loch"))
         m_3d.add_command(label=tr("menu.3d.extrudieren"),
                          command=lambda: self.ansicht3d_befehl("extrudieren"))
         m_3d.add_command(label=tr("menu.3d.block"),
@@ -1372,6 +1375,18 @@ class CadApp(AendernMixin, Ansicht3DMixin):
         for key in ("vpunkt", "verbindung", "querverweis",
                     "klemme", "kabel", "koordinatenfeld", "ftext", "maske"):
             self._werkzeug_knopf(tb, key, ICON_ROT)
+
+        ttk.Separator(tb, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=8)
+        ttk.Label(tb, text=tr("menu.3d") + ":", style="Title.TLabel"
+                  ).pack(side=tk.LEFT, padx=(0, 4))
+        self._umschalt_knopf(tb, "ansicht3d", FARBEN["cyan"], self._3d_var,
+                             lambda: self.ansicht3d_setzen(self._3d_var.get()))
+        for key, cmd in (("k_quader", "neu:quader"), ("k_zylinder", "neu:zylinder"),
+                         ("k_kegel", "neu:kegel"), ("k_pyramide", "neu:pyramide"),
+                         ("k_kugel", "neu:kugel"), ("extrudieren", "extrudieren"),
+                         ("loch", "loch"), ("block3d", "block"), ("aufloesen3d", "aufloesen")):
+            self._befehl_knopf(tb, key, FARBEN["cyan"],
+                               lambda c=cmd: self.ansicht3d_befehl(c))
 
         # --- Toolbar 2 ---
         tb2 = self.tb2
@@ -1825,6 +1840,8 @@ class CadApp(AendernMixin, Ansicht3DMixin):
         """Tool selection by the user: "Selection" clears the selection."""
         if self.aktives_werkzeug.get() == "auswahl":
             self.auswahl = []
+        if self.ansicht3d_aktiv() and self.aktives_werkzeug.get() != "auswahl":
+            self.ansicht3d_setzen(False)          # 2D tools work in the 2D view
         self._werkzeug_gewechselt()
 
     def _bem_art_starten(self, art):
@@ -4358,10 +4375,11 @@ class CadApp(AendernMixin, Ansicht3DMixin):
 
     def redraw(self):
         c = self.canvas
-        try:
-            self.root.after_idle(self.ansicht3d_aktualisieren)
-        except Exception:
-            pass
+        if self._ansicht3d is not None:
+            try:
+                self.root.after_idle(self.ansicht3d_aktualisieren)
+            except Exception:
+                pass
         self._bild_live = []                # keeps the PhotoImages of this frame
         try:
             self._leitungen_automatisch()
@@ -7468,7 +7486,10 @@ class CadApp(AendernMixin, Ansicht3DMixin):
             self.manipulator_umschalten()
         elif cmd.startswith("3d:"):
             teil = cmd[3:]
-            self.ansicht3d_befehl("3d" if teil == "oeffnen" else teil)
+            if teil == "oeffnen":
+                self.ansicht3d_umschalten()
+            else:
+                self.ansicht3d_befehl(teil)
         elif cmd.startswith("ausrichten:"):
             self.ausrichten(cmd.split(":", 1)[1])
         elif cmd == "abrunden":
