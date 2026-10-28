@@ -276,4 +276,9 @@ check({"Türgriff", "Schloss"} <= set(_b2), "Schrank: Türgriff + Schloss")
 check(_b2["Türgriff"][1] < 0 and _b2["Schloss"][1] < _b2["Türgriff"][1], "Griff ragt vor der Tür")
 _e = W.Ansicht3D._ecken_von([_g2])
 check(len(_e) == 8 and min(p[1] for p in _e) == 0.0, "Fangecken ohne Griff/Tür")
+_gl = SCH.schrank_bauen(600, 1800, 300, 0, 0, 0, None, 0, True, False, False, True)
+_bl = {t.bez: t.bbox3() for t in _gl.teile}
+check(_bl["Türgriff"][0] < 100 and _b2["Türgriff"][3] > 500, "Türgriff links/rechts")
+for k in ("d3.schrank.griff", "d3.schrank.rechts", "d3.schrank.links"):
+    check(k in I.TEXTE["de"] and k in I.TEXTE["en"], k)
 print(f"test_3d - {ok} Checks bestanden")
