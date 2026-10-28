@@ -4015,7 +4015,7 @@ class Gruppe3D(Element):
 class Skizze3D(Element):
     """2D shape drawn on a work plane in space (a face of a 3D body or the
     ground plane). Used to pull up (extrude) or to cut a hole / pocket."""
-    FORMEN = ("kreis", "rechteck", "polylinie")
+    FORMEN = ("kreis", "rechteck", "polylinie", "linie")
 
     def __init__(self, form="kreis", ebene=None, daten=None, **kw):
         super().__init__("skizze3d", **kw)
@@ -4033,7 +4033,12 @@ class Skizze3D(Element):
             return rechteck_profil(x1, y1, x2, y2)
         if self.form == "polylinie":
             return [(float(p[0]), float(p[1])) for p in d]
+        if self.form == "linie" and len(d) >= 4:
+            return [(float(d[0]), float(d[1])), (float(d[2]), float(d[3]))]
         return []
+
+    def geschlossen(self):
+        return self.form != "linie"
 
     def rund(self):
         return self.form == "kreis"
@@ -4045,8 +4050,9 @@ class Skizze3D(Element):
         kw = dict(layer=self.layer, farbe=self.farbe, linientyp=self.linientyp,
                   eig_farbe=self.eig_farbe, staerke=self.staerke)
         pts = self.zug3()
+        paare = zip(pts, pts[1:] + (pts[:1] if self.geschlossen() else []))
         return [Linie(a[0], a[1], b[0], b[1], **kw)
-                for a, b in zip(pts, pts[1:] + pts[:1])
+                for a, b in paare
                 if math.hypot(a[0] - b[0], a[1] - b[1]) > 1e-9]
 
     def bbox(self):
@@ -4081,7 +4087,7 @@ class Skizze3D(Element):
         d = self.daten
         if self.form == "kreis" and len(d) >= 3:
             self.daten = [d[0], -d[1], d[2]]
-        elif self.form == "rechteck" and len(d) >= 4:
+        elif self.form in ("rechteck", "linie") and len(d) >= 4:
             self.daten = [d[0], -d[1], d[2], -d[3]]
         else:
             self.daten = [[p[0], -p[1]] for p in d]
