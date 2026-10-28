@@ -34,9 +34,9 @@ def spalten_zeilen(anzahl, hoehe_px):
     return max(6, min(anzahl, int(hoehe_px // ZELLE_PX)))
 
 
-LEISTEN = ("seitenleiste", "werkzeug", "elektro", "3d")            # order inside a docking area
-LEISTEN_ATTR = {"seitenleiste": "tbS", "werkzeug": "tb1", "elektro": "tbE", "3d": "tbD"}
-CONFIG_KEY = {"seitenleiste": "toolbar_pos_seitenleiste", "werkzeug": "toolbar_pos", "elektro": "toolbar_pos_elektro",
+LEISTEN = ("werkzeug", "elektro", "3d")            # order inside a docking area
+LEISTEN_ATTR = {"werkzeug": "tb1", "elektro": "tbE", "3d": "tbD"}
+CONFIG_KEY = {"werkzeug": "toolbar_pos", "elektro": "toolbar_pos_elektro",
               "3d": "toolbar_pos_3d"}
 
 

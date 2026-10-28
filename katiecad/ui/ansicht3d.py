@@ -754,7 +754,8 @@ class Ansicht3D(tk.Frame):
         def in_ebene(p):
             return abs(G.ebene_lokal(ebene, p)[2]) < 1e-3
 
-        fp = S.fang_suche(self._sichtbare(), self.kamera, mx, my, e.x, e.y, 12.0, in_ebene)
+        fp = (S.fang_suche(self._sichtbare(), self.kamera, mx, my, e.x, e.y, 12.0, in_ebene)
+              if self.app.osnap.get() else None)             # F3 / "OFANG" also applies in 3D
         if fp is not None:
             l = G.ebene_lokal(ebene, fp[0])
             return (l[0], l[1]), fp[1], fp[0]
@@ -767,7 +768,8 @@ class Ansicht3D(tk.Frame):
         """(3D point, kind) for dimensions: object snap anywhere, else the face under the
         mouse, else the work plane."""
         mx, my = self._mitte()
-        fp = S.fang_suche(self._sichtbare(), self.kamera, mx, my, e.x, e.y)
+        fp = S.fang_suche(self._sichtbare(), self.kamera, mx, my, e.x, e.y) \
+            if self.app.osnap.get() else None
         if fp is not None:
             return fp
         fl = self._flaeche_unter(e) if self.zustand.get("auto", True) else None
@@ -776,13 +778,32 @@ class Ansicht3D(tk.Frame):
         return (r[2], r[1]) if r else None
 
     def _lokal_punkt(self, e, ebene=None):
-        """Local point on the work plane under the mouse (object snap, then grid)."""
+        """Local point on the work plane under the mouse (object snap, then grid).
+        With ORTHO (F8) lines/polylines are restricted to the local X or Y direction."""
         r = self._fang_ebene(e, ebene or self._ebene())
-        return r[0] if r else None
+        p = r[0] if r else None
+        sk = self._skiz
+        if (p is not None and sk and self.app.ortho.get() and sk.get("pts")
+                and sk["form"] in ("linie", "poly")):
+            q = sk["pts"][-1]
+            if abs(p[0] - q[0]) >= abs(p[1] - q[1]):
+                p = (p[0], q[1])
+            else:
+                p = (q[0], p[1])
+        return p
 
     def _raum_punkt(self, e):
         r = self._fang_raum(e)
-        return r[0] if r else None
+        p = r[0] if r else None
+        sk = self._skiz
+        if (p is not None and sk and self.app.ortho.get() and len(sk.get("pts", ())) == 1
+                and sk["form"] in ("bem", "messen")):
+            # ORTHO: only along the dominant coordinate axis from the first point
+            q = sk["pts"][0]
+            d = G.v_sub(p, q)
+            i = max(range(3), key=lambda k: abs(d[k]))
+            p = tuple(q[k] + (d[k] if k == i else 0.0) for k in range(3))
+        return p
 
     def _hover_berechnen(self):
         """Face highlight + snap marker under the mouse (drawing modes only)."""
@@ -1334,11 +1355,56 @@ class Ansicht3D(tk.Frame):
                              wert=f"{mm / self.app._einh_faktor():.2f}",
                              einheit=self.app.einheit.get()))
 
+    def eingabe_3d(self, text):
+        """Input line of the main window while drawing in 3D (like in 2D). First point as
+        'x,y' on the work plane; then circle: radius, rectangle: 'width,height' (or 'width x
+        height'), line: 'length' or 'length<angle', polyline: 'x,y' or '@dx,dy'. -> True if used."""
+        m = self._modus
+        if m not in self.SKIZZEN:
+            return False
+        f = self.app._einh_faktor()
+        sk = self._skiz
+
+        def zahl(t):
+            return float(t.strip().replace(",", ".")) * f
+        try:
+            t = text.strip().lower()
+            if sk is None:
+                a = [v for v in re.split(r"[,;]\s*|\s+", t) if v]
+                if len(a) != 2:
+                    raise ValueError
+                p = (float(a[0].replace(",", ".")) * f, float(a[1].replace(",", ".")) * f)
+                self._skiz = {"form": m, "pts": [p], "maus": p}
+                self.info_var.set(tr("d3.msg.skizze_" + m))
+            elif m == "poly":
+                rel = t.startswith("@")
+                a = [v for v in re.split(r"[,;]\s*|\s+", t.lstrip("@")) if v]
+                if len(a) != 2:
+                    raise ValueError
+                x, y = float(a[0].replace(",", ".")) * f, float(a[1].replace(",", ".")) * f
+                if rel:
+                    x, y = sk["pts"][-1][0] + x, sk["pts"][-1][1] + y
+                sk["pts"].append((x, y))
+            elif m == "linie" and "<" in t:
+                l, w = t.split("<", 1)
+                L, W = zahl(l), math.radians(float(w.strip().replace(",", ".")))
+                q = sk["pts"][0]
+                self._skizze_fertig("linie", [q[0], q[1], q[0] + L * math.cos(W), q[1] + L * math.sin(W)])
+            else:
+                self._skizze_wert(t, sk)
+                return True
+        except ValueError:
+            self.info_var.set(tr("d3.msg.zahl"))
+            return True
+        self.zeichne()
+        return True
+
     def _skizze_wert(self, text, sk):
         """Typed size while drawing: circle = radius, rectangle = width [x height]."""
         f = self.app._einh_faktor()
         try:
-            teile = [t for t in re.split(r"[x; ]+", text.strip().lower()) if t]
+            trenner = r"[x;, ]+" if sk["form"] == "rechteck" else r"[x; ]+"   # "500,1000" like in 2D
+            teile = [t for t in re.split(trenner, text.strip().lower()) if t]
             zahlen = [float(t.replace(",", ".")) * f for t in teile]
         except ValueError:
             zahlen = []

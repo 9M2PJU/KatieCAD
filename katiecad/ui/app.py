@@ -1207,7 +1207,7 @@ class CadApp(AendernMixin, Ansicht3DMixin, ToolbarDockMixin):
                        bg=FARBEN["bg_mittel"], fg=FARBEN["cyan"],
                        activebackground=FARBEN["cyan"],
                        activeforeground=FARBEN["bg_dunkel"])
-        for _name in ("seitenleiste", "werkzeug", "elektro", "3d"):
+        for _name in ("werkzeug", "elektro", "3d"):
             m_n = tk.Menu(m_tb, tearoff=0, bg=FARBEN["bg_mittel"], fg=FARBEN["cyan"],
                           activebackground=FARBEN["cyan"],
                           activeforeground=FARBEN["bg_dunkel"])
@@ -1388,7 +1388,7 @@ class CadApp(AendernMixin, Ansicht3DMixin, ToolbarDockMixin):
 
     def _build_toolbars(self):
         self._wz_knoepfe = {}
-        for attr in ("tbS", "tb1", "tbE", "tbD", "tb2", "tb3"):
+        for attr in ("tb1", "tbE", "tbD", "tb2", "tb3"):
             if not hasattr(self, attr):
                 frm = ttk.Frame(self.root, padding=4)
                 frm.pack(side=tk.TOP, fill=tk.X)
@@ -1402,9 +1402,6 @@ class CadApp(AendernMixin, Ansicht3DMixin, ToolbarDockMixin):
 
         # --- Toolbar 1 ---
         tb = self.tb1
-        self._leisten_griff(self.tbS, "seitenleiste")
-        ttk.Button(self.tbS, text="\u2630", width=3,
-                   command=self.seitenleiste_umschalten).pack(side=tk.LEFT, padx=(0, 4))
         self._leisten_griff(tb, "werkzeug")
         ttk.Label(tb, text=tr("tb.werkzeug"), style="Title.TLabel").pack(side=tk.LEFT, padx=(0, 4))
         for key in ("auswahl", "linie", "polylinie", "kreis", "bogen",
@@ -1722,6 +1719,11 @@ class CadApp(AendernMixin, Ansicht3DMixin, ToolbarDockMixin):
         bar.pack(side=tk.BOTTOM, fill=tk.X)
         self._statusbar_frame = bar
         self._status_buttons = {}
+        # fixed place bottom left: stays reachable when the sidebar is hidden
+        self.btn_seitenleiste = ttk.Button(bar, text="\u2630", width=3,
+                                           command=self.seitenleiste_umschalten)
+        self.btn_seitenleiste.pack(side=tk.LEFT, padx=(0, 8))
+        Tooltip(self.btn_seitenleiste, tr("menu.ansicht.seitenleiste"))
 
         def toggle_btn(key, text, var, command=None, key_hint=""):
             def cmd():
@@ -5741,6 +5743,14 @@ class CadApp(AendernMixin, Ansicht3DMixin, ToolbarDockMixin):
                 messagebox.showerror(tr("eingabe.label"), str(ex))
             self._update_eingabe_hinweis()
             return
+        w3 = self._ansicht3d if (self.ansicht3d_aktiv() and not self._ist_layout()) else None
+        if w3 is not None and (not text or (BEFEHLE.get(text.split(None, 1)[0].upper()) is None)):
+            if not text:
+                w3._skizze_abschliessen()                  # Enter closes a 3D polyline
+                return
+            if w3.eingabe_3d(text):                        # typed sizes while drawing in 3D
+                self.eingabe_var.set("")
+                return
         if not text:
             self._eingabe_leer()
             return

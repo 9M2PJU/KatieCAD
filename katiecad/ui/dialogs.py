@@ -365,6 +365,8 @@ class PropertiesDialog(tk.Toplevel):
         elif isinstance(element, Rechteck):
             for k in ("x1", "y1", "x2", "y2"):
                 add_geo(k.upper() + ":", k, getattr(element, k))
+            self._rechteck_groesse(f, row)
+            row += 3
         elif isinstance(element, Polylinie):
             ttk.Label(f, text="Punkte:").grid(row=row, column=0, sticky=tk.NW, pady=3)
             self.punkte_text = tk.Text(f, width=25, height=8,
@@ -446,6 +448,62 @@ class PropertiesDialog(tk.Toplevel):
         ttk.Button(bf, text=tr("dlg.abbrechen"),
                    command=self.destroy).pack(side=tk.LEFT, padx=6)
         self.wait_window(self)
+
+    def _rechteck_groesse(self, f, row):
+        """Width / height of a rectangle (derived from the corners). Editing them resizes the
+        rectangle about corner 1 or about the centre (shrinks/grows on both sides)."""
+        g = self.geo_vars
+        self._b_var = tk.DoubleVar(value=abs(g["x2"].get() - g["x1"].get()))
+        self._h_var = tk.DoubleVar(value=abs(g["y2"].get() - g["y1"].get()))
+        self._anker_var = tk.StringVar(value=tr("dlg.prop.anker_ecke"))
+        for i, (txt, var) in enumerate(((tr("dlg.prop.breite"), self._b_var),
+                                        (tr("dlg.prop.hoehe"), self._h_var))):
+            ttk.Label(f, text=txt).grid(row=row + i, column=0, sticky=tk.W, pady=3)
+            e = ttk.Entry(f, textvariable=var, width=15)
+            e.grid(row=row + i, column=1, sticky=tk.W, pady=3)
+            e.bind("<Return>", lambda ev: self._groesse_anwenden())
+            e.bind("<FocusOut>", lambda ev: self._groesse_anwenden())
+        ttk.Label(f, text=tr("dlg.prop.anker")).grid(row=row + 2, column=0, sticky=tk.W, pady=3)
+        ttk.Combobox(f, textvariable=self._anker_var, width=20, state="readonly",
+                     values=[tr("dlg.prop.anker_ecke"), tr("dlg.prop.anker_mitte")]).grid(
+            row=row + 2, column=1, sticky=tk.W, pady=3)
+        for k in ("x1", "y1", "x2", "y2"):
+            g[k].trace_add("write", lambda *_: self._groesse_anzeigen())
+
+    def _groesse_anzeigen(self):
+        if getattr(self, "_sperre", False):
+            return
+        try:
+            g = self.geo_vars
+            self._sperre = True
+            self._b_var.set(abs(g["x2"].get() - g["x1"].get()))
+            self._h_var.set(abs(g["y2"].get() - g["y1"].get()))
+        except Exception:
+            pass
+        finally:
+            self._sperre = False
+
+    def _groesse_anwenden(self):
+        if getattr(self, "_sperre", False):
+            return
+        try:
+            g = self.geo_vars
+            b, h = abs(self._b_var.get()), abs(self._h_var.get())
+            mitte = self._anker_var.get() == tr("dlg.prop.anker_mitte")
+            self._sperre = True
+            for a, c, mass in (("x1", "x2", b), ("y1", "y2", h)):
+                v1, v2 = g[a].get(), g[c].get()
+                vz = 1.0 if v2 >= v1 else -1.0
+                if mitte:
+                    m = (v1 + v2) / 2.0
+                    g[a].set(round(m - vz * mass / 2.0, 6))
+                    g[c].set(round(m + vz * mass / 2.0, 6))
+                else:
+                    g[c].set(round(v1 + vz * mass, 6))
+        except Exception:
+            pass
+        finally:
+            self._sperre = False
 
     def _farbe_waehlen(self):
         _, hexc = colorchooser.askcolor(color=self.farbe_var.get())
