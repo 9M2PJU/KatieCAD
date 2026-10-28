@@ -108,6 +108,15 @@ und Farbe, Linienart und Linienstärke in der Werkzeugleiste.
 
 **Manipulator (Bearbeiten › Manipulator, Werkzeugleiste, Befehl `MANIP`):** Schaltet ein Achsenkreuz an der Auswahl ein/aus. Auf den **roten X-Pfeil** oder den **grünen Y-Pfeil** klicken: Das Objekt bewegt sich nur auf dieser Achse. Beim Klick auf den Zielpunkt zählt nur der Anteil in Achsrichtung – auch wenn der Objektfang einen Punkt neben der Achse trifft, bleibt das Gerät auf seiner Flucht. Alternativ den Abstand tippen (`25`, `-10`). Das **gelbe Quadrat** verschiebt frei. ESC bricht ab.
 
+**3D-Drahtmodell (Menü 3D, Befehl `3D`):** Öffnet ein eigenes 3D-Fenster neben der 2D-Zeichnung. Die 2D-Zeichnung liegt dort flach auf der Grundebene (z = 0), 3D-Körper erscheinen als Drahtmodell. Im 2D-Plan sieht man 3D-Körper von oben.
+- **Ansicht:** mittlere Maustaste = drehen, **Strg + mittlere Maustaste** (oder rechte Taste) = Ansicht verschieben, Mausrad = Zoom, Doppelklick mittlere Taste = „Alles zeigen“. Der **Ansichtswürfel** (oben rechts, ein-/ausblendbar) setzt per Klick auf eine Fläche Oben/Unten/Vorne/Hinten/Links/Rechts; im Würfel ziehen dreht die Ansicht. „Perspektive“ schaltet zwischen paralleler und perspektivischer Darstellung.
+- **Darstellung:** *Drahtgitter* (alle Kanten), *Verdeckte Kanten aus* oder *Verdeckte Kanten gestrichelt*. Beim Drehen wird zur Geschwindigkeit kurz das Drahtgitter gezeigt, danach die verdeckte Ansicht neu berechnet.
+- **Hochziehen wie in AutoCAD:** Rechteck, Kreis oder geschlossene Polylinie in 2D zeichnen, im 3D-Fenster auswählen und den **blauen Z-Pfeil** nach oben oder unten ziehen (oder Pfeil anklicken, Höhe tippen, Enter; negative Werte ziehen nach unten). Alternativ „Extrudieren…“.
+- **3D-Manipulator:** Der Achsenkreuz-Pfeil X (rot), Y (grün), Z (blau) verschiebt die Auswahl nur auf dieser Achse; bei eingeschaltetem Fang rastet der Abstand ein. Mit „Z-Pfeil ändert Höhe des Körpers“ ändert der Z-Pfeil bei Prisma/Pyramide die Höhe statt zu verschieben.
+- **Direkte Körper:** Quader, Pyramide, Zylinder, Kegel, Kugel (Menü 3D oder Befehle `QUADER`, `PYRAMIDE`, `ZYLINDER`, `KEGEL`, `KUGEL`). Maße und Position im Dialog eingeben oder die Position per Klick auf die Grundebene wählen.
+- **3D-Block:** Mehrere 3D-Körper auswählen › „3D-Block bilden“ (`3DBLOCK`); der Block wird als Einheit gewählt und verschoben. Er dient nur der Übersicht und hat keine elektrische Funktion. „Block auflösen“ trennt ihn wieder.
+- Auswahl wird zwischen 2D- und 3D-Fenster geteilt. Alles bleibt einfaches Drahtmodell (keine Flächen, kein Rendering).
+
 **Schnellauswahl (Bearbeiten › Schnellauswahl, Befehl `QS`):** wählt alle Objekte mit einer Objektart, einem Layer, einer Farbe oder einem Linientyp. Mehrere Kriterien gelten gemeinsam (UND). Optional: alles außer den Treffern auswählen oder zur bestehenden Auswahl hinzufügen.
 
 **Kettenbemaßung (Einfügen › Kettenbemaßung, Befehl `KETTE`):** zwei Messpunkte und die Lage der Maßlinie wie bei der normalen Bemaßung; danach reicht je ein Klick pro weiterem Punkt, und jede neue Maßzahl setzt am letzten Punkt auf derselben Maßlinie an. ESC oder Rechtsklick beendet.

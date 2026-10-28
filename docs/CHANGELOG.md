@@ -29,8 +29,11 @@
 - Länge ändern (`LAENGE`): Linienende anklicken, dann neues Ende klicken oder `+5` / `-5` / `=50` tippen; Werkzeugleisten-Symbol
 - Ausrichten (links, rechts, oben, unten, Mitte horizontal/vertikal) im Menü Bearbeiten
 - Manipulator (`MANIP`): Achsenkreuz an der Auswahl; Verschieben nur auf der gewählten Achse (Objektfang zählt nur in Achsrichtung), Abstand tippbar, freies Verschieben über das Quadrat
+- 3D-Drahtmodell: eigenes 3D-Fenster (Menü 3D, `3D`) mit Drehen (Mitteltaste), Verschieben (Strg+Mitteltaste), Zoom, optionalem Ansichtswürfel, Perspektive und wählbarer Darstellung (Drahtgitter / verdeckte Kanten aus / gestrichelt); 2D-Formen per Z-Pfeil hoch- oder runterziehen, Quader, Pyramide, Zylinder, Kegel, Kugel direkt erzeugen, 3D-Manipulator (X/Y/Z), 3D-Blöcke
 - Texte können **fett** sein (Textdialog, Eigenschaften, Eigenschaftenpalette „Arial fett“); auch im PDF (Helvetica-Bold)
 - Klemmenplan: gleicher Funktionstext erscheint nur bei der ersten Klemme einer Leiste
+- Manipulator: Beim Verschieben fängt der Objektfang nicht mehr an den bewegten Objekten selbst (dadurch ging Senkrecht nicht); der Schalter in der Werkzeugleiste bleibt gedrückt, solange der Manipulator aktiv ist
+- Werkzeugleiste: „Länge ändern“ steht vor „Suchen und Ersetzen“; „Maske“ steht hinter „Funktionstext“
 - Versionssprung auf 1.1.0
 
 ## 1.0.3

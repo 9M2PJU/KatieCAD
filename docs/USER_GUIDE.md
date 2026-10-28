@@ -109,6 +109,15 @@ line weight in the toolbar.
 
 **Manipulator (Edit > Manipulator, toolbar, command `MANIP`):** switches an axis cross on the selection on/off. Click the **red X arrow** or the **green Y arrow**: the object moves only along that axis. When you click the target point only its component along the axis counts - even if the object snap hits a point beside the axis, the device stays on its line. Or type the distance (`25`, `-10`). The **yellow square** moves freely. ESC cancels.
 
+**3D wireframe (menu 3D, command `3D`):** opens a separate 3D window next to the 2D drawing. The 2D drawing lies flat on the ground plane (z = 0) there, 3D bodies are shown as wireframe. In the 2D plan, 3D bodies are seen from above.
+- **View:** middle mouse button = orbit, **Ctrl + middle mouse button** (or right button) = pan, wheel = zoom, double-click middle button = "Show all". The **view cube** (top right, can be shown/hidden) sets Top/Bottom/Front/Back/Left/Right by clicking a face; dragging in the cube orbits. "Perspective" toggles between parallel and perspective projection.
+- **Display:** *Wireframe* (all edges), *Hidden edges off* or *Hidden edges dashed*. While orbiting a quick wireframe is shown, the hidden-line view is recomputed afterwards.
+- **Pull up like AutoCAD:** draw a rectangle, circle or closed polyline in 2D, select it in the 3D window and drag the **blue Z arrow** up or down (or click the arrow, type the height, Enter; negative values pull downwards). Or use "Extrude…".
+- **3D manipulator:** the arrows X (red), Y (green), Z (blue) move the selection along that axis only; with snap on the distance snaps to the grid. With "Z arrow changes body height" the Z arrow changes the height of a prism/pyramid instead of moving it.
+- **Direct bodies:** box, pyramid, cylinder, cone, sphere (menu 3D or commands `BOX`, `PYRAMID`, `CYLINDER`, `CONE`, `SPHERE`). Enter size and position in the dialog or pick the position on the ground plane.
+- **3D block:** select several 3D bodies › "Make 3D block" (`3DBLOCK`); the block is selected and moved as one unit. It is for overview only and has no electrical function. "Dissolve block" splits it again.
+- The selection is shared between the 2D and 3D windows. Everything stays a simple wireframe (no faces, no rendering).
+
 **Quick select (Edit > Quick select, command `QS`):** selects all objects of one object type, layer, colour or line type. Several criteria apply together (AND). Optionally select everything except the matches or add to the current selection.
 
 **Chain dimension (Insert > Chain dimension, command `KETTE`):** two measurement points and the position of the dimension line as with the normal dimension; after that one click per further point is enough, and every new dimension starts at the last point on the same dimension line. ESC or right-click ends.
