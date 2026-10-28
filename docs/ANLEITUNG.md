@@ -100,9 +100,15 @@ und Farbe, Linienart und Linienstärke in der Werkzeugleiste.
 
 **Eigenschaften übertragen (Bearbeiten › Eigenschaften übertragen, Befehl `EU`):** Erst das Quellobjekt anklicken, dann nacheinander die Zielobjekte. Übertragen werden Layer, Farbe, Linientyp und Linienstärke; bei Texten zusätzlich Höhe und Schriftart, bei Schraffuren Winkel und Abstand. ESC oder Rechtsklick beendet.
 
+**Versatz (Bearbeiten › Versatz, Befehle `VERSATZ` / `O`):** Abstand eingeben, Objekt anklicken, dann die Seite anklicken, auf der die Kopie entstehen soll. Funktioniert mit Linien, Kreisen, Bögen, Rechtecken und Polylinien (Ecken mit Gehrung). Ist der Abstand zu groß (nach innen), meldet KatieCAD „nicht möglich“.
+
+**Schnellauswahl (Bearbeiten › Schnellauswahl, Befehl `QS`):** wählt alle Objekte mit einer Objektart, einem Layer, einer Farbe oder einem Linientyp. Mehrere Kriterien gelten gemeinsam (UND). Optional: alles außer den Treffern auswählen oder zur bestehenden Auswahl hinzufügen.
+
+**Kettenbemaßung (Einfügen › Kettenbemaßung, Befehl `KETTE`):** zwei Messpunkte und die Lage der Maßlinie wie bei der normalen Bemaßung; danach reicht je ein Klick pro weiterem Punkt, und jede neue Maßzahl setzt am letzten Punkt auf derselben Maßlinie an. ESC oder Rechtsklick beendet.
+
 **Messen (Bearbeiten › Messen, Befehle `MESS` / `DI`):** Zwei Punkte anklicken (mit Objektfang). KatieCAD zeigt Abstand, dX, dY und Winkel in der Statuszeile und zeichnet die Messstrecke ein. Mit weiteren Klicks messen Sie weiter, ESC oder Rechtsklick beendet. Die Werte erscheinen in der aktuellen Einheit.
 
-**Abrunden und Fase (Bearbeiten › Abrunden / Fase, Befehle `ABRUNDEN` oder `F`, `FASE`):** Radius bzw. Fasenabstände eingeben, dann nacheinander zwei Linien anklicken. Die Linien werden an der Ecke gekürzt (oder verlängert) und mit einem Bogen bzw. einer Fasenlinie verbunden; behalten wird jeweils die längere Seite. Radius 0 bzw. Abstand 0 schließt nur die Ecke. Bei parallelen Linien oder zu großem Radius meldet KatieCAD „nicht möglich“. Der Dialog merkt sich die letzten Werte; ESC beendet.
+**Abrunden und Fase (Bearbeiten › Abrunden / Fase, Befehle `ABRUNDEN` oder `F`, `FASE`):** Radius bzw. Fasenabstände eingeben, dann nacheinander zwei Linien anklicken. Die Linien werden an der Ecke gekürzt (oder verlängert) und mit einem Bogen bzw. einer Fasenlinie verbunden; behalten wird jeweils die längere Seite. Radius 0 bzw. Abstand 0 schließt nur die Ecke. Du kannst auch ein **Rechteck oder eine Polylinie** anklicken: Klick auf eine Ecke rundet nur diese Ecke, Klick auf eine Kante alle Ecken; das Objekt wird dabei in Linien und echte Bögen aufgelöst. Bei parallelen Linien oder zu großem Radius meldet KatieCAD „nicht möglich“. Der Dialog merkt sich die letzten Werte; ESC beendet.
 
 **Ellipse und Spline (Einfügen › Ellipse / Spline, Befehle `ELLIPSE`, `SPLINE`):** *Ellipse:* Mittelpunkt, Ende der ersten Achse, dann die Länge der zweiten Halbachse (Klick oder Koordinaten in der Eingabezeile). Mit den Griffen verändern Sie Mitte und beide Halbachsen, auch Drehen, Skalieren und Spiegeln funktionieren. *Spline:* Stützpunkte nacheinander setzen, die Kurve läuft glatt durch alle Punkte; Enter oder Rechtsklick beendet, ein Klick auf den Startpunkt schließt die Kurve. Jeder Stützpunkt hat einen Griff. Beim DXF-Export werden beide als Polylinie ausgegeben (DXF-Import von Ellipsen/Splines bleibt als Polylinie). Beim Einfügen in Blöcke/Auflösen werden sie zu einfachen Polylinien.
 
@@ -262,6 +268,7 @@ Blätter im Projekt, wahlweise in **DIN A4** oder **DIN A3** (Auswahl im Dialog;
 
 - **Deckblatt** und **Inhaltsverzeichnis** (vor den Zeichnungsblättern)
 - **Geräteliste**, **Klemmenplan** und **Kabelplan** (dahinter)
+- weitere Listen (im Dialog zuschaltbar): **Verbindungsliste** (von/nach mit Kabel und Ader), **Stückliste** (gruppiert nach TYP mit Hersteller, Bestellnummer, Beschreibung und Kennzeichen), **Querverweisliste**, **Potenzialübersicht** (L1, N, PE, +24V … mit allen Anschlüssen), **Steckerübersicht** (Pinbelegung aller Stecker; als Stecker gelten Geräte mit Kennzeichen `X…` oder einem Typ wie „Stecker“/„Buchse“), **Etikettenliste** (Geräte, Klemmen, Kabel zum Beschriften) und **Revisionsübersicht** (aus der Revisionstabelle der Projekteigenschaften)
 
 Im Dialog wählst du die gewünschten Blätter, die Schriftkopf-Vorlage und die
 Projektdaten (Anlage, Kunde, Auftragsnummer, Zeichnungsnummer, Firma, gezeichnet /
@@ -271,6 +278,8 @@ unverändert.
 
 - Die Listen entstehen aus den Masken (IND/TYP/PER), den Klemmen, den Kabeln und
   den Leitungen dazwischen. Fundstellen stehen als Blatt/Spalte/Zeile.
+- **Bauteilkatalog (Projekt › Bauteilkatalog…):** Hier ordnest du jedem TYP Hersteller, Bestellnummer und Beschreibung zu. „Typen aus Zeichnung übernehmen“ trägt alle gefundenen TYP-Werte ein, du musst nur noch die Angaben ergänzen. Die Stückliste übernimmt sie automatisch. Der Katalog liegt in der Projektdatei.
+- **Geräte automatisch nummerieren (Projekt › Geräte automatisch nummerieren, Befehl `NUMMERIEREN`):** Geräte, deren Kennzeichen (IND) nur aus einem Präfix besteht (`-K`, `K?`), bekommen die nächste freie Nummer: `-K1`, `-K2` … Die Nummern setzen hinter der höchsten schon vergebenen im ganzen Projekt fort; vergebene Nummern ändern sich nie. Nummeriert wird nur das Hauptsymbol, von oben nach unten und links nach rechts, wahlweise für das ganze Projekt oder nur das aktuelle Blatt. Hilfsteile (Kontakte) werden nicht verändert.
 - **Listen als CSV exportieren…** schreibt dieselben Tabellen für Excel
   (Semikolon-getrennt, UTF-8).
 - **Spalten anpassen:** Kopiere `report_templates/geraete.example.json` und

@@ -5,7 +5,7 @@ sie nicht auf einem anderen System erzeugen kann.
 
 1. Version in `katiecad/manifest.py` (`VERSION`) prüfen und committen.
 2. Tag setzen und hochladen:
-   `git tag v1.0.4 && git push origin v1.0.4`
+   `git tag v1.1.0 && git push origin v1.1.0`
    (oder auf GitHub: Actions > Release > Run workflow – dann nur Build, kein Release).
 3. Nach ca. 10-15 Minuten liegen unter *Releases* bzw. *Actions > Artefakte*:
    - `KatieCAD-<Version>-Windows-Setup.exe` (Installer, Inno Setup)

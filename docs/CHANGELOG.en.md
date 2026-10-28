@@ -1,6 +1,6 @@
 # Changes
 
-## 1.0.4
+## 1.1.0
 - Find and replace across the whole project (all sheets); double-click a hit to jump to the object
 - Match properties (layer, colour, line type, weight, text height) from one object to others
 - Layer window: "Purge" deletes all unused layers (across all sheets in a project)
@@ -8,6 +8,14 @@
 - Fillet (`FILLET` / `F`) and chamfer (`CHAMFER`) at the corner of two lines
 - New elements ellipse and spline with their own drawing tools (Insert menu, toolbar, commands `ELLIPSE`, `SPLINE`), grips, rotate/scale/mirror, stretch, save/load, DXF export as polyline
 - Angle dimension from 3 points or 2 lines (commands `ANGULAR`, `WINKELLINIEN`), grips, scale/mirror/rotate
+- Fix: a rectangle was distorted when rotated by arbitrary angles (only two corners were rotated). It now becomes a polyline; in 90° steps it stays a rectangle
+- Fillet and chamfer also by clicking rectangles and polylines (corner = that corner only, edge = all corners)
+- Offset (`OFFSET` / `O`) for lines, circles, arcs, rectangles and polylines
+- Quick select (`QS`) by object type, layer, colour and line type
+- Chain dimension (`KETTE`)
+- New reports: connection list, parts list (with parts catalogue for manufacturer, order number, description), cross reference list, potential overview, connector overview, label list, revision overview (all also as CSV)
+- Project > Parts catalogue...; Project > Number devices automatically (`NUMMERIEREN`)
+- Version jump to 1.1.0
 
 ## 1.0.3
 - About window: mascot picture on the left of the texts (file `KatieCAD_Maskottchen.png`)
@@ -66,4 +74,3 @@
 ## 1.0.0
 - First release: 2D CAD, blocks, projects with sheets, schematics, cross references, terminals, cables,
   reports, title block automation, DXF/DWG import and export, installers for Windows, Linux and macOS
-

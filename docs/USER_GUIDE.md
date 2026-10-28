@@ -98,9 +98,15 @@ line weight in the toolbar.
 
 **Match properties (Edit > Match properties, command `MA`):** click the source object first, then the target objects one after another. Layer, colour, line type and line weight are copied; for texts also height and font, for hatches angle and spacing. ESC or right-click ends.
 
+**Offset (Edit > Offset, commands `OFFSET` / `O`):** enter the distance, click an object, then click the side where the copy is to be created. Works with lines, circles, arcs, rectangles and polylines (corners are mitred). If the distance is too large (inwards), KatieCAD says "not possible".
+
+**Quick select (Edit > Quick select, command `QS`):** selects all objects of one object type, layer, colour or line type. Several criteria apply together (AND). Optionally select everything except the matches or add to the current selection.
+
+**Chain dimension (Insert > Chain dimension, command `KETTE`):** two measurement points and the position of the dimension line as with the normal dimension; after that one click per further point is enough, and every new dimension starts at the last point on the same dimension line. ESC or right-click ends.
+
 **Measure (Edit > Measure, commands `MEASURE` / `DI`):** click two points (object snap works). KatieCAD shows distance, dX, dY and angle in the status bar and draws the measured segment. Further clicks start a new measurement, ESC or right-click ends. Values use the current unit.
 
-**Fillet and chamfer (Edit > Fillet / Chamfer, commands `FILLET` or `F`, `CHAMFER`):** enter the radius or the chamfer distances, then click two lines one after the other. The lines are trimmed (or extended) at the corner and joined by an arc or a chamfer line; the longer side of each line is kept. Radius 0 / distance 0 just closes the corner. Parallel lines or a radius that is too large give "not possible". The dialog remembers the last values; ESC ends.
+**Fillet and chamfer (Edit > Fillet / Chamfer, commands `FILLET` or `F`, `CHAMFER`):** enter the radius or the chamfer distances, then click two lines one after the other. The lines are trimmed (or extended) at the corner and joined by an arc or a chamfer line; the longer side of each line is kept. Radius 0 / distance 0 just closes the corner. You can also click a **rectangle or polyline**: a click on a corner rounds only that corner, a click on an edge rounds all corners; the object is split into lines and true arcs. Parallel lines or a radius that is too large give "not possible". The dialog remembers the last values; ESC ends.
 
 **Ellipse and spline (Insert > Ellipse / Spline, commands `ELLIPSE`, `SPLINE`):** *Ellipse:* centre, end of the first axis, then the length of the second semi-axis (click or coordinates in the input line). Grips change centre and both semi-axes; rotate, scale and mirror work as well. *Spline:* place the support points one after another, the curve runs smoothly through all of them; Enter or right-click finishes, a click on the start point closes the curve. Every support point has a grip. DXF export writes both as polylines (imported DXF ellipses/splines stay polylines). Inside blocks / when exploded they become plain polylines.
 
@@ -256,6 +262,7 @@ project, in either **DIN A4** or **DIN A3** (chosen in the dialog; on A3 areas, 
 
 - **cover sheet** and **table of contents** (in front of the drawing sheets)
 - **device list**, **terminal diagram** and **cable plan** (behind them)
+- more lists (switch on in the dialog): **connection list** (from/to with cable and core), **parts list** (grouped by TYP with manufacturer, order number, description and designations), **cross reference list**, **potential overview** (L1, N, PE, +24V ... with all connections), **connector overview** (pin assignment of all connectors; connectors are devices with a designation `X...` or a type like "connector"/"plug"), **label list** (devices, terminals, cables for labelling) and **revision overview** (from the revision table in the project properties)
 
 In the dialog you choose the sheets, the title block template and the project data
 (plant, customer, order number, drawing number, company, drawn / checked by,
@@ -264,6 +271,8 @@ changes in them are lost; your drawing sheets stay untouched.
 
 - The lists are built from the masks (IND/TYP/PER), terminals, cables and the wires
   between them. Locations are given as sheet/column/row.
+- **Parts catalogue (Project > Parts catalogue...):** assign manufacturer, order number and description to every TYP. "Take over types from drawing" enters all TYP values found, you only add the details. The parts list uses them automatically. The catalogue is stored in the project file.
+- **Number devices automatically (Project > Number devices automatically, command `NUMMERIEREN`):** devices whose designation (IND) is only a prefix (`-K`, `K?`) get the next free number: `-K1`, `-K2` ... Numbers continue after the highest one already used in the whole project; assigned numbers never change. Only the main symbol is numbered, top to bottom and left to right, for the whole project or the current sheet. Auxiliary parts (contacts) are not changed.
 - **Export lists as CSV…** writes the same tables for Excel (semicolon separated,
   UTF-8).
 - **Customise columns:** copy `report_templates/geraete.example.json` and rename it

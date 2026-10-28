@@ -1,6 +1,6 @@
 # Änderungen
 
-## 1.0.4
+## 1.1.0
 - Suchen und Ersetzen über das ganze Projekt (alle Blätter); Doppelklick auf einen Treffer springt zum Objekt
 - Eigenschaften übertragen (Layer, Farbe, Linientyp, Stärke, Texthöhe) von einem Objekt auf andere
 - Layerfenster: „Bereinigen“ löscht alle nicht verwendeten Layer (im Projekt über alle Blätter)
@@ -8,6 +8,14 @@
 - Abrunden (`ABRUNDEN` / `F`) und Fase (`FASE`) an Ecken zweier Linien
 - Neue Elemente Ellipse und Spline mit eigenen Zeichenwerkzeugen (Einfügen-Menü, Werkzeugleiste, Befehle `ELLIPSE`, `SPLINE`), Griffe, Drehen/Skalieren/Spiegeln, Strecken, Speichern/Laden, DXF-Export als Polylinie
 - Winkelbemaßung aus 3 Punkten oder 2 Linien (Befehle `WINKEL`, `WINKELLINIEN`), Griffe, Skalieren/Spiegeln/Drehen
+- Fix: Ein Rechteck verzerrte sich beim Drehen um beliebige Winkel (nur zwei Ecken wurden gedreht). Es wird jetzt zur Polylinie; bei 90°-Schritten bleibt es ein Rechteck
+- Abrunden und Fase auch durch Anklicken von Rechtecken und Polylinien (Ecke = nur diese Ecke, Kante = alle Ecken)
+- Versatz (`VERSATZ` / `O`) für Linien, Kreise, Bögen, Rechtecke und Polylinien
+- Schnellauswahl (`QS`) nach Objektart, Layer, Farbe und Linientyp
+- Kettenbemaßung (`KETTE`)
+- Neue Berichte: Verbindungsliste, Stückliste (mit Bauteilkatalog für Hersteller, Bestellnummer, Beschreibung), Querverweisliste, Potenzialübersicht, Steckerübersicht, Etikettenliste, Revisionsübersicht (alle auch als CSV)
+- Projekt › Bauteilkatalog…; Projekt › Geräte automatisch nummerieren (`NUMMERIEREN`)
+- Versionssprung auf 1.1.0
 
 ## 1.0.3
 - Info-Fenster: Maskottchen links neben den Texten (Datei `KatieCAD_Maskottchen.png`)
