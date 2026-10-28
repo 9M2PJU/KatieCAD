@@ -261,6 +261,8 @@ Potential wie `L1`, das an vielen Stellen vorkommt, bleibt ein Endpunkt.
   Leitungen. Das Ende lässt sich später am Griff verlängern. CAB ist die Kennung des
   Kabels (z. B. `W1`).
 
+**Werkzeugleiste:** Die Werkzeuge sind Symbole (Zeichnen lila, Elektro rot). Lass die Maus kurz auf einem Symbol ruhen, dann erscheint der Name. Das aktive Werkzeug hat einen helleren Hintergrund.
+
 ## 9. Dokumentation erzeugen
 
 **Projekt > Dokumentation erzeugen / aktualisieren…** erstellt als normale
