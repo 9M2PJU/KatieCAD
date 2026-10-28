@@ -234,4 +234,14 @@ for k in ("tb.wz.drehen3d", "tb.wz.abrunden3d", "tb.wz.manip_pivot", "menu.3d.dr
     check(k in I.TEXTE["de"] and k in I.TEXTE["en"], k)
 check(core.BEFEHLE.get("3DDREHEN") == "3d:drehen" and core.BEFEHLE.get("3DABRUNDEN") == "3d:abrunden"
       and core.BEFEHLE.get("3DPIVOT") == "3d:pivot", "Befehle drehen/abrunden/pivot")
+_o = core.quader(0, 0, 40, 30, 0, 20)
+check(_o.kanten_oben_unten(5, True, False) and _o.r_oben == 5 and abs(_o.bbox3()[5] - 20) < 1e-9, "obere Kanten abrunden")
+check(len(_o.netz().kanten) > len(core.quader(0, 0, 40, 30, 0, 20).netz().kanten), "Schichtlinien")
+_o2 = core.quader(0, 0, 40, 30, 0, 20); _o2.kanten_oben_unten(100, True, True)
+check(0 < _o2.r_oben <= 10.0 and _o2.r_unten == _o2.r_oben, "Radius oben+unten begrenzt")
+_d2 = _o.to_dict(); _d2.pop("typ", None)
+check(core.Koerper3D(**_d2).r_oben == 5, "r_oben Round-Trip")
+check(W.WERKZEUG_3D == {"linie": "linie", "polylinie": "poly", "kreis": "kreis", "rechteck": "rechteck", "bemassung": "bem"},
+      "Werkzeug-Zuordnung 3D")
+check(len(G.profil_einruecken([(0, 0), (10, 0), (10, 10), (0, 10)], 2)) == 4, "Profil einrücken")
 print(f"test_3d - {ok} Checks bestanden")
