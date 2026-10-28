@@ -61,18 +61,18 @@ class Sym:
                for a in range(0, 360, 30)]
         self.el.append(Schraffur(pts, muster="solid", staerke=None, **STYLE))
 
-    def attr(self, tag, wert, x=0.0, y=0.0):
+    def attr(self, tag, wert, x=0.0, y=0.0, prompt=None):
         """Invisible block attribute (e.g. SPS = module kind)."""
-        self.el.append(AttributDefinition(x, y, tag=tag, prompt=tag, wert=wert,
+        self.el.append(AttributDefinition(x, y, tag=tag, prompt=prompt or tag, wert=wert,
                                           sichtbar=False, hoehe=2.0, staerke=None,
                                           **STYLE))
 
-    def pin(self, x, y, name, winkel=0.0):
+    def pin(self, x, y, name, winkel=0.0, text_dx=0.0):
         n = len(self.pin_names) + 1
         self.pin_names.append(name)
         self.el.append(Verbindungspunkt(x, y, name, 2.0, winkel, "Arial", None,
                                         tag="VP%d" % n, prompt="Pin %d" % n,
-                                        wert=name, sichtbar=True, radius=0.5,
+                                        wert=name, sichtbar=True, radius=0.5, text_dx=text_dx,
                                         staerke=0.25, **STYLE))
 
     def mask(self, x, y, rolle="haupt"):
@@ -394,6 +394,16 @@ for nm, de, letter in (("Voltmeter", "Voltmeter", "V"), ("Ammeter", "Amperemeter
 # 10 PLC (SPS)  - modules carry the invisible attribute SPS = CPU/DI/DO/AI/AO;
 # the channel address is the pin name (editable), the pins are the I/O points.
 # ===============================================================
+def plc_attribute(s, kind, n_kanaele, x, y):
+    """Invisible attributes: kind, controller, slot and per channel symbol/comment."""
+    s.attr("SPS", kind, x, y)
+    s.attr("STATION", "", x, y, "Steuerung / Station")
+    s.attr("PLATZ", "", x, y, "Steckplatz")
+    for i in range(1, n_kanaele + 1):
+        s.attr("VP%d_SYM" % i, "", x, y, "Symbol Kanal %d" % i)
+        s.attr("VP%d_KOM" % i, "", x, y, "Kommentar Kanal %d" % i)
+
+
 def plc_module(name, de, kind, label, prefix, n, extra_bottom=()):
     s = sym(name, "10 PLC", de)
     w = 5.0 * (n - 1)
@@ -402,12 +412,12 @@ def plc_module(name, de, kind, label, prefix, n, extra_bottom=()):
     for i in range(n):
         s.line(5.0 * i, 5.0, 5.0 * i, 7.5)
         s.pin(5.0 * i, 7.5, "%s%d.%d" % (prefix, 0, i) if prefix in ("I", "Q")
-              else "%s%d" % (prefix, i), winkel=90.0)
+              else "%s%d" % (prefix, i), winkel=90.0, text_dx=-1.8)
     for j, nm in enumerate(extra_bottom):
         x = 5.0 * j
         s.line(x, -5.0, x, -7.5)
         s.pin(x, -7.5, nm)
-    s.attr("SPS", kind, -2.5, 5.0)
+    plc_attribute(s, kind, n, -2.5, 5.0)
     s.mask(-3.5, -5.0)
     return s
 
@@ -425,20 +435,21 @@ s.text(0.0, 0.0, "CPU", 3.0)
 for x, nm in ((-5.0, "L+"), (5.0, "M")):
     s.line(x, -5.0, x, -7.5); s.pin(x, -7.5, nm)
 s.attr("SPS", "CPU", -10.0, 5.0)
+s.attr("STATION", "", -10.0, 5.0, "Steuerung / Station")
 s.mask(-11.0, -5.0)
 
 s = sym("PLC channel DI", "10 PLC", "SPS Eingangskanal (einzeln)")
 s.rect(-3.5, -3.0, 3.5, 3.0); s.text(0.0, 0.0, "DI", 2.5)
 s.line(0, 3.0, 0, 7.5); s.pin(0, 7.5, "I0.0")
 s.line(0, -3.0, 0, -7.5); s.pin(0, -7.5, "M")
-s.attr("SPS", "DI", -3.5, 3.0)
+plc_attribute(s, "DI", 1, -3.5, 3.0)
 s.mask(-4.5, -3.0)
 
 s = sym("PLC channel DO", "10 PLC", "SPS Ausgangskanal (einzeln)")
 s.rect(-3.5, -3.0, 3.5, 3.0); s.text(0.0, 0.0, "DO", 2.5)
 s.line(0, 3.0, 0, 7.5); s.pin(0, 7.5, "Q0.0")
 s.line(0, -3.0, 0, -7.5); s.pin(0, -7.5, "M")
-s.attr("SPS", "DO", -3.5, 3.0)
+plc_attribute(s, "DO", 1, -3.5, 3.0)
 s.mask(-4.5, -3.0)
 
 
@@ -459,4 +470,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
