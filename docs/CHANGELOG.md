@@ -16,6 +16,9 @@
 - Neue Berichte: Verbindungsliste, Stückliste (mit Bauteilkatalog für Hersteller, Bestellnummer, Beschreibung), Querverweisliste, Potenzialübersicht, Steckerübersicht, Etikettenliste, Revisionsübersicht (alle auch als CSV)
 - Projekt › Bauteilkatalog…; Projekt › Geräte automatisch nummerieren (`NUMMERIEREN`)
 - Werkzeugleiste mit Symbolen statt Texten: Zeichenwerkzeuge in Lila, Elektro-Werkzeuge in Rot; der Name erscheint als Hinweis, wenn die Maus kurz auf dem Symbol ruht; das aktive Werkzeug ist hervorgehoben (ohne Pillow bleiben die Texte)
+- Suchen und Ersetzen als Symbol in der Werkzeugleiste
+- „Block als Datei speichern“ und „Gerät als Datei speichern“ zusammengeführt: ein Eintrag „Block/Gerät als Datei speichern…“ (Menü Blöcke)
+- Neue Symbolkategorie „10 PLC“ (SPS): Digital-/Analog-Ein- und -Ausgangsbaugruppen, CPU und Einzelkanäle; jede trägt das unsichtbare Attribut `SPS` (CPU/DI/DO/AI/AO) und als Pin-Namen die Kanaladresse – Grundlage für die spätere SPS-Liste
 - Versionssprung auf 1.1.0
 
 ## 1.0.3
@@ -75,4 +78,3 @@
 ## 1.0.0
 - Erstes Release: 2D-CAD, Blöcke, Projekte mit Blättern, Schaltpläne, Querverweise, Klemmen, Kabel,
   Reports, Schriftfeld-Automatik, DXF/DWG-Import und -Export, Installer für Windows, Linux und macOS
-

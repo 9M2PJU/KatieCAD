@@ -173,7 +173,7 @@ Symbol). Menü **Blöcke**:
   setzt ihn in die Zeichnung. Die Blöcke sind normale Dateien (`*.katieblock`) in
   den Ordnern, die der Browser anzeigt (auch der Projektordner `Bloecke`).
 - **Blockliste (BL)**, **Block auflösen (X)** zerlegt einen Block wieder.
-- **Block als Datei speichern / aus Datei laden**.
+- **Block/Gerät als Datei speichern / aus Datei laden** (ein gemeinsamer Menüeintrag unter Blöcke; der doppelte Eintrag im Elektro-Menü entfällt).
 - **Attribut definieren (ATTDEF)**: ein Textfeld im Symbol, dessen Wert je
   eingefügtem Block verschieden ist. Markiere es zusammen mit der Symbolgeometrie
   und erzeuge den Block. Beim Einfügen fragt KatieCAD die Werte ab.

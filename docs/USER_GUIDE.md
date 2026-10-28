@@ -171,7 +171,7 @@ A **block** is a reusable group of objects (for example a symbol). **Blocks** me
   in the drawing. Blocks are ordinary files (`*.katieblock`) in the folders shown by
   the browser (including the project folder `Bloecke`).
 - **Block list (BL)**; **Explode block (X)** breaks a block apart again.
-- **Save block as file / load block from file**.
+- **Save block/device to file / load block from file** (one shared entry in the Blocks menu; the duplicate entry in the Electrical menu is gone).
 - **Define attribute (ATTDEF)**: a text field inside the symbol whose value differs
   per inserted block. Select it together with the symbol geometry and create the
   block. KatieCAD asks for the values on insertion. **Edit attributes (ATTEDIT)**
@@ -374,4 +374,3 @@ In **Sheet properties (F2)** you also set the **sheet type** (circuit diagram, p
 
 Note: PDF export writes KatieCAD layers as PDF layers. You can toggle them in PDF viewers and re-import such a PDF into KatieCAD with the same layer names.
 **File > Import image...** inserts a photo or graphic (PNG, JPG, BMP, GIF, TIFF). The image is stored inside the drawing, so the original file is no longer needed. Resize with the yellow corner grip or **Scale**; move, rotate and mirror work as for other objects. Large images are reduced to at most 2400 pixels on the long side. Images appear in PDF output; on DXF export the image file is written next to the DXF file. Project DXF export does not include images.
-

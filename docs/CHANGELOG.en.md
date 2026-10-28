@@ -16,6 +16,9 @@
 - New reports: connection list, parts list (with parts catalogue for manufacturer, order number, description), cross reference list, potential overview, connector overview, label list, revision overview (all also as CSV)
 - Project > Parts catalogue...; Project > Number devices automatically (`NUMMERIEREN`)
 - Toolbar with icons instead of texts: drawing tools in purple, electrical tools in red; the name appears as a tooltip when the mouse rests on the icon; the active tool is highlighted (without Pillow the texts remain)
+- Find and replace as an icon in the toolbar
+- "Save block to file" and "Save device to file" merged into one entry "Save block/device to file..." (Blocks menu)
+- New symbol category "10 PLC": digital/analogue input and output modules, CPU and single channels; each carries the invisible attribute `SPS` (CPU/DI/DO/AI/AO) and the channel address as pin name - basis for the later PLC list
 - Version jump to 1.1.0
 
 ## 1.0.3
