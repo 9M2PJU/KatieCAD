@@ -1,6 +1,6 @@
 name: Release
 
-# Start: push a tag  (git tag v1.0.4 && git push origin v1.0.4)
+# Start: push a tag  (git tag v1.1.0 && git push origin v1.1.0)
 # or manually under  Actions > Release > Run workflow.
 on:
   push:
