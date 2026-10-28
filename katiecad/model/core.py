@@ -18,7 +18,7 @@ from copy import deepcopy
 
 from katiecad.common.i18n import tr, SPRACHE
 from katiecad.model.geom2d import ellipse_punkte, spline_punkte
-from katiecad.model.geom3d import (profil_abrunden, v_rotieren, punkt_rotieren, prisma_netz, pyramide_netz, kugel_netz, kreis_profil,
+from katiecad.model.geom3d import (prisma_netz_gerundet, profil_abrunden, v_rotieren, punkt_rotieren, prisma_netz, pyramide_netz, kugel_netz, kreis_profil,
                                    rechteck_profil, netz_abbilden, ebene_punkt, ebene_basis, BODEN_EBENE)
 
 
@@ -3724,8 +3724,9 @@ class Koerper3D(Element):
 
     def __init__(self, art="prisma", profil=None, z0=0.0, hoehe=10.0, spitze=None,
                  rund=False, kugel=None, bez="", loecher=None, ebene=None,
-                 ausschnitte=None, glatt=None, **kw):
+                 ausschnitte=None, glatt=None, r_oben=0.0, r_unten=0.0, **kw):
         super().__init__("koerper3d", **kw)
+        self.r_oben, self.r_unten = float(r_oben or 0.0), float(r_unten or 0.0)
         self.glatt = [bool(g) for g in glatt] if glatt else None
         self.art = art if art in self.ARTEN else "prisma"
         self.profil = [(float(p[0]), float(p[1])) for p in (profil or [])]
@@ -3753,7 +3754,8 @@ class Koerper3D(Element):
         if self.art == "pyramide":
             nz = pyramide_netz(self.profil, self.z0, self.hoehe, self.spitze, self.rund)
         else:
-            nz = prisma_netz(self.profil, self.z0, self.hoehe, self.rund, glatt=self.glatt)
+            nz = prisma_netz_gerundet(self.profil, self.z0, self.hoehe, self.rund, self.glatt,
+                                      self.r_unten, self.r_oben)
         return netz_abbilden(nz, self.ebene) if self.ebene else nz
 
     def _loch_netz(self, loch):
@@ -3898,6 +3900,8 @@ class Koerper3D(Element):
                             for (x, y, r, t) in self.loecher]
         self.z0 *= f
         self.hoehe *= f
+        self.r_oben *= f
+        self.r_unten *= f
         for a in self.ausschnitte:
             a["ebene"] = _ebene_skalieren(a["ebene"], cx, cy, f)
             a["profil"] = [(x * f, y * f) for (x, y) in a["profil"]]
@@ -3952,6 +3956,24 @@ class Koerper3D(Element):
         for a in self.ausschnitte:
             a["ebene"] = ebene_rot(a["ebene"])
 
+    def kanten_oben_unten(self, r, oben=True, unten=False):
+        """Rounds the top and/or bottom perimeter edges. True if done."""
+        if self.art != "prisma" or len(self.profil) < 3 or r <= 0:
+            return False
+        xs = [p[0] for p in self.profil]; ys = [p[1] for p in self.profil]
+        grenze = 0.45 * min(max(xs) - min(xs), max(ys) - min(ys))
+        r = min(r, grenze, abs(self.hoehe) / (2 if (oben and unten) else 1))
+        if r <= 1e-9:
+            return False
+        # z0 is the bottom for a positive height; for a negative one the "top" lies below z0
+        if self.hoehe >= 0:
+            if oben: self.r_oben = r
+            if unten: self.r_unten = r
+        else:
+            if oben: self.r_unten = r
+            if unten: self.r_oben = r
+        return True
+
     def kanten_abrunden(self, r, n=6):
         """Rounds the vertical edges (corners of the base polygon). True if done."""
         if self.art != "prisma" or self.rund or len(self.profil) < 3 or r <= 0:
@@ -3968,6 +3990,7 @@ class Koerper3D(Element):
         d = super().to_dict()
         d["profil"] = [list(p) for p in self.profil]
         d["glatt"] = list(self.glatt) if self.glatt else None
+        d["r_oben"], d["r_unten"] = self.r_oben, self.r_unten
         d["spitze"] = list(self.spitze) if self.spitze else None
         d["kugel"] = list(self.kugel) if self.kugel else None
         d["loecher"] = [list(l) for l in self.loecher]

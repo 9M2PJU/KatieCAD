@@ -284,6 +284,74 @@ def prisma_netz(profil, z0, hoehe, rund=False, senkrechte=8, glatt=None):
     return nz
 
 
+def profil_einruecken(pts, d):
+    """Closed polygon moved inwards by d (miter at the corners)."""
+    n = len(pts)
+    if n < 3 or abs(d) < 1e-12:
+        return [tuple(p) for p in pts]
+    flaeche = sum(pts[i][0] * pts[(i + 1) % n][1] - pts[(i + 1) % n][0] * pts[i][1] for i in range(n))
+    vorz = 1.0 if flaeche > 0 else -1.0                    # CCW: inside is on the left
+    nor = []
+    for i in range(n):
+        a, b = pts[i], pts[(i + 1) % n]
+        dx, dy = b[0] - a[0], b[1] - a[1]
+        l = math.hypot(dx, dy) or 1.0
+        nor.append((-dy / l * vorz, dx / l * vorz))
+    out = []
+    for i in range(n):
+        n1, n2 = nor[i - 1], nor[i]
+        k = 1.0 + n1[0] * n2[0] + n1[1] * n2[1]
+        if k < 0.05:
+            out.append((pts[i][0] + n2[0] * d, pts[i][1] + n2[1] * d))
+        else:
+            out.append((pts[i][0] + (n1[0] + n2[0]) / k * d, pts[i][1] + (n1[1] + n2[1]) / k * d))
+    return out
+
+
+def prisma_netz_gerundet(profil, z0, hoehe, rund=False, glatt=None, r_unten=0.0, r_oben=0.0, n=4):
+    """Prism whose bottom / top perimeter edges are rounded (quarter-round, n steps):
+    a stack of inset outlines along the arc. Falls back to prisma_netz without rounding."""
+    za, zb = min(z0, z0 + hoehe), max(z0, z0 + hoehe)
+    h = zb - za
+    if len(profil) < 3 or h <= 0 or (r_unten <= 1e-9 and r_oben <= 1e-9):
+        return prisma_netz(profil, z0, hoehe, rund, glatt=glatt)
+    r_unten = min(r_unten, h / 2) if r_oben > 1e-9 else min(r_unten, h)
+    r_oben = min(r_oben, h - r_unten)
+    schichten = []                                         # (z, inset)
+    if r_unten > 1e-9:
+        for k in range(n + 1):                             # bottom face -> side
+            t = math.radians(90.0 * (1 - k / n))
+            schichten.append((za + r_unten - r_unten * math.sin(t), r_unten - r_unten * math.cos(t)))
+    else:
+        schichten.append((za, 0.0))
+    if r_oben > 1e-9:
+        for k in range(n + 1):                             # side -> top face
+            t = math.radians(90.0 * k / n)
+            schichten.append((zb - r_oben + r_oben * math.sin(t), r_oben - r_oben * math.cos(t)))
+    else:
+        schichten.append((zb, 0.0))
+    nz = Netz()
+    ringe = []
+    m = len(profil)
+    for z, d in schichten:
+        poly = profil_einruecken(profil, d) if d > 1e-9 else [tuple(p) for p in profil]
+        ringe.append([nz.punkt((x, y, z)) for (x, y) in poly])
+    for ring in ringe:
+        for i in range(m):
+            nz.kante(ring[i], ring[(i + 1) % m])
+    schritt = max(1, m // 8) if rund else 1
+    for li in range(len(ringe) - 1):
+        for i in range(0, m, schritt):
+            if glatt and i < len(glatt) and glatt[i] and not rund:
+                continue
+            nz.kante(ringe[li][i], ringe[li + 1][i])
+        for i in range(m):
+            j = (i + 1) % m
+            nz.flaeche([ringe[li][i], ringe[li][j], ringe[li + 1][j], ringe[li + 1][i]])
+    nz.flaeche(ringe[0]); nz.flaeche(ringe[-1])
+    return nz
+
+
 def profil_abrunden(pts, r, n=6):
     """Rounds all corners of the closed polygon `pts` with radius r (limited per corner
     to half of the shorter neighbouring edge). Returns (points, glatt) where glatt[i] is
