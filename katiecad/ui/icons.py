@@ -186,6 +186,37 @@ def _zeichne(name, d, c, f):
         d.rectangle([62 * f, 12 * f, 92 * f, 42 * f], outline=c, width=int(6 * f))
         L([(46, 56), (56, 46)], 5)
         d.polygon([(60 * f, 42 * f), (46 * f, 44 * f), (58 * f, 56 * f)], fill=c)
+    elif name == "raster3d":
+        for t in (14, 38, 62, 86):
+            L([(t, 14), (t, 86)], 4); L([(14, t), (86, t)], 4)
+    elif name == "flaeche3d":
+        d.polygon([(50 * f, 8 * f), (88 * f, 29 * f), (50 * f, 50 * f), (12 * f, 29 * f)], fill=c)
+        L([(12, 29), (12, 71), (50, 92), (88, 71), (88, 29)], 5); L([(50, 50), (50, 92)], 5)
+    elif name == "skizze_kreis":
+        L([(8, 78), (30, 52), (92, 52), (70, 78), (8, 78)], 4)
+        d.ellipse([34 * f, 22 * f, 66 * f, 54 * f], outline=c, width=int(6 * f))
+    elif name == "skizze_rechteck":
+        L([(8, 78), (30, 52), (92, 52), (70, 78), (8, 78)], 4)
+        d.rectangle([34 * f, 14 * f, 74 * f, 46 * f], outline=c, width=int(6 * f))
+    elif name == "skizze_poly":
+        L([(8, 78), (30, 52), (92, 52), (70, 78), (8, 78)], 4)
+        L([(30, 46), (46, 12), (74, 30), (62, 46), (30, 46)], 6)
+    elif name == "ebene0":
+        L([(8, 74), (30, 46), (92, 46), (70, 74), (8, 74)], 5)
+        L([(40, 60), (40, 12)], 6)
+        d.polygon([(40 * f, 4 * f), (28 * f, 20 * f), (52 * f, 20 * f)], fill=c)
+    elif name == "bem3d":
+        L([(14, 80), (14, 36)], 4); L([(86, 80), (86, 36)], 4)
+        L([(14, 48), (86, 48)], 5)
+        d.polygon([(14 * f, 48 * f), (30 * f, 38 * f), (30 * f, 58 * f)], fill=c)
+        d.polygon([(86 * f, 48 * f), (70 * f, 38 * f), (70 * f, 58 * f)], fill=c)
+        L([(30, 90), (70, 90)], 4); L([(30, 84), (30, 96)], 3); L([(70, 84), (70, 96)], 3)
+    elif name == "mass3d":
+        d.rectangle([14 * f, 38 * f, 62 * f, 86 * f], outline=c, width=int(6 * f))
+        L([(62, 38), (84, 16)], 5); L([(62, 86), (84, 64)], 5); L([(84, 16), (84, 64)], 5)
+        L([(14, 38), (36, 16), (84, 16)], 5)
+        L([(70, 50), (92, 50)], 4)
+        d.polygon([(96 * f, 50 * f), (84 * f, 42 * f), (84 * f, 58 * f)], fill=c)
     elif name == "persp":
         d.rectangle([6 * f, 14 * f, 94 * f, 86 * f], outline=c, width=int(5 * f))
         d.rectangle([36 * f, 38 * f, 64 * f, 62 * f], outline=c, width=int(5 * f))
@@ -215,7 +246,8 @@ NAMEN = ("auswahl", "linie", "polylinie", "kreis", "bogen", "ellipse", "spline",
          "zoom_grenzen", "reset", "ftext", "laenge", "manip",
          "ansicht3d", "wuerfel", "k_quader", "k_zylinder", "k_kegel", "k_pyramide",
          "k_kugel", "extrudieren", "loch", "block3d", "aufloesen3d", "persp",
-         "einpassen3d", "iso3d", "hoehe3d")
+         "einpassen3d", "iso3d", "hoehe3d", "raster3d", "flaeche3d", "skizze_kreis",
+         "skizze_rechteck", "skizze_poly", "ebene0", "bem3d", "mass3d")
 
 
 def icon_png(name, farbe, groesse=26):
