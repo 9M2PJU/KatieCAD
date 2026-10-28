@@ -29,7 +29,7 @@
 - Change length (`LAENGE`): click a line end, then click the new end or type `+5` / `-5` / `=50`; toolbar icon
 - Align (left, right, top, bottom, centre horizontally/vertically) in the Edit menu
 - Manipulator (`MANIP`): axis cross on the selection; moves only along the chosen axis (object snap counts only along the axis), distance can be typed, free move via the square
-- 3D wireframe: separate 3D window (menu 3D, `3D`) with orbit (middle button), pan (Ctrl+middle), zoom, optional view cube, perspective and selectable display (wireframe / hidden edges off / dashed); pull 2D shapes up or down with the Z arrow, create box, pyramid, cylinder, cone, sphere directly, 3D manipulator (X/Y/Z), 3D blocks
+- 3D wireframe in the main view (toolbar group "3D:" after Electrical with icons, menu 3D, `3D`): orbit (middle button), pan (Ctrl+middle), zoom, view cube with direction arrows, perspective; pull 2D shapes up or down with the Z arrow, create box, cylinder, cone, pyramid, sphere directly, holes/bores (`HOLE`), 3D manipulator (X/Y/Z), 3D blocks; plain wireframe (no hidden-line removal)
 - Text can be **bold** (text dialog, properties, properties palette "Arial fett"); also in the PDF (Helvetica-Bold)
 - Terminal diagram: the same function text appears only at the first terminal of a strip
 - Manipulator: while moving, the object snap no longer snaps to the moved objects themselves (this blocked vertical moves); the toolbar button stays pressed while the manipulator is active
