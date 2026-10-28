@@ -60,7 +60,7 @@ def qv_texte_aus_blattdaten(daten):
     for d in daten.get("elemente", []):
         if isinstance(d, dict) and d.get("typ") == "querverweis":
             t = str(d.get("text", "")).strip()
-            if t:
+            if t and not d.get("extern"):
                 try:
                     feld = feld_an(felder, float(d.get("x", 0)), float(d.get("y", 0)))
                 except (TypeError, ValueError):
@@ -73,7 +73,7 @@ def qv_texte_aus_elementen(elemente):
     """Cross references of an element list: list of (text, "column/row")."""
     felder = felder_aus_elementen(elemente)
     return [(e.text.strip(), feld_an(felder, *_pos(e)), e.art) for e in elemente
-            if isinstance(e, Querverweis) and e.text.strip()]
+            if isinstance(e, Querverweis) and e.text.strip() and not e.extern]
 
 
 def _text_feld(eintrag):
@@ -121,7 +121,7 @@ def querverweis_ziele(elemente, blatt_nr, andere_blaetter):
     eigene = []                                  # (qv, text, field)
     for qv in qvs:
         t = qv.text.strip()
-        if t:
+        if t and not qv.extern:
             eigene.append((qv, t, feld_an(felder, *_pos(qv))))
     vorkommen = defaultdict(list)                # text -> [(sheet, field, qv|None)]
     for qv, t, feld in eigene:
@@ -132,7 +132,7 @@ def querverweis_ziele(elemente, blatt_nr, andere_blaetter):
             vorkommen[t].append((nr, feld, None, art))
     for qv in qvs:
         t = qv.text.strip()
-        if not t:
+        if not t or qv.extern:
             qv.ziel = []
             continue
         andere = [o for o in vorkommen[t] if o[2] is not qv]
