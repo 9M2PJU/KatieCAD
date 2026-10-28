@@ -52,6 +52,7 @@ from katiecad.model.blocks import (block_speichern, block_laden,
                               vorschau_geometrie, standard_ordner, symbol_ordner)
 from katiecad.ui.menuleiste import MenuLeiste
 from katiecad.ui import icons as ICONS
+from katiecad.ui.ansicht3d import Ansicht3DMixin
 from katiecad.ui.aendern import AendernMixin
 from katiecad.model import geom2d as G2
 from katiecad.model import auswahl as AUSW
@@ -72,6 +73,7 @@ from katiecad.model.core import (
     Bemassung, Viewport, Schraffur, Bild, konturen_aus_elementen, bereich_an_punkt,
     AttributDefinition, Leitung, Verbindungspunkt, Querverweis,
     Verbindung, ElektroMaske, Klemme, Kabel, Koordinatenfeld, ZUSAMMENGESETZT,
+    Koerper3D, Gruppe3D,
     vp_tags_eindeutig, LEITUNG_FARBE, UI_SCHRIFT,
     BlockDefinition, BlockReferenz, BlockBibliothek,
     bogen_sweep, bogen_punkte, winkel_im_bogen, bogen_aus_3_punkten,
@@ -231,7 +233,7 @@ def geraete_aus_blattdaten_liste(app, j):
     return app._geraete_blatt(p.blatt_pfad(j))
 
 
-class CadApp(AendernMixin):
+class CadApp(AendernMixin, Ansicht3DMixin):
     def __init__(self, root):
         self.root = root
         if _MAC:
@@ -423,6 +425,7 @@ class CadApp(AendernMixin):
         self._versatz = None
         self._laenge = None
         self._manip_an = False
+        self._manip_var = tk.BooleanVar(value=False)
         self._versatz_d = 10.0
         self._ecke_param = {"r": 5.0, "d1": 5.0, "d2": 5.0}
         self.messergebnis = ""
@@ -1253,6 +1256,26 @@ class CadApp(AendernMixin):
                               command=self.geraet_erzeugen)
         menubar.add_cascade(label=tr("menu.elektro"), menu=m_elektro)
 
+        # 3D
+        m_3d = tk.Menu(menubar, tearoff=0,
+                       bg=FARBEN["bg_mittel"], fg=FARBEN["cyan"],
+                       activebackground=FARBEN["cyan"],
+                       activeforeground=FARBEN["bg_dunkel"])
+        m_3d.add_command(label=tr("menu.3d.oeffnen"),
+                         command=lambda: self.ansicht3d_befehl("3d"))
+        m_3d.add_separator()
+        for _art in ("quader", "pyramide", "zylinder", "kegel", "kugel"):
+            m_3d.add_command(label=tr("menu.3d." + _art),
+                             command=lambda a=_art: self.ansicht3d_befehl("neu:" + a))
+        m_3d.add_separator()
+        m_3d.add_command(label=tr("menu.3d.extrudieren"),
+                         command=lambda: self.ansicht3d_befehl("extrudieren"))
+        m_3d.add_command(label=tr("menu.3d.block"),
+                         command=lambda: self.ansicht3d_befehl("block"))
+        m_3d.add_command(label=tr("menu.3d.aufloesen"),
+                         command=lambda: self.ansicht3d_befehl("aufloesen"))
+        menubar.add_cascade(label=tr("menu.3d"), menu=m_3d)
+
         # Language
         m_sprache = tk.Menu(menubar, tearoff=0,
                             bg=FARBEN["bg_mittel"], fg=FARBEN["cyan"],
@@ -1338,15 +1361,16 @@ class CadApp(AendernMixin):
                     "ellipse", "spline", "rechteck", "text", "bemassung",
                     "stutzen", "brechen"):
             self._werkzeug_knopf(tb, key, FARBEN["cyan"])
-        self._befehl_knopf(tb, "suchen", FARBEN["cyan"], self.suchen_ersetzen)
         self._befehl_knopf(tb, "laenge", FARBEN["cyan"], self.laenge_start)
-        self._befehl_knopf(tb, "manip", FARBEN["cyan"], self.manipulator_umschalten)
+        self._befehl_knopf(tb, "suchen", FARBEN["cyan"], self.suchen_ersetzen)
+        self._umschalt_knopf(tb, "manip", FARBEN["cyan"], self._manip_var,
+                             lambda: self.manipulator_setzen(self._manip_var.get()))
 
         ttk.Separator(tb, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=8)
         ttk.Label(tb, text=tr("menu.elektro") + ":",
                   style="Elektro.TLabel").pack(side=tk.LEFT, padx=(0, 4))
         for key in ("vpunkt", "verbindung", "querverweis",
-                    "maske", "klemme", "kabel", "koordinatenfeld", "ftext"):
+                    "klemme", "kabel", "koordinatenfeld", "ftext", "maske"):
             self._werkzeug_knopf(tb, key, ICON_ROT)
 
         # --- Toolbar 2 ---
@@ -1750,6 +1774,29 @@ class CadApp(AendernMixin):
         b = ttk.Radiobutton(parent, image=bild, value=key, style="Icon.Toolbutton",
                             variable=self.aktives_werkzeug,
                             command=self._werkzeug_toolbar)
+        b.pack(side=tk.LEFT, padx=1)
+        Tooltip(b, text)
+
+    def _umschalt_knopf(self, parent, key, farbe, var, befehl):
+        """Icon toggle button (pressed while `var` is True)."""
+        text = tr(f"tb.wz.{key}")
+        bild = None
+        png = ICONS.icon_png(key, farbe) if PILLOW_VERFUEGBAR else None
+        if png:
+            try:
+                import base64
+                bild = tk.PhotoImage(data=base64.b64encode(png).decode("ascii"))
+            except tk.TclError:
+                bild = None
+        if bild is None:
+            ttk.Checkbutton(parent, text=text, variable=var, command=befehl
+                            ).pack(side=tk.LEFT, padx=1)
+            return
+        if not hasattr(self, "_toolbar_icons"):
+            self._toolbar_icons = {}
+        self._toolbar_icons[key] = bild
+        b = ttk.Checkbutton(parent, image=bild, style="Icon.Toolbutton",
+                            variable=var, command=befehl)
         b.pack(side=tk.LEFT, padx=1)
         Tooltip(b, text)
 
@@ -2893,7 +2940,9 @@ class CadApp(AendernMixin):
                 sammle(x, y, "quadrant", 2)
 
         for el in liste:
-            if el is self._snap_ausschluss:
+            if el is self._snap_ausschluss or (
+                    isinstance(self._snap_ausschluss, list)
+                    and any(el is x for x in self._snap_ausschluss)):
                 continue
             l = self.layers.get(el.layer)
             if l and not l.sichtbar:
@@ -4309,6 +4358,10 @@ class CadApp(AendernMixin):
 
     def redraw(self):
         c = self.canvas
+        try:
+            self.root.after_idle(self.ansicht3d_aktualisieren)
+        except Exception:
+            pass
         self._bild_live = []                # keeps the PhotoImages of this frame
         try:
             self._leitungen_automatisch()
@@ -5072,6 +5125,8 @@ class CadApp(AendernMixin):
             if typ == "klemme":     return Klemme(**d)
             if typ == "koordinatenfeld": return Koordinatenfeld(**d)
             if typ == "kabel":      return Kabel(**d)
+            if typ == "koerper3d":  return Koerper3D(**d)
+            if typ == "gruppe3d":   return Gruppe3D(**d)
             if typ == "block":
                 kinder_dicts = d.pop("elemente", [])
                 kinder = []
@@ -7156,6 +7211,7 @@ class CadApp(AendernMixin):
 
     def _op_beenden(self, meldung=""):
         self._op = None
+        self._snap_ausschluss = None
         self.letzter_punkt = None
         self._clear_temp()
         self._snap_marker_loeschen()
@@ -7410,6 +7466,9 @@ class CadApp(AendernMixin):
             self.laenge_start()
         elif cmd == "manip":
             self.manipulator_umschalten()
+        elif cmd.startswith("3d:"):
+            teil = cmd[3:]
+            self.ansicht3d_befehl("3d" if teil == "oeffnen" else teil)
         elif cmd.startswith("ausrichten:"):
             self.ausrichten(cmd.split(":", 1)[1])
         elif cmd == "abrunden":
