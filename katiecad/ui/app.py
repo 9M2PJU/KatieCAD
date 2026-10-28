@@ -1231,8 +1231,6 @@ class CadApp:
         m_elektro.add_separator()
         m_elektro.add_command(label=tr("menu.elektro.geraet_erzeugen"),
                               command=self.geraet_erzeugen)
-        m_elektro.add_command(label=tr("menu.elektro.geraet_speichern"),
-                              command=self.block_speichern_datei)
         m_elektro.add_command(label=tr("menu.elektro.geraet_laden"),
                               command=self.block_einfuegen)
         menubar.add_cascade(label=tr("menu.elektro"), menu=m_elektro)
@@ -1322,6 +1320,7 @@ class CadApp:
                     "ellipse", "spline", "rechteck", "text", "bemassung",
                     "stutzen", "brechen"):
             self._werkzeug_knopf(tb, key, FARBEN["cyan"])
+        self._befehl_knopf(tb, "suchen", FARBEN["cyan"], self.suchen_ersetzen)
 
         ttk.Separator(tb, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=8)
         ttk.Label(tb, text=tr("menu.elektro") + ":",
@@ -1731,6 +1730,27 @@ class CadApp:
         b = ttk.Radiobutton(parent, image=bild, value=key, style="Icon.Toolbutton",
                             variable=self.aktives_werkzeug,
                             command=self._werkzeug_toolbar)
+        b.pack(side=tk.LEFT, padx=1)
+        Tooltip(b, text)
+
+    def _befehl_knopf(self, parent, key, farbe, befehl):
+        """Icon button that runs a command (no tool); text button without Pillow."""
+        text = tr(f"tb.wz.{key}")
+        bild = None
+        png = ICONS.icon_png(key, farbe) if PILLOW_VERFUEGBAR else None
+        if png:
+            try:
+                import base64
+                bild = tk.PhotoImage(data=base64.b64encode(png).decode("ascii"))
+            except tk.TclError:
+                bild = None
+        if bild is None:
+            ttk.Button(parent, text=text, command=befehl).pack(side=tk.LEFT, padx=1)
+            return
+        if not hasattr(self, "_toolbar_icons"):
+            self._toolbar_icons = {}
+        self._toolbar_icons[key] = bild
+        b = ttk.Button(parent, image=bild, style="Icon.Toolbutton", command=befehl)
         b.pack(side=tk.LEFT, padx=1)
         Tooltip(b, text)
 
