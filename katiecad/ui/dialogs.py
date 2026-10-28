@@ -20,6 +20,7 @@ from katiecad.electrical import suchen as SU
 from katiecad.model.core import (
     FARBEN, ZEICHNUNGSFORMATE, LINIENTYPEN, LINIENSTAERKEN,
     SCHRIFTARTEN, MASSSTAEBE, BEM_RICHTUNGEN,
+    schrift_fett, schrift_name, schrift_setzen,
     Layer, Text, Linie, Kreis, Bogen, Rechteck, Polylinie,
     Bemassung, Viewport, Verbindung, ElektroMaske,
     parse_massstab, massstab_text,
@@ -384,11 +385,16 @@ class PropertiesDialog(tk.Toplevel):
             add_geo("Y:", "y", element.y)
             add_geo("Höhe:", "hoehe", element.hoehe)
             add_geo("Winkel:", "winkel", element.winkel)
-            self.schrift_var = tk.StringVar(value=element.schriftart)
+            self.schrift_var = tk.StringVar(value=schrift_name(element.schriftart))
+            self.fett_var = tk.BooleanVar(value=schrift_fett(element.schriftart))
             ttk.Label(f, text=tr("dlg.text.schrift")).grid(row=row, column=0,
                                                             sticky=tk.W, pady=3)
             ttk.Combobox(f, textvariable=self.schrift_var, values=SCHRIFTARTEN,
                          width=20).grid(row=row, column=1, sticky=tk.W, pady=3)
+            row += 1
+            ttk.Checkbutton(f, text=tr("dlg.text.fett"),
+                            variable=self.fett_var).grid(row=row, column=1,
+                                                         sticky=tk.W, pady=3)
             row += 1
             ttk.Label(f, text=tr("dlg.text.einfuegepunkt")).grid(
                 row=row, column=0, sticky=tk.W, pady=3)
@@ -487,7 +493,7 @@ class PropertiesDialog(tk.Toplevel):
                 el.y = self.geo_vars["y"].get()
                 el.hoehe = self.geo_vars["hoehe"].get()
                 el.winkel = self.geo_vars["winkel"].get()
-                el.schriftart = self.schrift_var.get()
+                el.schriftart = schrift_setzen(self.schrift_var.get(), self.fett_var.get())
                 try:
                     idx = self.einfuegepunkt_anzeige.index(
                         self.einfuegepunkt_var.get())
@@ -838,8 +844,13 @@ class TextDialog(tk.Toplevel):
         ttk.Label(f, text=tr("dlg.text.schrift")).grid(row=1, column=0,
                                                         sticky=tk.W, pady=4)
         self.schrift_var = tk.StringVar(value=app.text_schriftart.get())
-        ttk.Combobox(f, textvariable=self.schrift_var, values=SCHRIFTARTEN,
-                     width=22).grid(row=1, column=1, sticky=tk.W)
+        self.fett_var = tk.BooleanVar(value=bool(getattr(app, "text_fett", False)))
+        sf = ttk.Frame(f)
+        sf.grid(row=1, column=1, sticky=tk.W)
+        ttk.Combobox(sf, textvariable=self.schrift_var, values=SCHRIFTARTEN,
+                     width=22).pack(side=tk.LEFT)
+        ttk.Checkbutton(sf, text=tr("dlg.text.fett"),
+                        variable=self.fett_var).pack(side=tk.LEFT, padx=8)
 
         ttk.Label(f, text=tr("dlg.text.hoehe")).grid(row=2, column=0,
                                                       sticky=tk.W, pady=4)
@@ -884,7 +895,8 @@ class TextDialog(tk.Toplevel):
         if not inhalt:
             return
         self.result = (inhalt, float(self.hoehe_var.get()),
-                       float(self.winkel_var.get()), self.schrift_var.get(),
+                       float(self.winkel_var.get()),
+                       schrift_setzen(self.schrift_var.get(), self.fett_var.get()),
                        self._aktueller_punkt())
         self.destroy()
 
@@ -1814,7 +1826,8 @@ class EigenschaftenPalette(tk.Toplevel):
             r += 1
         v = tk.StringVar()
         self._vars["schriftart"] = v
-        cb = ttk.Combobox(f, textvariable=v, width=24, values=list(SCHRIFTARTEN))
+        cb = ttk.Combobox(f, textvariable=v, width=24,
+                          values=list(SCHRIFTARTEN) + [s + " fett" for s in SCHRIFTARTEN])
         cb.bind("<<ComboboxSelected>>", lambda e: self._anwenden("schriftart"))
         zeile(r, "schriftart", lambda: cb)
         r += 1
