@@ -287,8 +287,8 @@ class PropertiesDialog(tk.Toplevel):
         self.el = element
         self.result = False
         self.title(tr("dlg.prop.titel", typ=element.typ.capitalize()))
-        self.geometry("480x680")
-        self.transient(parent)
+        self.transient(parent)             # size follows the content (no fixed size: DPI scaling)
+        self.minsize(380, 0)
         _modal(self)
         self.configure(bg=FARBEN["bg_mittel"])
         f = ttk.Frame(self, padding=10)
@@ -333,12 +333,13 @@ class PropertiesDialog(tk.Toplevel):
         ttk.Combobox(f, textvariable=self.staerke_var, values=LINIENSTAERKEN,
                      width=10).grid(row=row, column=1, sticky=tk.W, pady=4)
         row += 1
-        ttk.Separator(f, orient=tk.HORIZONTAL).grid(row=row, column=0, columnspan=2,
-                                                     sticky=tk.EW, pady=8)
+        geo_sep = ttk.Separator(f, orient=tk.HORIZONTAL)
+        geo_sep.grid(row=row, column=0, columnspan=2, sticky=tk.EW, pady=8)
         row += 1
-        ttk.Label(f, text=tr("dlg.prop.geometrie"), style="Title.TLabel").grid(
-            row=row, column=0, columnspan=2, sticky=tk.W, pady=4)
+        geo_kopf = ttk.Label(f, text=tr("dlg.prop.geometrie"), style="Title.TLabel")
+        geo_kopf.grid(row=row, column=0, columnspan=2, sticky=tk.W, pady=4)
         row += 1
+        geo_start = row
         self.geo_vars = {}
 
         def add_geo(label, key, value):
@@ -444,6 +445,9 @@ class PropertiesDialog(tk.Toplevel):
             add_geo("Modell-CX:", "mcx", element.modell_zentrum_x)
             add_geo("Modell-CY:", "mcy", element.modell_zentrum_y)
             add_geo("Zoom:", "zoom", element.zoom)
+        if row == geo_start:               # element without editable geometry (e.g. 3D bodies)
+            geo_sep.destroy()
+            geo_kopf.destroy()
         bf = ttk.Frame(f)
         bf.grid(row=row, column=0, columnspan=2, pady=16)
         ttk.Button(bf, text=tr("dlg.prop.uebernehmen"),

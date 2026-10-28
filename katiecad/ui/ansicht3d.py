@@ -228,6 +228,54 @@ class Koerper3DDialog(tk.Toplevel):
 
 
 
+class TextDialog3D(tk.Toplevel):
+    """Text, height and angle of a 3D text. result = (text, height in mm, angle in degrees)."""
+
+    def __init__(self, parent, text, hoehe, winkel, faktor, einheit):
+        super().__init__(parent)
+        self.result = None
+        self.f = faktor
+        self.title(tr("d3.text.titel"))
+        self.transient(parent)
+        self.configure(bg=FARBEN["bg_mittel"])
+        self.resizable(False, False)
+        f = ttk.Frame(self, padding=12)
+        f.pack(fill=tk.BOTH, expand=True)
+        ttk.Label(f, text=tr("d3.text.frage")).grid(row=0, column=0, sticky=tk.W, pady=3)
+        self.t = tk.StringVar(value=text.replace("\n", " | "))
+        e = ttk.Entry(f, textvariable=self.t, width=30)
+        e.grid(row=0, column=1, padx=8, pady=3)
+        ttk.Label(f, text=tr("d3.text.hoehe") + f" ({einheit})").grid(row=1, column=0, sticky=tk.W, pady=3)
+        self.h = tk.StringVar(value="%g" % round(hoehe / faktor, 4))
+        ttk.Entry(f, textvariable=self.h, width=12).grid(row=1, column=1, sticky=tk.W, padx=8, pady=3)
+        ttk.Label(f, text=tr("d3.text.winkel")).grid(row=2, column=0, sticky=tk.W, pady=3)
+        self.w = tk.StringVar(value="%g" % winkel)
+        ttk.Entry(f, textvariable=self.w, width=12).grid(row=2, column=1, sticky=tk.W, padx=8, pady=3)
+        ttk.Label(f, text=tr("d3.text.hinweis"), style="Hint.TLabel").grid(
+            row=3, column=0, columnspan=2, sticky=tk.W, pady=(2, 6))
+        bt = ttk.Frame(f)
+        bt.grid(row=4, column=0, columnspan=2)
+        ttk.Button(bt, text="OK", command=self._ok).pack(side=tk.LEFT, padx=6)
+        ttk.Button(bt, text=tr("dlg.abbrechen"), command=self.destroy).pack(side=tk.LEFT, padx=6)
+        self.bind("<Return>", lambda ev: self._ok())
+        self.bind("<Escape>", lambda ev: self.destroy())
+        e.focus_set()
+        _modal(self)
+
+    def _ok(self):
+        try:
+            text = self.t.get().replace(" | ", "\n")
+            h = float(self.h.get().strip().replace(",", ".")) * self.f
+            w = float(self.w.get().strip().replace(",", "."))
+            if not text.strip() or h <= 0:
+                raise ValueError
+        except ValueError:
+            messagebox.showerror(tr("d3.titel"), tr("d3.msg.zahl"), parent=self)
+            return
+        self.result = (text, h, w)
+        self.destroy()
+
+
 class DrehDialog(tk.Toplevel):
     """Axis (X/Y/Z) and angle for rotating 3D objects. result = (axis, degrees)."""
 
@@ -612,7 +660,7 @@ class Ansicht3D(tk.Frame):
                 self._polylinie(zug, farbe, br, geschlossen=geschlossen)
             if isinstance(el, Bemassung3D):
                 self._text3(el.text_pos3(), el.wert_text(), farbe)
-            elif isinstance(el, Text3D):
+            elif isinstance(el, Text3D) and el.ebene is None:
                 q = self.kamera.proj(el.p, *self._mitte())
                 if q is not None:
                     px = max(6, int(round(el.hoehe * self.kamera.skala * 0.9)))
@@ -926,7 +974,7 @@ class Ansicht3D(tk.Frame):
             return
         h = {"fang": None, "flaeche": None}
         erste = self._skiz is None
-        if m in ("bem", "pivot", "text", "messen"):
+        if m in ("bem", "pivot", "messen"):
             h["fang"] = self._fang_raum(e)
             fl = self._flaeche_unter(e) if self.zustand.get("auto", True) else None
             h["flaeche"] = fl[1] if fl else None
@@ -1099,11 +1147,15 @@ class Ansicht3D(tk.Frame):
             self.info_var.set(tr("d3.msg.pivot_ok"))
             self.zeichne()
         elif m == "text":
-            p = self._raum_punkt(e)
-            if p is None:
+            if self.zustand.get("auto", True):
+                fl = self._flaeche_unter(e)           # text lies on the face under the mouse
+                if fl:
+                    self.zustand["plane"] = {"ebene": fl[0], "pts": fl[1]}
+            lp = self._lokal_punkt(e)
+            if lp is None:
                 self.info_var.set(tr("d3.msg.keine_ebene"))
                 return
-            self._text_setzen(p)
+            self._text_setzen(lp)
         elif m == "messen":
             p = self._raum_punkt(e)
             if p is None:
@@ -1132,30 +1184,43 @@ class Ansicht3D(tk.Frame):
                 self._bem_fertig(self._bem_versatz(e, sk["pts"]))
             self.zeichne()
 
-    def _text_setzen(self, p):
-        from tkinter import simpledialog
-        t = simpledialog.askstring(tr("d3.text.titel"), tr("d3.text.frage"), parent=self.app.root)
-        if not t or not t.strip():
+    def _text_hoehe_vorgabe(self):
+        h = self.zustand.get("text_h")
+        if h:
+            return h
+        roh = 16.0 / max(self.kamera.skala, 1e-6)       # about 16 pixels high
+        zehner = 10 ** math.floor(math.log10(roh))
+        return min((1, 2, 5, 10), key=lambda m: abs(m * zehner - roh)) * zehner
+
+    def _text_setzen(self, lp):
+        """Text on the current work plane at the local point lp = (x, y)."""
+        f = self.app._einh_faktor()
+        dlg = TextDialog3D(self.app.root, "", self._text_hoehe_vorgabe(), 0.0, f,
+                           self.app.einheit.get())
+        self.app.root.wait_window(dlg)
+        if not dlg.result:
             return
+        t, h, w = dlg.result
+        self.zustand["text_h"] = h
+        e = self._ebene()
+        el = Text3D(G.ebene_punkt(e, lp[0], lp[1]), t, h, ebene=e, winkel=w, **self._stil())
         self.app._snapshot()
-        try:
-            h = float(self.app._zahl(getattr(self.app, "text_hoehe", None), 3.5)) or 3.5
-        except Exception:
-            h = 3.5
-        el = Text3D(p, t, h, **self._stil())
         self.app.elemente.append(el)
         self.app.auswahl = [el]
         self.app.redraw()
+        self.zeichne()
         self.info_var.set(tr("d3.msg.text_fertig"))
 
     def text_bearbeiten(self, el):
-        from tkinter import simpledialog
-        t = simpledialog.askstring(tr("d3.text.titel"), tr("d3.text.frage"), parent=self.app.root,
-                                   initialvalue=el.inhalt)
-        if t is not None and t.strip():
-            self.app._snapshot()
-            el.inhalt = t
-            self.app.redraw()
+        f = self.app._einh_faktor()
+        dlg = TextDialog3D(self.app.root, el.inhalt, el.hoehe, el.winkel, f, self.app.einheit.get())
+        self.app.root.wait_window(dlg)
+        if not dlg.result:
+            return
+        self.app._snapshot()
+        el.inhalt, el.hoehe, el.winkel = dlg.result
+        self.app.redraw()
+        self.zeichne()
 
     def _mess_text3(self, p1, p2):
         f = self.app._einh_faktor()
@@ -1857,10 +1922,7 @@ class Ansicht3D(tk.Frame):
             m.add_separator()
         m.add_command(label=tr("d3.ctx.layer_ein"), command=self._ctx_layer_ein)
         m.add_command(label=tr("d3.ctx.layer_dialog"), command=self.app.layer_verwalten)
-        try:
-            m.tk_popup(e.x_root, e.y_root)
-        finally:
-            m.grab_release()
+        self.app._menue_zeigen(m, e.x_root, e.y_root)    # Linux/X11: own handling (menu stays open)
 
     def _ctx_eigenschaften(self):
         if len(self.app.auswahl) == 1:
