@@ -51,6 +51,8 @@ from katiecad.model.blocks import (block_speichern, block_laden,
                               vorschlag_dateiname, BlockDateiFehler,
                               vorschau_geometrie, standard_ordner, symbol_ordner)
 from katiecad.ui.menuleiste import MenuLeiste
+from katiecad.model import geom2d as G2
+from katiecad.model.geom2d import spline_punkte
 from katiecad.ui.sidebar import Seitenleiste
 from katiecad.ui.widgets import FlatButton, farb_swatch
 from katiecad.model.core import (
@@ -61,6 +63,7 @@ from katiecad.model.core import (
     BEFEHLE, PdfSeite, ist_dunkel,
     E_DEVICES, E_LINES, E_CABLE, E_CLAMPS, E_PIN, ELEKTRO_LAYER,
     Layer, Layout, Element, Linie, Kreis, Bogen, Rechteck, Polylinie, Text,
+    Ellipse, Spline,
     Bemassung, Viewport, Schraffur, Bild, konturen_aus_elementen, bereich_an_punkt,
     AttributDefinition, Leitung, Verbindungspunkt, Querverweis,
     Verbindung, ElektroMaske, Klemme, Kabel, Koordinatenfeld, ZUSAMMENGESETZT,
@@ -398,6 +401,10 @@ class CadApp:
         self._warte_auf_basispunkt = False
         self._hatch_pick = None
         self._prop_pick = None
+        self._mess = None
+        self._ecke = None
+        self._ecke_param = {"r": 5.0, "d1": 5.0, "d2": 5.0}
+        self.messergebnis = ""
         self._letztes_fenster = None
         self._menuleiste = None
         self._menubar = None
@@ -871,6 +878,7 @@ class CadApp:
         self._cmd_pending = None
         self._pts = []
         self._bem_kreis = None
+        self._wk_l1 = None
         self._clear_temp()
 
     def _bogen_abbrechen(self):
@@ -1039,6 +1047,12 @@ class CadApp:
                             command=self.suchen_ersetzen)
         m_bearb.add_command(label=tr("menu.bearbeiten.eig_uebertragen"),
                             command=self.eigenschaften_uebertragen_start)
+        m_bearb.add_command(label=tr("menu.bearbeiten.messen"),
+                            command=self.messen_start)
+        m_bearb.add_command(label=tr("menu.bearbeiten.abrunden"),
+                            command=lambda: self.ecke_start("abrunden"))
+        m_bearb.add_command(label=tr("menu.bearbeiten.fase"),
+                            command=lambda: self.ecke_start("fase"))
         m_bearb.add_separator()
         m_bearb.add_command(label=tr("menu.bearbeiten.verschieben"),
                             command=lambda: self._op_start("move"))
@@ -1083,6 +1097,10 @@ class CadApp:
                            command=lambda: self._werkzeug_aus_menue("kreis"))
         m_einf.add_command(label=tr("menu.einfuegen.bogen"),
                            command=lambda: self._werkzeug_aus_menue("bogen"))
+        m_einf.add_command(label=tr("menu.einfuegen.ellipse"),
+                           command=lambda: self._werkzeug_aus_menue("ellipse"))
+        m_einf.add_command(label=tr("menu.einfuegen.spline"),
+                           command=lambda: self._werkzeug_aus_menue("spline"))
         m_einf.add_command(label=tr("menu.einfuegen.rechteck"),
                            command=lambda: self._werkzeug_aus_menue("rechteck"))
         m_einf.add_separator()
@@ -1094,6 +1112,10 @@ class CadApp:
                            command=lambda: self._bem_art_starten("radius"))
         m_einf.add_command(label=tr("menu.einfuegen.durchmesser"),
                            command=lambda: self._bem_art_starten("durchmesser"))
+        m_einf.add_command(label=tr("menu.einfuegen.winkel"),
+                           command=lambda: self._bem_art_starten("winkel"))
+        m_einf.add_command(label=tr("menu.einfuegen.winkel_linien"),
+                           command=lambda: self._bem_art_starten("winkel_linien"))
         m_einf.add_separator()
         m_einf.add_command(label=tr("menu.einfuegen.viewport"),
                            command=self.viewport_modus_starten)
@@ -1271,7 +1293,7 @@ class CadApp:
                    command=self.seitenleiste_umschalten).pack(side=tk.LEFT, padx=(0, 8))
         ttk.Label(tb, text=tr("tb.werkzeug"), style="Title.TLabel").pack(side=tk.LEFT, padx=(0, 4))
         for key in ("auswahl", "linie", "polylinie", "kreis", "bogen",
-                    "rechteck", "text", "bemassung",
+                    "ellipse", "spline", "rechteck", "text", "bemassung",
                     "stutzen", "brechen"):
             ttk.Radiobutton(tb, text=tr(f"tb.wz.{key}"), value=key,
                             variable=self.aktives_werkzeug,
@@ -1388,7 +1410,8 @@ class CadApp:
         self.lbl_bem = ttk.Label(tb3, text="  " + tr("tb.mass"), style="Title.TLabel")
         self.cb_bem_art = ttk.Combobox(tb3, textvariable=self.bem_art,
                                        values=["auto", "horizontal", "vertikal",
-                                               "ausgerichtet", "radius", "durchmesser"],
+                                               "ausgerichtet", "radius", "durchmesser",
+                                               "winkel", "winkel_linien"],
                                        width=12, state="readonly")
         self.cb_bem_art.bind("<<ComboboxSelected>>",
                              lambda e: (self._bem_abbrechen(), self._update_eingabe_hinweis()))
@@ -1674,12 +1697,16 @@ class CadApp:
 
     def _bem_art_starten(self, art):
         """Activates the dimension tool with radius/diameter preselected."""
-        if art not in ("radius", "durchmesser"):
+        if art not in ("radius", "durchmesser", "winkel", "winkel_linien"):
             return
         self.bem_art.set(art)
         self.aktives_werkzeug.set("bemassung")
         self._werkzeug_gewechselt()
         de = SPRACHE["aktuell"] == "de"
+        if art in ("winkel", "winkel_linien"):
+            self.status.set(self._winkel_hinweis())
+            self._update_eingabe_hinweis()
+            return
         self.status.set(
             ("Radius-Bemaßung: Kreis/Bogen anklicken, dann Textposition."
              if de and art == "radius" else
@@ -2232,6 +2259,8 @@ class CadApp:
             self._griff_drag_id = None
         self._schraffur_pick_ende()
         self._eigenschaften_ende()
+        self._mess_ende(leise=True)
+        self._ecke_ende(leise=True)
         self._bem_abbrechen()
         self._bogen_abbrechen()
         self._trim_abbrechen()
@@ -2269,6 +2298,7 @@ class CadApp:
         self.letzter_punkt = None
         self.aktuelle_polylinie = []
         self._pts = []
+        self._wk_l1 = None
         self._op = None
         self._cmd_pending = None
         self._vp_fenster = None
@@ -2553,6 +2583,12 @@ class CadApp:
         if getattr(self, "_prop_pick", None) is not None:
             self._eigenschaften_ende()
             return
+        if getattr(self, "_mess", None) is not None:
+            self._mess_ende()
+            return
+        if getattr(self, "_ecke", None) is not None:
+            self._ecke_ende()
+            return
         if self._op is not None:
             self._op_rechtsklick()
             return
@@ -2591,6 +2627,7 @@ class CadApp:
                 self._polylinie_abschliessen(geschlossen=False)
             self.letzter_punkt = None
             self._pts = []
+            self._wk_l1 = None
             self._clear_temp()
             self._eingabe_zuruecksetzen()
             self._update_eingabe_hinweis()
@@ -2852,6 +2889,8 @@ class CadApp:
                 ende(el.x, el.y)
             elif isinstance(el, Bemassung):
                 ende(el.x1, el.y1); ende(el.x2, el.y2)
+                if el.x3 is not None and el.y3 is not None:
+                    ende(el.x3, el.y3)
 
         if modi["naechster"].get() or (modi["lot"].get() and ref is not None):
             for (x1, y1, x2, y2) in segs:
@@ -2886,7 +2925,7 @@ class CadApp:
             return None
         tol = 12.0 / self._ctx_skala()
         liste = self._ctx_liste()
-        if self.aktuelle_polylinie and self.aktives_werkzeug.get() == "polylinie":
+        if self.aktuelle_polylinie and self.aktives_werkzeug.get() in ("polylinie", "spline"):
             liste = list(liste) + [Polylinie(list(self.aktuelle_polylinie))]
         return self._finde_snap_in_liste(liste, x, y, tol, ref)
 
@@ -2962,6 +3001,9 @@ class CadApp:
                  f"[PASTE]  X = {ziel[0] / einh:8.2f} {unit}   "
                  f"Y = {ziel[1] / einh:8.2f} {unit}   |   "
                  f"Click = place, ESC = cancel"))
+            return
+        if getattr(self, "_mess", None) is not None:
+            self._mess_bewegt(event)
             return
         if self._attdef_wartend is not None:
             pt = self._eingabepunkt(event)
@@ -3367,6 +3409,12 @@ class CadApp:
         if getattr(self, "_prop_pick", None) is not None:
             self._eigenschaften_klick(event)
             return
+        if getattr(self, "_mess", None) is not None:
+            self._mess_klick(event)
+            return
+        if getattr(self, "_ecke", None) is not None:
+            self._ecke_klick(event)
+            return
         if self._block_erzeuge_auswahl is not None:
             x, y = self._eingabepunkt(event)
             self._block_erzeugen_fertig((x, y))
@@ -3466,7 +3514,9 @@ class CadApp:
                 self._ziel_liste().append(self._neue_linie(lp[0], lp[1], x_mm, y_mm))
                 self.letzter_punkt = None
                 self.redraw()
-        elif werkzeug == "polylinie":
+        elif werkzeug == "ellipse":
+            self._ellipse_klick(pt)
+        elif werkzeug in ("polylinie", "spline"):
             if lp is None or not self.aktuelle_polylinie:
                 self.aktuelle_polylinie = [pt]
             else:
@@ -4117,9 +4167,14 @@ class CadApp:
     def _polylinie_abschliessen(self, geschlossen=False):
         if len(self.aktuelle_polylinie) >= 2:
             self._snapshot()
-            self._ziel_liste().append(Polylinie(self.aktuelle_polylinie,
-                                                geschlossen=geschlossen,
-                                                **self._layer_daten()))
+            if self.aktives_werkzeug.get() == "spline":
+                self._ziel_liste().append(Spline(self.aktuelle_polylinie,
+                                                 geschlossen=geschlossen,
+                                                 **self._layer_daten()))
+            else:
+                self._ziel_liste().append(Polylinie(self.aktuelle_polylinie,
+                                                    geschlossen=geschlossen,
+                                                    **self._layer_daten()))
         self.aktuelle_polylinie = []
         self.letzter_punkt = None
         self.redraw()
@@ -4883,6 +4938,8 @@ class CadApp:
             if typ == "bogen":      return Bogen(**d)
             if typ == "rechteck":   return Rechteck(**d)
             if typ == "polylinie":  return Polylinie(**d)
+            if typ == "ellipse":    return Ellipse(**d)
+            if typ == "spline":     return Spline(**d)
             if typ == "text":       return Text(**d)
             if typ == "bemassung":  return Bemassung(**d)
             if typ == "viewport":   return Viewport(**d)
@@ -5248,6 +5305,16 @@ class CadApp:
                      else "Länge / 'L<Winkel' / '@dx,dy' / 'x,y'") if de else
                     ("First point 'x,y' OR click" if self.letzter_punkt is None
                      else "Length / 'L<angle' / '@dx,dy' / 'x,y'")))
+        elif w == "ellipse":
+            h(text=(("Mittelpunkt 'x,y' ODER klicken", "Ende der ersten Achse",
+                     "Länge der zweiten Halbachse")[min(n, 2)] if de else
+                    ("Centre 'x,y' OR click", "End of the first axis",
+                     "Length of the second semi-axis")[min(n, 2)]))
+        elif w == "spline":
+            h(text=(("Stützpunkte setzen - Enter/Rechtsklick = fertig, Klick auf "
+                     "Startpunkt = geschlossen") if de else
+                    ("Set support points - Enter/right-click = finish, click on "
+                     "start point = closed")))
         elif w == "kreis":
             h(text=(("Mittelpunkt 'x,y' ODER klicken" if self.letzter_punkt is None
                      else ("Radius eingeben" if self.kreis_modus.get() == "radius"
@@ -5272,7 +5339,9 @@ class CadApp:
                        ["Set start point", "Set point on arc", "Set end point"])
             h(text=txt[min(n, 2)])
         elif w == "bemassung":
-            if self.bem_art.get() in ("radius", "durchmesser"):
+            if self.bem_art.get() in ("winkel", "winkel_linien"):
+                h(text=self._winkel_hinweis())
+            elif self.bem_art.get() in ("radius", "durchmesser"):
                 h(text=(("Kreis/Bogen anklicken" if n == 0
                          else "Position der Maßangabe setzen") if de else
                         ("Click circle/arc" if n == 0
@@ -5322,7 +5391,7 @@ class CadApp:
         einh = self._einh_faktor()
         try:
             wort = text.upper()
-            if w == "polylinie" and self.aktuelle_polylinie and wort in (
+            if w in ("polylinie", "spline") and self.aktuelle_polylinie and wort in (
                     "S", "SCHLIESSEN", "C", "CLOSE"):
                 self._polylinie_abschliessen(geschlossen=True)
                 self.letzter_punkt = None
@@ -5352,9 +5421,9 @@ class CadApp:
                 self._eingabe_kreis(text, einh)
             elif w == "rechteck":
                 self._eingabe_rechteck(text, einh)
-            elif w == "polylinie":
+            elif w in ("polylinie", "spline"):
                 self._eingabe_polylinie(text, einh)
-            elif w in ("bogen", "bemassung"):
+            elif w in ("bogen", "bemassung", "ellipse"):
                 self._eingabe_punkt_werkzeug(text, einh)
             self.eingabe_var.set("")
             self._update_eingabe_hinweis()
@@ -5887,6 +5956,45 @@ class CadApp:
             return (p[0][0], p[0][1], r, s, e)
         return bogen_aus_3_punkten(p[0], p[1], p[2])
 
+    def _ellipse_aus_punkten(self, c, p1, p2):
+        """Ellipse: centre c, end of the first axis p1, p2 fixes the second
+        semi-axis (distance of p2 to the first axis)."""
+        a = math.hypot(p1[0] - c[0], p1[1] - c[1])
+        if a < 1e-9:
+            return None
+        ux, uy = (p1[0] - c[0]) / a, (p1[1] - c[1]) / a
+        b = abs(-(p2[0] - c[0]) * uy + (p2[1] - c[1]) * ux)
+        if b < 1e-9:
+            return None
+        rot = math.degrees(math.atan2(uy, ux)) % 360.0
+        return Ellipse(c[0], c[1], a, b, rot)
+
+    def _ellipse_klick(self, pt):
+        de = SPRACHE["aktuell"] == "de"
+        n = len(self._pts)
+        if n >= 1 and math.hypot(pt[0] - self._pts[-1][0],
+                                 pt[1] - self._pts[-1][1]) < 1e-9:
+            return
+        self._pts.append(pt)
+        self.letzter_punkt = pt
+        if len(self._pts) < 3:
+            if len(self._pts) == 1:
+                self.status.set("Ellipse: Ende der ersten Achse setzen." if de
+                                else "Ellipse: set the end of the first axis.")
+            else:
+                self.status.set("Ellipse: Länge der zweiten Halbachse festlegen."
+                                if de else
+                                "Ellipse: set the length of the second semi-axis.")
+            return
+        el = self._ellipse_aus_punkten(*self._pts)
+        self._pts = []
+        self.letzter_punkt = None
+        if el is not None:
+            el.__dict__.update(self._layer_daten())
+            self._snapshot()
+            self._ziel_liste().append(el)
+        self.redraw()
+
     def _bogen_klick(self, pt):
         modus = self.bogen_modus.get()
         self._pts.append(pt)
@@ -5949,6 +6057,13 @@ class CadApp:
         daten["eig_farbe"] = True
         daten["staerke"] = None
         daten["linientyp"] = "Volllinie (schmal)"
+        if art in ("winkel", "winkel_linien"):
+            return Bemassung(pts[0][0], pts[0][1], pts[1][0], pts[1][1],
+                             x3=pts[2][0], y3=pts[2][1],
+                             mx=m[0], my=m[1], richtung="winkel",
+                             hoehe=self._zahl(self.bem_hoehe, 2.5),
+                             pfeil=self._zahl(self.bem_pfeil, 2.5),
+                             dez=self._zahl(self.bem_dez, 2, ganz=True), **daten)
         if art in ("radius", "durchmesser"):
             richt = art
         elif art == "auto":
@@ -5961,10 +6076,89 @@ class CadApp:
                          pfeil=self._zahl(self.bem_pfeil, 2.5),
                          dez=self._zahl(self.bem_dez, 2, ganz=True), **daten)
 
+    def _winkel_hinweis(self):
+        de = SPRACHE["aktuell"] == "de"
+        n = len(self._pts)
+        if self.bem_art.get() == "winkel_linien":
+            if getattr(self, "_wk_l1", None) is None:
+                return ("Winkelbemaßung: erste Linie anklicken." if de
+                        else "Angle dimension: click the first line.")
+            if n < 3:
+                return ("Winkelbemaßung: zweite Linie anklicken." if de
+                        else "Angle dimension: click the second line.")
+        else:
+            if n == 0:
+                return ("Winkelbemaßung: Scheitelpunkt setzen." if de
+                        else "Angle dimension: set the vertex.")
+            if n == 1:
+                return ("Winkelbemaßung: Punkt auf dem ersten Schenkel setzen."
+                        if de else "Angle dimension: point on the first leg.")
+            if n == 2:
+                return ("Winkelbemaßung: Punkt auf dem zweiten Schenkel setzen."
+                        if de else "Angle dimension: point on the second leg.")
+        return ("Winkelbemaßung: Bogenposition setzen, Klick = fertig." if de
+                else "Angle dimension: set the arc position, click = done.")
+
+    def _winkel_linien_klick(self, pt):
+        """Two lines -> vertex = intersection, leg points = line ends nearer
+        to the click."""
+        de = SPRACHE["aktuell"] == "de"
+        el = self._element_unter_maus(pt[0], pt[1], 8 / self.view["zoom"])
+        if not isinstance(el, Linie):
+            self.status.set("Bitte eine Linie anklicken." if de
+                            else "Please click a line.")
+            return
+        if getattr(self, "_wk_l1", None) is None:
+            self._wk_l1 = (el, pt)
+            self.status.set(self._winkel_hinweis())
+            return
+        l1, k1 = self._wk_l1
+        if el is l1:
+            self.status.set("Zwei verschiedene Linien wählen." if de
+                            else "Pick two different lines.")
+            return
+        c = G2.schnitt_geraden((l1.x1, l1.y1), (l1.x2, l1.y2),
+                               (el.x1, el.y1), (el.x2, el.y2))
+        if c is None:
+            self.status.set("Die Linien sind parallel." if de
+                            else "The lines are parallel.")
+            return
+
+        def schenkel(l, k):
+            # leg point: on the side of the vertex where the click was
+            d = (l.x2 - l.x1, l.y2 - l.y1)
+            L = math.hypot(*d) or 1.0
+            t = ((k[0] - c[0]) * d[0] + (k[1] - c[1]) * d[1]) / L
+            if abs(t) < 1e-9:
+                t = 1.0
+            return (c[0] + d[0] / L * math.copysign(max(abs(t), 1e-3), t),
+                    c[1] + d[1] / L * math.copysign(max(abs(t), 1e-3), t))
+        self._pts = [c, schenkel(l1, k1), schenkel(el, pt)]
+        self._wk_l1 = (l1, k1)
+        self.letzter_punkt = pt
+        self.status.set(self._winkel_hinweis())
+
     def _bem_klick(self, pt):
         art = self.bem_art.get()
         n = len(self._pts)
         de = SPRACHE["aktuell"] == "de"
+        if art == "winkel_linien":
+            if n >= 3:
+                self._bem_fertig(pt)
+            else:
+                self._winkel_linien_klick(pt)
+            return
+        if art == "winkel":
+            if n >= 3:
+                self._bem_fertig(pt)
+                return
+            if n >= 1 and math.hypot(pt[0] - self._pts[-1][0],
+                                     pt[1] - self._pts[-1][1]) < 1e-9:
+                return
+            self._pts.append(pt)
+            self.letzter_punkt = pt
+            self.status.set(self._winkel_hinweis())
+            return
         if art in ("radius", "durchmesser"):
             if n == 0:
                 k = self._kreis_unter_punkt(pt)
@@ -6003,9 +6197,11 @@ class CadApp:
             self._bem_fertig(pt)
 
     def _bem_fertig(self, m):
-        el = self._bem_element(self._pts[:2], m)
+        winkel = self.bem_art.get() in ("winkel", "winkel_linien")
+        el = self._bem_element(self._pts[:3 if winkel else 2], m)
         self._snapshot()
         self._ziel_liste().append(el)
+        self._wk_l1 = None
         self._pts = []
         self.letzter_punkt = None
         self._clear_temp()
@@ -6089,6 +6285,26 @@ class CadApp:
             zeige(Rechteck(lp[0], lp[1], pt[0], pt[1]))
             label((lp[0] + pt[0]) / 2, (lp[1] + pt[1]) / 2,
                   f"{abs(pt[0] - lp[0]) / einh:.1f} x {abs(pt[1] - lp[1]) / einh:.1f}", 0)
+        elif w == "ellipse" and self._pts:
+            p = self._pts
+            hilfslinie(p[0], pt if len(p) == 1 else p[1])
+            if len(p) == 1:
+                a = math.hypot(pt[0] - p[0][0], pt[1] - p[0][1])
+                label(pt[0], pt[1], f"a = {a / einh:.2f} {unit}")
+            else:
+                el = self._ellipse_aus_punkten(p[0], p[1], pt)
+                if el is not None:
+                    zeige(el)
+                    label(pt[0], pt[1], f"a = {el.a / einh:.2f}  b = {el.b / einh:.2f} {unit}")
+        elif w == "spline" and self.aktuelle_polylinie:
+            pts = list(self.aktuelle_polylinie) + [pt]
+            if len(pts) >= 3:
+                zeige(Polylinie(spline_punkte(pts)))
+            elif len(pts) == 2:
+                zeige(Polylinie(pts))
+            a = self.aktuelle_polylinie[-1]
+            label((a[0] + pt[0]) / 2, (a[1] + pt[1]) / 2,
+                  f"{math.hypot(pt[0] - a[0], pt[1] - a[1]) / einh:.2f} {unit}")
         elif w == "polylinie" and self.aktuelle_polylinie:
             pts = list(self.aktuelle_polylinie) + [pt]
             if len(pts) >= 2:
@@ -6118,6 +6334,16 @@ class CadApp:
                     a = math.radians(s + bogen_sweep(s, e) / 2)
                     label(cx + r * math.cos(a), cy + r * math.sin(a),
                           f"R {r / einh:.2f}  {bogen_sweep(s, e):.1f}°")
+        elif w == "bemassung" and self._pts and self.bem_art.get() in (
+                "winkel", "winkel_linien"):
+            p = self._pts
+            if len(p) >= 3:
+                zeige(self._bem_element(p[:3], pt),
+                      {"farbe": FARBEN["gelb"], "w": 1, "dash": None})
+            else:
+                hilfslinie(p[0], p[1] if len(p) == 2 else pt)
+                if len(p) == 2:
+                    hilfslinie(p[0], pt)
         elif w == "bemassung" and self._pts:
             radial = self.bem_art.get() in ("radius", "durchmesser")
             if len(self._pts) == 1 and not radial:
@@ -6663,6 +6889,13 @@ class CadApp:
                 el.y1 += dy
             if innen(el.x1, el.y2) or innen(el.x2, el.y2):
                 el.y2 += dy
+        elif isinstance(el, Ellipse):
+            if innen(el.cx, el.cy):
+                el.verschieben(dx, dy)
+        elif isinstance(el, Spline):
+            el.stuetz = [((x + dx, y + dy) if innen(x, y) else (x, y))
+                         for (x, y) in el.stuetz]
+            el.neu_berechnen()
         elif isinstance(el, Polylinie):
             el.punkte = [((x + dx, y + dy) if innen(x, y) else (x, y))
                          for (x, y) in el.punkte]
@@ -6674,6 +6907,8 @@ class CadApp:
                 el.x1 += dx; el.y1 += dy
             if innen(el.x2, el.y2):
                 el.x2 += dx; el.y2 += dy
+            if el.x3 is not None and innen(el.x3, el.y3):
+                el.x3 += dx; el.y3 += dy
             if innen(el.x1, el.y1) and innen(el.x2, el.y2):
                 el.mx += dx; el.my += dy
                 if el.tx is not None and el.ty is not None:
@@ -6891,7 +7126,8 @@ class CadApp:
     def _eingabe_leer(self):
         if self._op is not None:
             self._op_rechtsklick()
-        elif self.aktives_werkzeug.get() == "polylinie" and self.aktuelle_polylinie:
+        elif (self.aktives_werkzeug.get() in ("polylinie", "spline")
+              and self.aktuelle_polylinie):
             self._polylinie_abschliessen(geschlossen=False)
             self.letzter_punkt = None
         elif self.aktives_werkzeug.get() == "stutzen" and self._trim_status == "grenzen":
@@ -6941,6 +7177,12 @@ class CadApp:
             self.suchen_ersetzen()
         elif cmd == "matchprop":
             self.eigenschaften_uebertragen_start()
+        elif cmd == "messen":
+            self.messen_start()
+        elif cmd == "abrunden":
+            self.ecke_start("abrunden")
+        elif cmd == "fase":
+            self.ecke_start("fase")
         elif cmd == "attdef":
             self.attdef_erstellen()
         elif cmd == "attedit":
@@ -9474,6 +9716,219 @@ class CadApp:
         if self._eigenschaften_anwenden(pp["quelle"], el):
             pp["anzahl"] += 1
         self.redraw()
+
+    # --------------------------------------------------------
+    # Measure
+    # --------------------------------------------------------
+    def messen_start(self):
+        """MESS: click two points - distance, dX, dY and angle."""
+        de = SPRACHE["aktuell"] == "de"
+        self._mess = {"p1": None, "p2": None}
+        if self.aktives_werkzeug.get() != "auswahl":
+            self.aktives_werkzeug.set("auswahl")
+            self._werkzeug_gewechselt()
+        self._mess = {"p1": None, "p2": None}
+        self.status.set("MESSEN: ersten Punkt anklicken (Fang aktiv, "
+                        "ESC = beenden)." if de else
+                        "MEASURE: click the first point (snap active, "
+                        "ESC = finish).")
+
+    def _mess_ende(self, leise=False):
+        if getattr(self, "_mess", None) is not None:
+            self._mess = None
+            self._clear_temp()
+            if not leise:
+                de = SPRACHE["aktuell"] == "de"
+                self.status.set("Messen beendet." if de else "Measure finished.")
+
+    def _mess_text(self, p1, p2):
+        de = SPRACHE["aktuell"] == "de"
+        m = G2.messung(p1, p2)
+        f, u = self._einh_faktor(), self.einheit.get()
+        def z(v):
+            t = f"{v / f:.3f}"
+            return t.replace(".", ",") if self.dezimalkomma.get() else t
+        w = f"{m['winkel']:.2f}".replace(".", ",") if self.dezimalkomma.get() \
+            else f"{m['winkel']:.2f}"
+        return (f"{'Abstand' if de else 'Distance'} = {z(m['abstand'])} {u}   "
+                f"dX = {z(m['dx'])} {u}   dY = {z(m['dy'])} {u}   "
+                f"{'Winkel' if de else 'Angle'} = {w}\u00b0")
+
+    def _mess_zeichnen(self, p1, p2):
+        self._clear_temp()
+        c = self.canvas
+        x1, y1 = self.mm_to_px(*p1)
+        x2, y2 = self.mm_to_px(*p2)
+        farbe = FARBEN["cyan"]
+        c.create_line(x1, y1, x2, y2, fill=farbe, width=2, dash=(5, 3),
+                      tags="vorschau")
+        c.create_line(x1, y1, x2, y1, fill=farbe, width=1, dash=(2, 3),
+                      tags="vorschau")
+        c.create_line(x2, y1, x2, y2, fill=farbe, width=1, dash=(2, 3),
+                      tags="vorschau")
+        for (px, py) in ((x1, y1), (x2, y2)):
+            c.create_oval(px - 4, py - 4, px + 4, py + 4, outline=farbe,
+                          width=2, tags="vorschau")
+        m = G2.messung(p1, p2)
+        f, u = self._einh_faktor(), self.einheit.get()
+        c.create_text((x1 + x2) / 2 + 8, (y1 + y2) / 2 - 10,
+                      text=f"{m['abstand'] / f:.3f} {u}", fill=farbe,
+                      anchor="w", font=(UI_SCHRIFT, 10, "bold"),
+                      tags="vorschau")
+
+    def _mess_bewegt(self, event):
+        ms = self._mess
+        pt = self._eingabepunkt(event, ms["p1"])
+        if ms["p1"] is not None and ms["p2"] is None:
+            self._mess_zeichnen(ms["p1"], pt)
+            self.status.set("[MESSEN]  " + self._mess_text(ms["p1"], pt))
+        self._fadenkreuz(event.x, event.y)
+
+    def _mess_klick(self, event):
+        de = SPRACHE["aktuell"] == "de"
+        ms = self._mess
+        pt = self._eingabepunkt(event, ms["p1"])
+        if ms["p1"] is None or ms["p2"] is not None:
+            ms["p1"], ms["p2"] = pt, None
+            self._clear_temp()
+            self.status.set("MESSEN: zweiten Punkt anklicken." if de else
+                            "MEASURE: click the second point.")
+            return
+        ms["p2"] = pt
+        self._mess_zeichnen(ms["p1"], pt)
+        txt = self._mess_text(ms["p1"], pt)
+        self.status.set("[MESSEN]  " + txt + ("  |  Klick = neue Messung, ESC = "
+                        "beenden" if de else "  |  click = new measurement, "
+                        "ESC = finish"))
+        self.messergebnis = txt
+
+    # --------------------------------------------------------
+    # Fillet / chamfer
+    # --------------------------------------------------------
+    def ecke_start(self, art):
+        """ABRUNDEN / FASE: ask for the size, then click two lines."""
+        de = SPRACHE["aktuell"] == "de"
+        f, u = self._einh_faktor(), self.einheit.get()
+        P = self._ecke_param
+        if art == "abrunden":
+            r = simpledialog.askfloat(
+                "Abrunden" if de else "Fillet",
+                (f"Radius in {u} (0 = Ecke schließen):" if de
+                 else f"Radius in {u} (0 = join corner):"),
+                initialvalue=P["r"] / f, minvalue=0.0, parent=self.root)
+            if r is None:
+                return
+            P["r"] = r * f
+        else:
+            d1 = simpledialog.askfloat(
+                "Fase" if de else "Chamfer",
+                (f"Abstand auf der ersten Linie in {u}:" if de
+                 else f"Distance on the first line in {u}:"),
+                initialvalue=P["d1"] / f, minvalue=0.0, parent=self.root)
+            if d1 is None:
+                return
+            d2 = simpledialog.askfloat(
+                "Fase" if de else "Chamfer",
+                (f"Abstand auf der zweiten Linie in {u}:" if de
+                 else f"Distance on the second line in {u}:"),
+                initialvalue=d1, minvalue=0.0, parent=self.root)
+            if d2 is None:
+                return
+            P["d1"], P["d2"] = d1 * f, d2 * f
+        if self.aktives_werkzeug.get() != "auswahl":
+            self.aktives_werkzeug.set("auswahl")
+            self._werkzeug_gewechselt()
+        self._ecke = {"art": art, "l1": None}
+        self.status.set(self._ecke_hinweis())
+
+    def _ecke_hinweis(self):
+        de = SPRACHE["aktuell"] == "de"
+        name = ("ABRUNDEN" if self._ecke["art"] == "abrunden" else "FASE") if de \
+            else ("FILLET" if self._ecke["art"] == "abrunden" else "CHAMFER")
+        n = "erste" if self._ecke["l1"] is None else "zweite"
+        n_en = "first" if self._ecke["l1"] is None else "second"
+        return (f"{name}: {n} Linie anklicken (ESC = beenden)." if de
+                else f"{name}: click the {n_en} line (ESC = finish).")
+
+    def _ecke_ende(self, leise=False):
+        if getattr(self, "_ecke", None) is not None:
+            self._ecke = None
+            if not leise:
+                de = SPRACHE["aktuell"] == "de"
+                self.status.set("Beendet." if de else "Finished.")
+
+    @staticmethod
+    def _linie_setzen(l, nah, fern):
+        """Keeps the end `fern` of line l, moves the other end to `nah`."""
+        d1 = math.hypot(l.x1 - fern[0], l.y1 - fern[1])
+        d2 = math.hypot(l.x2 - fern[0], l.y2 - fern[1])
+        if d1 <= d2:
+            l.x1, l.y1, l.x2, l.y2 = fern[0], fern[1], nah[0], nah[1]
+        else:
+            l.x1, l.y1, l.x2, l.y2 = nah[0], nah[1], fern[0], fern[1]
+
+    def ecke_anwenden(self, l1, l2, art, P):
+        """Fillets/chamfers the corner of two Linie objects; returns the new
+        element (Bogen/Linie) or True (corner only joined) or None."""
+        a = ((l1.x1, l1.y1), (l1.x2, l1.y2))
+        b = ((l2.x1, l2.y1), (l2.x2, l2.y2))
+        neu = None
+        if art == "abrunden":
+            e = G2.abrunden(a, b, P["r"])
+            if e is None:
+                return None
+            self._linie_setzen(l1, *e["neu1"])
+            self._linie_setzen(l2, *e["neu2"])
+            if e["mitte"] is not None:
+                neu = Bogen(e["mitte"][0], e["mitte"][1], e["r"], e["w0"], e["w1"],
+                            layer=l1.layer, farbe=l1.farbe, linientyp=l1.linientyp,
+                            eig_farbe=l1.eig_farbe, staerke=l1.staerke)
+        else:
+            e = G2.fase(a, b, P["d1"], P["d2"])
+            if e is None:
+                return None
+            self._linie_setzen(l1, *e["neu1"])
+            self._linie_setzen(l2, *e["neu2"])
+            if e["fase"] is not None:
+                (p, q) = e["fase"]
+                neu = Linie(p[0], p[1], q[0], q[1], layer=l1.layer,
+                            farbe=l1.farbe, linientyp=l1.linientyp,
+                            eig_farbe=l1.eig_farbe, staerke=l1.staerke)
+        if neu is not None:
+            self._ziel_liste().append(neu)
+        return neu if neu is not None else True
+
+    def _ecke_klick(self, event):
+        de = SPRACHE["aktuell"] == "de"
+        x, y = self.px_to_mm(event.x, event.y)
+        el = self._element_unter_maus(x, y, 8 / self.view["zoom"])
+        if not isinstance(el, Linie):
+            self.status.set("Bitte eine Linie anklicken." if de
+                            else "Please click a line.")
+            return
+        E = self._ecke
+        if E["l1"] is None:
+            E["l1"] = el
+            self.auswahl = [el]
+            self.redraw()
+            self.status.set(self._ecke_hinweis())
+            return
+        if el is E["l1"]:
+            self.status.set("Zwei verschiedene Linien wählen." if de
+                            else "Pick two different lines.")
+            return
+        self._snapshot()
+        erg = self.ecke_anwenden(E["l1"], el, E["art"], self._ecke_param)
+        E["l1"] = None
+        self.auswahl = []
+        self.redraw()
+        if erg is None:
+            self.status.set("Nicht möglich (Linien parallel oder Radius/Abstand "
+                            "zu groß)." if de else
+                            "Not possible (lines parallel or radius/distance "
+                            "too large).")
+        else:
+            self.status.set(self._ecke_hinweis())
 
     def _schraffur_pick_start(self):
         """Like AutoCAD: no selection needed - click into a closed area."""
