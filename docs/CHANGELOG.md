@@ -19,6 +19,11 @@
 - Suchen und Ersetzen als Symbol in der Werkzeugleiste
 - „Block als Datei speichern“ und „Gerät als Datei speichern“ zusammengeführt: ein Eintrag „Block/Gerät als Datei speichern…“ (Menü Blöcke)
 - Neue Symbolkategorie „10 PLC“ (SPS): Digital-/Analog-Ein- und -Ausgangsbaugruppen, CPU und Einzelkanäle; jede trägt das unsichtbare Attribut `SPS` (CPU/DI/DO/AI/AO) und als Pin-Namen die Kanaladresse – Grundlage für die spätere SPS-Liste
+- SPS: Beschriftung der Kanal-Pins an den SPS-Baugruppen steht jetzt links neben der Anschlusslinie; Zusatzfelder (unsichtbare Attribute) Steuerung `STATION`, Steckplatz `PLATZ`, je Kanal Symbol `VPn_SYM` und Kommentar `VPn_KOM`
+- Neue **SPS-Liste** (E/A-Liste: Steuerung, Baugruppe, Platz, Art, Adresse, Datentyp, Symbol, Kommentar, Anschluss, Fundstelle), auch als CSV
+- Neues Elektro-Werkzeug **Funktionstext** (`FTEXT`): mehrzeiliger Text auf dem Layer „F-Text“; die Geräteliste und der Klemmenplan zeigen ihn ganz rechts in der Spalte „Funktion“ bei allen Geräten/Klemmen hinter dem Einfügepunkt
+- „Gerät aus Datei laden…“ (Elektro) ersetzt durch „Block/Gerät aus Datei laden…“ im Menü Blöcke (lädt die Datei in die Blockbibliothek)
+- Zoom +, Zoom −, Zoom Grenzen und Reset als Symbole (Lupen, Pfeilkreise) in der Werkzeugzeile; die Beschriftung „Elektro:“ ist rot
 - Versionssprung auf 1.1.0
 
 ## 1.0.3

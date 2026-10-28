@@ -41,7 +41,7 @@ gespeichert.
 | Bereich | Was es tut |
 |---|---|
 | **Menüleiste** | Datei, Projekt, Bearbeiten, Einfügen, Ansicht, Blöcke, Elektro, Sprache, Hilfe |
-| **Werkzeugleisten** (oben) | Zeichenwerkzeuge (Auswahl, Linie, Polylinie, Kreis, Bogen, Rechteck, Text, Bemaßung, Stutzen, Brechen) und die Elektro-Werkzeuge (Pin, Verbindung, Querverweis, Maske, Klemme, Kabel, …). Dazu Layer, Linienart, Linienstärke, Farbe, Einheit, Maßstab, Zoom. |
+| **Werkzeugleisten** (oben) | Zeichenwerkzeuge (Auswahl, Linie, Polylinie, Kreis, Bogen, Rechteck, Text, Bemaßung, Stutzen, Brechen) und die Elektro-Werkzeuge (Pin, Verbindung, Querverweis, Maske, Klemme, Kabel, …). Dazu Layer, Linienart, Linienstärke, Farbe, Einheit, Maßstab und die Zoom-Symbole (Lupe +, Lupe −, Lupe „+ G“ = Zoom Grenzen, Reset). Die Zeichenwerkzeuge sind lila, die Elektro-Werkzeuge rot dargestellt. |
 | **Seitenleiste** (links, F4 blendet sie aus/ein) | Rückgängig / Wiederholen und die Blattliste des Projekts |
 | **Zeichenfläche** | Hier zeichnest du. Das Modell ist die Zeichnung in 1:1, das Layout das Papierblatt. |
 | **Eingabezeile** | Unter der Zeichenfläche. Hier tippst du Befehle und Koordinaten. |
@@ -196,6 +196,7 @@ Alle Werkzeuge stehen im Menü **Elektro** und in der Werkzeugleiste.
 | **Klemme** (KLEMME) | Reihenklemme mit zwei Anschlüssen (oben/unten) und den Feldern IND (Klemmleiste), TYP, PER, NUM (Nummer). |
 | **Kabel** (KABEL) | Waagerechte Linie mit Beschriftung. Wo eine senkrechte Leitung sie kreuzt, entsteht automatisch ein Aderstrich (L1, L2, L3, N, PE …), die Bezeichnung ist änderbar. |
 | **Koordinatenfeld** (FELD) | Spalten-/Zeilenraster des Blatts, damit Verweise als „Blatt/Spalte/Zeile“ angegeben werden. Im Dialog wählst du **DIN A4** (287 × 164 mm, 6 × 4) oder **DIN A3** (395 × 252,59 mm, 8 × 5) oder gibst eigene Werte ein. |
+| **Funktionstext** (FTEXT) | Normaler mehrzeiliger Text auf dem Layer **F-Text** (wird automatisch angelegt). Er beschreibt, wofür die Geräte und Klemmen **hinter** seinem Einfügepunkt da sind. Regel: Ein Gerät/eine Klemme gehört zum nächstliegenden Funktionstext **desselben Blatts**, der **links von ihr (oder direkt darüber)** liegt. In Geräteliste und Klemmenplan erscheint der Text ganz **rechts** in der Spalte **Funktion** (ohne Funktionstexte entfällt die Spalte). |
 
 ### Fertige Symbole
 
@@ -270,6 +271,7 @@ Blätter im Projekt, wahlweise in **DIN A4** oder **DIN A3** (Auswahl im Dialog;
 
 - **Deckblatt** und **Inhaltsverzeichnis** (vor den Zeichnungsblättern)
 - **Geräteliste**, **Klemmenplan** und **Kabelplan** (dahinter)
+- **SPS-Liste** (E/A-Liste aller SPS-Baugruppen: Steuerung, Baugruppe, Platz, Art, Adresse, Datentyp, Symbol, Kommentar, Anschluss, Fundstelle). Als SPS-Baugruppe gilt jeder Block mit dem Attribut `SPS` = `DI`, `DO`, `AI` oder `AO` (die Symbole aus „10 PLC“ haben es). Zusatzfelder trägst du mit **Attribute bearbeiten** ein: `STATION` (Steuerung), `PLATZ` (Steckplatz) und je Kanal `VPn_SYM` (Symbol) und `VPn_KOM` (Kommentar). Die Adresse ist der Pin-Text (z. B. `I0.0`).
 - weitere Listen (im Dialog zuschaltbar): **Verbindungsliste** (von/nach mit Kabel und Ader), **Stückliste** (gruppiert nach TYP mit Hersteller, Bestellnummer, Beschreibung und Kennzeichen), **Querverweisliste**, **Potenzialübersicht** (L1, N, PE, +24V … mit allen Anschlüssen), **Steckerübersicht** (Pinbelegung aller Stecker; als Stecker gelten Geräte mit Kennzeichen `X…` oder einem Typ wie „Stecker“/„Buchse“), **Etikettenliste** (Geräte, Klemmen, Kabel zum Beschriften) und **Revisionsübersicht** (aus der Revisionstabelle der Projekteigenschaften)
 
 Im Dialog wählst du die gewünschten Blätter, die Schriftkopf-Vorlage und die

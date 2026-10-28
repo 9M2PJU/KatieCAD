@@ -44,6 +44,7 @@ Change the language in the **Language** menu (Deutsch / English). It is remember
 | **Side bar** (left, F4 shows/hides it) | Undo / Redo and the sheet list of the project |
 | **Drawing area** | This is where you draw. The model is the drawing at 1:1, the layout is the paper sheet. |
 | **Input line** | Below the drawing area. Type commands and coordinates here. |
+| **Toolbars** | Drawing tools are purple, electrical tools red; zoom has magnifier icons (+, -, "+ G" = zoom extents) and a reset icon. |
 | **Status bar** | Mouse coordinates, zoom, layer, selection, hints for the current tool and the switches for object snap, grid and ortho |
 
 The hint in the status bar always tells you what the active tool expects next.
@@ -194,6 +195,7 @@ All tools are in the **Electrical** menu and in the toolbar.
 | **Terminal** (KLEMME) | Terminal block with two connections (top/bottom) and the fields IND (terminal strip), TYP, PER, NUM (number). |
 | **Cable** (KABEL) | Horizontal line with a label. Where a vertical wire crosses it, a core marker (L1, L2, L3, N, PE …) appears automatically; the designation can be changed. |
 | **Coordinate field** (FELD) | Column/row grid of the sheet, so that references can be given as "sheet/column/row". In the dialog choose **DIN A4** (287 × 164 mm, 6 × 4), **DIN A3** (395 × 252.59 mm, 8 × 5) or enter your own values. |
+| **Function text** (FTEXT) | Normal multi-line text on the layer **F-Text** (created automatically). It says what the devices and terminals **behind** its insertion point are for. Rule: a device/terminal belongs to the nearest function text **on the same sheet** that lies **to its left (or directly above)**. The text appears at the far **right** of the device list and the terminal diagram in the column **Function** (the column is dropped when there are no function texts). |
 
 ### Ready-made symbols
 
@@ -213,7 +215,7 @@ are already prepared. The list is in `symbols/README.md`.
 4. **Electrical > Create device from selection…**, click the base point, enter a
    name and confirm main/auxiliary device. The device is now a block and is saved
    as a file in the block folder.
-5. Place it with **Insert block/device (I)** or **Electrical > Load device from file…**.
+5. Place it with **Insert block/device (I)** or **Blocks > Load block/device from file…**.
    On insertion the program asks for IND, TYP, PER and the pin names.
 
 Devices with the **same IND** belong together: the main device shows the sheets of
@@ -264,6 +266,7 @@ project, in either **DIN A4** or **DIN A3** (chosen in the dialog; on A3 areas, 
 
 - **cover sheet** and **table of contents** (in front of the drawing sheets)
 - **device list**, **terminal diagram** and **cable plan** (behind them)
+- **PLC list** (I/O list of all PLC modules: controller, module, slot, type, address, data type, symbol, comment, connection, location). A block is a PLC module if it has the attribute `SPS` = `DI`, `DO`, `AI` or `AO` (the symbols of "10 PLC" do). Fill in the extra fields with **Edit attributes**: `STATION` (controller), `PLATZ` (slot) and per channel `VPn_SYM` (symbol) and `VPn_KOM` (comment). The address is the pin text (e.g. `I0.0`).
 - more lists (switch on in the dialog): **connection list** (from/to with cable and core), **parts list** (grouped by TYP with manufacturer, order number, description and designations), **cross reference list**, **potential overview** (L1, N, PE, +24V ... with all connections), **connector overview** (pin assignment of all connectors; connectors are devices with a designation `X...` or a type like "connector"/"plug"), **label list** (devices, terminals, cables for labelling) and **revision overview** (from the revision table in the project properties)
 
 In the dialog you choose the sheets, the title block template and the project data

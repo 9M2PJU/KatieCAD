@@ -19,6 +19,11 @@
 - Find and replace as an icon in the toolbar
 - "Save block to file" and "Save device to file" merged into one entry "Save block/device to file..." (Blocks menu)
 - New symbol category "10 PLC": digital/analogue input and output modules, CPU and single channels; each carries the invisible attribute `SPS` (CPU/DI/DO/AI/AO) and the channel address as pin name - basis for the later PLC list
+- PLC: labels of the channel pins now sit to the left of the connection line; extra fields (invisible attributes) controller `STATION`, slot `PLATZ`, per channel symbol `VPn_SYM` and comment `VPn_KOM`
+- New **PLC list** (I/O list: controller, module, slot, type, address, data type, symbol, comment, connection, location), also as CSV
+- New electrical tool **Function text** (`FTEXT`): multi-line text on the layer "F-Text"; the device list and the terminal diagram show it at the far right in the column "Function" for all devices/terminals behind the insertion point
+- "Load device from file..." (Electrical) replaced by "Load block/device from file..." in the Blocks menu (loads the file into the block library)
+- Zoom +, Zoom -, Zoom extents and Reset as icons (magnifiers, circular arrows) in the toolbar; the label "Electrical:" is red
 - Version jump to 1.1.0
 
 ## 1.0.3
