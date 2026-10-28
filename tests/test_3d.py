@@ -266,4 +266,10 @@ check(core.BEFEHLE.get("SCHRANK") == "3d:neu:schrank", "Befehl SCHRANK")
 for k in ("menu.3d.schrank", "d3.neu.schrank", "d3.schrank.auswahl", "d3.schrank.frei", "d3.schrank.pb", "d3.schrank.ph",
           "d3.schrank.platte", "d3.schrank.sockel", "d3.schrank.ohne", "tb.wz.k_schrank"):
     check(k in I.TEXTE["de"] and k in I.TEXTE["en"], k)
+_g2 = SCH.schrank_bauen(600, 1800, 300, 0, 0, 0, None, 0, True, True, True)
+_b2 = {t.bez: t.bbox3() for t in _g2.teile}
+check({"Tür", "Seitenwand links", "Seitenwand rechts"} <= set(_b2) and len(_g2.teile) == 4, "Schrank: Tür + Seitenwände")
+check(_b2["Tür"][4] == SCH.TUER_DICKE and _b2["Seitenwand rechts"][3] == 600, "Tür/Seitenwand Lage")
+for k in ("d3.schrank.tuer", "d3.schrank.seite_l", "d3.schrank.seite_r"):
+    check(k in I.TEXTE["de"] and k in I.TEXTE["en"], k)
 print(f"test_3d - {ok} Checks bestanden")
