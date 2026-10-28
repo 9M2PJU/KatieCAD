@@ -19,7 +19,7 @@ from copy import deepcopy
 from katiecad.common.i18n import tr, SPRACHE
 from katiecad.model.geom2d import ellipse_punkte, spline_punkte
 from katiecad.model.geom3d import (prisma_netz_gerundet, profil_abrunden, v_rotieren, punkt_rotieren, prisma_netz, pyramide_netz, kugel_netz, kreis_profil,
-                                   rechteck_profil, netz_abbilden, ebene_punkt, ebene_basis, BODEN_EBENE)
+                                   rechteck_profil, netz_abbilden, ebene_punkt, ebene_basis, BODEN_EBENE, v_cross)
 
 
 # ============================================================
@@ -4181,29 +4181,78 @@ class Skizze3D(Element):
 
 
 class Text3D(Element):
-    """Text label at a point in space (3D view). It always faces the viewer; in the 2D
-    drawing it appears as ordinary text at (x, y)."""
+    """Text in the 3D model. With a work plane (`ebene`: 9-tuple, axes u/v used) the text lies
+    on that plane as stroke text, lower left corner at `p`, rotated by `winkel` degrees within
+    the plane. Without a plane (older files) it is a label that faces the viewer.
+    In the 2D drawing it appears as ordinary text (vertical planes: as lines)."""
 
-    def __init__(self, p=(0, 0, 0), inhalt="", hoehe=3.5, **kw):
+    def __init__(self, p=(0, 0, 0), inhalt="", hoehe=3.5, ebene=None, winkel=0.0, **kw):
         super().__init__("text3d", **kw)
         self.p = tuple(float(v) for v in p)
         self.inhalt = inhalt
         self.hoehe = float(hoehe)
+        self.ebene = _ebene_tuple(ebene)
+        self.winkel = float(winkel)
 
     def zentrum3(self):
         return self.p
 
-    def _text2d(self):
-        t = Text(self.p[0], self.p[1], self.inhalt, hoehe=self.hoehe, layer=self.layer,
-                 farbe=self.farbe, linientyp=self.linientyp, eig_farbe=self.eig_farbe,
-                 staerke=self.staerke)
-        return t
+    def _achsen(self):
+        """In-plane axes (u, v) including the rotation `winkel`."""
+        e = self.ebene or BODEN_EBENE
+        u, v = tuple(e[3:6]), tuple(e[6:9])
+        if abs(self.winkel) > 1e-9:
+            w = v_cross(u, v)
+            u, v = v_rotieren(u, w, self.winkel), v_rotieren(v, w, self.winkel)
+        return u, v
 
-    def bbox(self):
-        return self._text2d().bbox()
+    def zuege3(self):
+        """3D polylines of the stroke text (empty for the viewer-facing variant)."""
+        if self.ebene is None:
+            return []
+        from katiecad.model.strichschrift import text_zuege
+        u, v = self._achsen()
+        p = self.p
+        return [[(p[0] + x * u[0] + y * v[0], p[1] + x * u[1] + y * v[1],
+                  p[2] + x * u[2] + y * v[2]) for (x, y) in zug]
+                for zug in text_zuege(self.inhalt, self.hoehe)]
+
+    def _kw(self):
+        return dict(layer=self.layer, farbe=self.farbe, linientyp=self.linientyp,
+                    eig_farbe=self.eig_farbe, staerke=self.staerke)
+
+    def _flach_oben(self):
+        if self.ebene is None:
+            return True
+        n = v_cross(tuple(self.ebene[3:6]), tuple(self.ebene[6:9]))
+        return abs(n[2]) > 0.99
+
+    def _text2d(self):
+        w = 0.0
+        if self.ebene is not None:
+            u, _v = self._achsen()
+            w = math.degrees(math.atan2(u[1], u[0]))
+            n = v_cross(tuple(self.ebene[3:6]), tuple(self.ebene[6:9]))
+            if n[2] < 0:
+                w = 0.0
+        return Text(self.p[0], self.p[1], self.inhalt, hoehe=self.hoehe, winkel=w, **self._kw())
 
     def aufgeloest(self):
-        return [self._text2d()]
+        if self._flach_oben():
+            return [self._text2d()]
+        out = []
+        for zug in self.zuege3():                 # vertical text: its strokes seen from above
+            for a, b in zip(zug, zug[1:]):
+                if math.hypot(a[0] - b[0], a[1] - b[1]) > 1e-9:
+                    out.append(Linie(a[0], a[1], b[0], b[1], **self._kw()))
+        return out
+
+    def bbox(self):
+        bs = [el.bbox() for el in self.aufgeloest()]
+        if not bs:
+            return (self.p[0], self.p[1], self.p[0], self.p[1])
+        return (min(b[0] for b in bs), min(b[1] for b in bs),
+                max(b[2] for b in bs), max(b[3] for b in bs))
 
     def verschieben(self, dx, dy, dz=0.0):
         self.p = (self.p[0] + dx, self.p[1] + dy, self.p[2] + dz)
@@ -4211,9 +4260,15 @@ class Text3D(Element):
     def drehen(self, cx, cy, winkel_deg):
         x, y = punkte_drehen(self.p[0], self.p[1], cx, cy, winkel_deg)
         self.p = (x, y, self.p[2])
+        if self.ebene is not None:
+            self.ebene = (self.p + tuple(v_rotieren(self.ebene[3:6], (0, 0, 1), winkel_deg))
+                          + tuple(v_rotieren(self.ebene[6:9], (0, 0, 1), winkel_deg)))
 
     def drehen3(self, p0, achse, winkel_deg):
         self.p = tuple(punkt_rotieren(self.p, p0, achse, winkel_deg))
+        if self.ebene is not None:
+            self.ebene = (self.p + tuple(v_rotieren(self.ebene[3:6], achse, winkel_deg))
+                          + tuple(v_rotieren(self.ebene[6:9], achse, winkel_deg)))
 
     def skalieren(self, cx, cy, f):
         x, y = _skal_pt(self.p[0], self.p[1], cx, cy, f)
@@ -4227,6 +4282,7 @@ class Text3D(Element):
     def to_dict(self):
         d = super().to_dict()
         d["p"] = list(self.p)
+        d["ebene"] = list(self.ebene) if self.ebene is not None else None
         return d
 
 

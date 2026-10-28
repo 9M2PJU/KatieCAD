@@ -35,6 +35,8 @@ def zuege3(el):
         return [(pts, el.geschlossen())] if len(pts) >= 2 else []
     if isinstance(el, Bemassung3D):
         return [(z, False) for z in el.zuege3()]
+    if isinstance(el, Text3D):
+        return [(z, False) for z in el.zuege3() if len(z) >= 2] if el.ebene is not None else []
     return [([(x, y, 0.0) for (x, y) in zug], closed) for zug, closed in flache_zuege(el)]
 
 
@@ -139,7 +141,7 @@ def pick(elemente, kamera, cx, cy, mx, my, tol=8.0):
     for el in reversed(elemente):
         if ist_3d(el):
             continue
-        if isinstance(el, Text3D):
+        if isinstance(el, Text3D) and el.ebene is None:
             q = kamera.proj(el.p, cx, cy)
             if q:
                 zeilen = (el.inhalt or " ").split("\n")
@@ -696,7 +698,7 @@ def szene_segmente(elemente, kamera, cx, cy, sichtbar=None):
             q = kamera.proj(el.text_pos3(), cx, cy)
             if q:
                 texte.append((el, (q[0], q[1]), el.wert_text()))
-        elif isinstance(el, Text3D):
+        elif isinstance(el, Text3D) and el.ebene is None:
             q = kamera.proj(el.p, cx, cy)
             if q:
                 texte.append((el, (q[0], q[1]), el.inhalt))
