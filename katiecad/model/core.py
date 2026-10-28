@@ -18,6 +18,8 @@ from copy import deepcopy
 
 from katiecad.common.i18n import tr, SPRACHE
 from katiecad.model.geom2d import ellipse_punkte, spline_punkte
+from katiecad.model.geom3d import (prisma_netz, pyramide_netz, kugel_netz, kreis_profil,
+                                   rechteck_profil)
 
 
 # ============================================================
@@ -601,6 +603,14 @@ BEFEHLE = {
     "VERSATZ": "versatz", "OFFSET": "versatz", "O": "versatz",
     "LAENGE": "laenge", "LÄNGE": "laenge", "LENGTHEN": "laenge", "LEN": "laenge",
     "MANIP": "manip", "MANIPULATOR": "manip", "MP": "manip",
+    "3D": "3d:oeffnen", "3DANSICHT": "3d:oeffnen", "3DVIEW": "3d:oeffnen",
+    "QUADER": "3d:neu:quader", "BOX": "3d:neu:quader",
+    "PYRAMIDE": "3d:neu:pyramide", "PYRAMID": "3d:neu:pyramide",
+    "ZYLINDER": "3d:neu:zylinder", "CYLINDER": "3d:neu:zylinder",
+    "KEGEL": "3d:neu:kegel", "CONE": "3d:neu:kegel",
+    "KUGEL": "3d:neu:kugel", "SPHERE": "3d:neu:kugel",
+    "EXTRUDIEREN": "3d:extrudieren", "EXT": "3d:extrudieren", "EXTRUDE": "3d:extrudieren",
+    "3DBLOCK": "3d:block", "3DAUFLOESEN": "3d:aufloesen",
     "AUSRICHTEN": "ausrichten:links", "ALIGN": "ausrichten:links",
     "AUSLINKS": "ausrichten:links", "AUSRECHTS": "ausrichten:rechts",
     "AUSOBEN": "ausrichten:oben", "AUSUNTEN": "ausrichten:unten",
@@ -3656,8 +3666,265 @@ class Koordinatenfeld(Element):
         self.x, self.y = punkte_drehen(self.x, self.y, cx, cy, winkel_deg)
 
 
+# ============================================================
+# 3D bodies (wireframe)
+# ============================================================
+class Koerper3D(Element):
+    """Simple 3D body for the wireframe view.
+
+    art "prisma":   base polygon `profil` extruded from z0 by `hoehe` (may be
+                    negative = downwards): box, cylinder, extruded 2D shapes.
+    art "pyramide": base polygon at z0, apex at z0 + hoehe above `spitze`
+                    (default centre): pyramid, cone.
+    art "kugel":    sphere `kugel` = (cx, cy, cz, r).
+    `rund`: base is a circle/ellipse (only a few vertical edges are drawn).
+    In the 2D drawing the body appears as its plan view (top view)."""
+    ARTEN = ("prisma", "pyramide", "kugel")
+
+    def __init__(self, art="prisma", profil=None, z0=0.0, hoehe=10.0, spitze=None,
+                 rund=False, kugel=None, bez="", **kw):
+        super().__init__("koerper3d", **kw)
+        self.art = art if art in self.ARTEN else "prisma"
+        self.profil = [(float(p[0]), float(p[1])) for p in (profil or [])]
+        self.z0, self.hoehe = float(z0), float(hoehe)
+        self.spitze = None if spitze is None else (float(spitze[0]), float(spitze[1]))
+        self.rund = bool(rund)
+        self.kugel = None if kugel is None else tuple(float(v) for v in kugel)
+        self.bez = bez
+
+    # ---- geometry ---------------------------------------------------------
+    def netz(self):
+        if self.art == "kugel" and self.kugel:
+            return kugel_netz(*self.kugel)
+        if self.art == "pyramide":
+            return pyramide_netz(self.profil, self.z0, self.hoehe, self.spitze, self.rund)
+        return prisma_netz(self.profil, self.z0, self.hoehe, self.rund)
+
+    def netze(self):
+        return [self.netz()]
+
+    def koerper(self):
+        return [self]
+
+    def bbox3(self):
+        return self.netz().bbox()
+
+    def bbox(self):
+        if self.art == "kugel" and self.kugel:
+            cx, cy, _cz, r = self.kugel
+            return (cx - r, cy - r, cx + r, cy + r)
+        if not self.profil:
+            return (0, 0, 0, 0)
+        xs = [p[0] for p in self.profil]; ys = [p[1] for p in self.profil]
+        if self.spitze:
+            xs.append(self.spitze[0]); ys.append(self.spitze[1])
+        return (min(xs), min(ys), max(xs), max(ys))
+
+    def zentrum3(self):
+        b = self.bbox3()
+        if b is None:
+            return (0.0, 0.0, 0.0)
+        return ((b[0] + b[3]) / 2, (b[1] + b[4]) / 2, (b[2] + b[5]) / 2)
+
+    def aufgeloest(self):
+        """Plan view as 2D lines (for the normal drawing, picking and DXF)."""
+        kw = dict(layer=self.layer, farbe=self.farbe, linientyp=self.linientyp,
+                  eig_farbe=self.eig_farbe, staerke=self.staerke)
+        if self.art == "kugel" and self.kugel:
+            return [Kreis(self.kugel[0], self.kugel[1], self.kugel[3], **kw)]
+        out, gesehen = [], set()
+        nz = self.netz()
+        for (i, j) in nz.kanten:
+            a, b = nz.punkte[i], nz.punkte[j]
+            if math.hypot(a[0] - b[0], a[1] - b[1]) < 1e-9:
+                continue
+            key = tuple(sorted(((round(a[0], 6), round(a[1], 6)),
+                                (round(b[0], 6), round(b[1], 6)))))
+            if key in gesehen:
+                continue
+            gesehen.add(key)
+            out.append(Linie(a[0], a[1], b[0], b[1], **kw))
+        return out
+
+    # ---- transformations -------------------------------------------------
+    def verschieben(self, dx, dy, dz=0.0):
+        self.profil = [(x + dx, y + dy) for (x, y) in self.profil]
+        if self.spitze:
+            self.spitze = (self.spitze[0] + dx, self.spitze[1] + dy)
+        if self.kugel:
+            self.kugel = (self.kugel[0] + dx, self.kugel[1] + dy, self.kugel[2] + dz,
+                          self.kugel[3])
+        self.z0 += dz
+
+    def drehen(self, cx, cy, winkel_deg):
+        self.profil = [punkte_drehen(x, y, cx, cy, winkel_deg) for (x, y) in self.profil]
+        if self.spitze:
+            self.spitze = punkte_drehen(self.spitze[0], self.spitze[1], cx, cy, winkel_deg)
+        if self.kugel:
+            x, y = punkte_drehen(self.kugel[0], self.kugel[1], cx, cy, winkel_deg)
+            self.kugel = (x, y, self.kugel[2], self.kugel[3])
+
+    def skalieren(self, cx, cy, f):
+        self.profil = [_skal_pt(x, y, cx, cy, f) for (x, y) in self.profil]
+        if self.spitze:
+            self.spitze = _skal_pt(self.spitze[0], self.spitze[1], cx, cy, f)
+        if self.kugel:
+            x, y = _skal_pt(self.kugel[0], self.kugel[1], cx, cy, f)
+            self.kugel = (x, y, self.kugel[2] * f, self.kugel[3] * f)
+        self.z0 *= f
+        self.hoehe *= f
+
+    def spiegeln(self, ax, ay, bx, by):
+        self.profil = [punkt_spiegeln(x, y, ax, ay, bx, by) for (x, y) in self.profil]
+        if self.spitze:
+            self.spitze = punkt_spiegeln(self.spitze[0], self.spitze[1], ax, ay, bx, by)
+        if self.kugel:
+            x, y = punkt_spiegeln(self.kugel[0], self.kugel[1], ax, ay, bx, by)
+            self.kugel = (x, y, self.kugel[2], self.kugel[3])
+
+    def hoehe_setzen(self, h):
+        """Push/pull: new signed height (apex / top face moves)."""
+        if self.art in ("prisma", "pyramide"):
+            self.hoehe = float(h)
+
+    def to_dict(self):
+        d = super().to_dict()
+        d["profil"] = [list(p) for p in self.profil]
+        d["spitze"] = list(self.spitze) if self.spitze else None
+        d["kugel"] = list(self.kugel) if self.kugel else None
+        return d
+
+
+class Gruppe3D(Element):
+    """'3D block': several 3D bodies handled as one object (overview only,
+    NOT a device with an electrical function)."""
+
+    def __init__(self, teile=None, name="3D-Block", **kw):
+        super().__init__("gruppe3d", **kw)
+        self.name = name
+        self.teile = []
+        for t in (teile or []):
+            if isinstance(t, dict):
+                t = dict(t)
+                typ = t.pop("typ", "koerper3d")
+                t = Gruppe3D(**t) if typ == "gruppe3d" else Koerper3D(**t)
+            self.teile.append(t)
+
+    def koerper(self):
+        out = []
+        for t in self.teile:
+            out.extend(t.koerper())
+        return out
+
+    def netze(self):
+        out = []
+        for t in self.teile:
+            out.extend(t.netze())
+        return out
+
+    def bbox3(self):
+        bs = [b for b in (t.bbox3() for t in self.teile) if b]
+        if not bs:
+            return None
+        return (min(b[0] for b in bs), min(b[1] for b in bs), min(b[2] for b in bs),
+                max(b[3] for b in bs), max(b[4] for b in bs), max(b[5] for b in bs))
+
+    def bbox(self):
+        bs = [t.bbox() for t in self.teile]
+        if not bs:
+            return (0, 0, 0, 0)
+        return (min(b[0] for b in bs), min(b[1] for b in bs),
+                max(b[2] for b in bs), max(b[3] for b in bs))
+
+    def zentrum3(self):
+        b = self.bbox3()
+        if b is None:
+            return (0.0, 0.0, 0.0)
+        return ((b[0] + b[3]) / 2, (b[1] + b[4]) / 2, (b[2] + b[5]) / 2)
+
+    def aufgeloest(self):
+        out = []
+        for t in self.teile:
+            out.extend(t.aufgeloest())
+        return out
+
+    def verschieben(self, dx, dy, dz=0.0):
+        for t in self.teile:
+            t.verschieben(dx, dy, dz)
+
+    def drehen(self, cx, cy, winkel_deg):
+        for t in self.teile:
+            t.drehen(cx, cy, winkel_deg)
+
+    def skalieren(self, cx, cy, f):
+        for t in self.teile:
+            t.skalieren(cx, cy, f)
+
+    def spiegeln(self, ax, ay, bx, by):
+        for t in self.teile:
+            t.spiegeln(ax, ay, bx, by)
+
+    def to_dict(self):
+        d = {k: v for k, v in self.__dict__.items() if k not in ("id", "teile")}
+        d["teile"] = [t.to_dict() for t in self.teile]
+        return d
+
+
+def profil_aus_element(el):
+    """Base polygon of a closed 2D shape for extruding: (profil, rund) or None."""
+    if isinstance(el, Rechteck):
+        x1, x2 = sorted((el.x1, el.x2)); y1, y2 = sorted((el.y1, el.y2))
+        return rechteck_profil(x1, y1, x2, y2), False
+    if isinstance(el, Kreis):
+        return kreis_profil(el.cx, el.cy, el.r, 32), True
+    if isinstance(el, Polylinie) and el.geschlossen and len(el.punkte) >= 3:
+        rund = isinstance(el, (Ellipse, Spline))
+        pts = list(el.punkte)
+        if len(pts) > 1 and math.hypot(pts[0][0] - pts[-1][0], pts[0][1] - pts[-1][1]) < 1e-9:
+            pts = pts[:-1]
+        return pts, rund
+    return None
+
+
+def extrusion(el, hoehe, z0=0.0):
+    """Koerper3D from a closed 2D element (None if not possible)."""
+    pr = profil_aus_element(el)
+    if pr is None:
+        return None
+    return Koerper3D("prisma", pr[0], z0, hoehe, rund=pr[1], bez="Extrusion",
+                     layer=el.layer, farbe=el.farbe, linientyp=el.linientyp,
+                     eig_farbe=el.eig_farbe, staerke=el.staerke)
+
+
+def quader(x1, y1, x2, y2, z0, hoehe, **kw):
+    x1, x2 = sorted((x1, x2)); y1, y2 = sorted((y1, y2))
+    return Koerper3D("prisma", rechteck_profil(x1, y1, x2, y2), z0, hoehe, bez="Quader", **kw)
+
+
+def zylinder(cx, cy, r, z0, hoehe, n=32, **kw):
+    return Koerper3D("prisma", kreis_profil(cx, cy, r, n), z0, hoehe, rund=True,
+                     bez="Zylinder", **kw)
+
+
+def kegel(cx, cy, r, z0, hoehe, n=32, **kw):
+    return Koerper3D("pyramide", kreis_profil(cx, cy, r, n), z0, hoehe, rund=True,
+                     bez="Kegel", **kw)
+
+
+def pyramide(cx, cy, z0, hoehe, ecken=4, breite=20.0, tiefe=20.0, **kw):
+    if ecken == 4:
+        prof = rechteck_profil(cx - breite / 2, cy - tiefe / 2, cx + breite / 2, cy + tiefe / 2)
+    else:
+        prof = kreis_profil(cx, cy, breite / 2, max(3, int(ecken)), 90.0)
+    return Koerper3D("pyramide", prof, z0, hoehe, bez="Pyramide", **kw)
+
+
+def kugel(cx, cy, cz, r, **kw):
+    return Koerper3D("kugel", [], 0.0, 0.0, kugel=(cx, cy, cz, r), bez="Kugel", **kw)
+
+
 ZUSAMMENGESETZT = (BlockReferenz, Querverweis, Verbindung, ElektroMaske, Klemme,
-                   Kabel, Koordinatenfeld)
+                   Kabel, Koordinatenfeld, Koerper3D, Gruppe3D)
 
 
 # ============================================================
@@ -3917,3 +4184,4 @@ _inst(_FestMaske, skalieren=_sk_pos, spiegeln=_sp_pos)
 _inst(Kabel, skalieren=_sk_kabel, spiegeln=_sp_kabel)
 _inst(Koordinatenfeld, skalieren=_sk_kf, spiegeln=_sp_kf)
 _inst(Bild, skalieren=_sk_kf, spiegeln=_sp_kf)
+
