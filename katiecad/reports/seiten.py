@@ -24,6 +24,7 @@ from katiecad.model import titleblock as TB
 from katiecad.common.i18n import tr
 from katiecad.reports import daten as D
 from katiecad.reports import daten_listen as DL
+from katiecad.reports import daten_sps as DS
 from katiecad.reports.netz import Netz
 from katiecad.reports.tabelle import (Spalte, tabellen_seiten,
                                       zeilen_vorbereiten, TEXT, LINIE)
@@ -42,10 +43,10 @@ def skala_fuer(fmt):
     return ZEICHNUNGSFORMATE[fmt][0] / ZEICHNUNGSFORMATE[FORMAT][0]
 STANDARD_TYPEN = ("deckblatt", "inhalt", "geraete", "klemmen", "kabel")
 TYPEN = STANDARD_TYPEN + ("verbindungen", "stueckliste", "querverweise",
-                          "potenziale", "stecker", "etiketten", "revisionen")
+                          "potenziale", "stecker", "etiketten", "revisionen", "sps")
 LISTEN = ("geraete", "klemmen", "kabel", "verbindungen", "stueckliste",
-          "querverweise", "potenziale", "stecker", "etiketten", "revisionen")
-NETZ_LISTEN = {"klemmen", "kabel", "verbindungen", "stueckliste", "querverweise",
+          "querverweise", "potenziale", "stecker", "etiketten", "revisionen", "sps")
+NETZ_LISTEN = {"sps", "klemmen", "kabel", "verbindungen", "stueckliste", "querverweise",
                "potenziale", "stecker", "etiketten"}
 
 TITEL_TAGS = TB.DATA_TAGS          # (kept for compatibility)
@@ -96,14 +97,16 @@ _STANDARD = {
                 ("einbauort", "rep.col.einbauort", 26, "l"),
                 ("typ", "rep.col.typ", 40, "l"), ("per", "rep.col.per", 40, "l"),
                 ("anzahl", "rep.col.anzahl", 9, "r"),
-                ("ort", "rep.col.fundstellen", 50, "l")],
+                ("ort", "rep.col.fundstellen", 50, "l"),
+                ("funktion", "rep.col.funktion", 40, "l")],
     "klemmen": [("leiste", "rep.col.leiste", 16, "l"),
                 ("einbauort", "rep.col.einbauort", 26, "l"),
                 ("typ", "rep.col.typ", 26, "l"),
                 ("oben", "rep.col.oben", 48, "l"),
                 ("num", "rep.col.num", 10, "l"),
                 ("bruecke", "rep.col.bruecke", 16, "c"),
-                ("unten", "rep.col.unten", 48, "l"), ("ort", "rep.col.ort", 20, "l")],
+                ("unten", "rep.col.unten", 48, "l"), ("ort", "rep.col.ort", 20, "l"),
+                ("funktion", "rep.col.funktion", 40, "l")],
     "kabel": [("cab", "rep.col.cab", 14, "l"),
               ("einbauort", "rep.col.einbauort", 26, "l"),
               ("typ", "rep.col.typ", 26, "l"),
@@ -137,6 +140,16 @@ _STANDARD = {
                   ("art", "rep.col.art", 16, "l"),
                   ("einbauort", "rep.col.einbauort", 26, "l"),
                   ("typ", "rep.col.typ", 34, "l"), ("ort", "rep.col.ort", 18, "l")],
+    "sps": [("station", "rep.col.station", 18, "l"),
+            ("baugruppe", "rep.col.baugruppe", 16, "l"),
+            ("platz", "rep.col.platz", 10, "l"),
+            ("art", "rep.col.art", 8, "l"),
+            ("adresse", "rep.col.adresse", 12, "l"),
+            ("datentyp", "rep.col.datentyp", 10, "l"),
+            ("symbol", "rep.col.symbol", 26, "l"),
+            ("kommentar", "rep.col.kommentar", 40, "l"),
+            ("anschluss", "rep.col.anschluesse", 40, "l"),
+            ("ort", "rep.col.ort", 16, "l")],
     "revisionen": [("stand", "rep.col.stand", 12, "l"),
                    ("aenderung", "rep.col.aenderung", 100, "l"),
                    ("name", "rep.col.name", 30, "l"),
@@ -305,6 +318,8 @@ def listen_zeilen(typ, blaetter, nummer, netz=None, klemmen_in_geraeteliste=True
                                   "kabel": tr("rep.art.kabel")})
     if typ == "revisionen":
         return DL.revisionsuebersicht(projektdaten)
+    if typ == "sps":
+        return DS.sps_liste(netz, blaetter, nummer, einbauorte)
     raise ValueError(typ)
 
 
@@ -317,6 +332,7 @@ def _ohne_leere_einbauorte(spalten, zeilen):
     'bruecke' without any bridge."""
     return [sp for sp in spalten
             if not (sp.key == "einbauort" and not any(z.get("einbauort") for z in zeilen))
+            and not (sp.key == "funktion" and not any(z.get("funktion") for z in zeilen))
             and not (sp.key == "bruecke" and not any(z.get("_bruecke") for z in zeilen))]
 
 
@@ -337,7 +353,8 @@ def tabellen_fuer_export(blaetter, nummer, ordner=(), klemmen_in_geraeteliste=Tr
 
 _GRUPPE = {"klemmen": ("_gk", ("leiste", "einbauort")),
            "kabel": ("_gk", ("cab", "einbauort", "typ")),
-           "stecker": ("_gk", ("stecker", "einbauort"))}
+           "stecker": ("_gk", ("stecker", "einbauort")),
+           "sps": ("_gk", ("station", "baugruppe", "einbauort"))}
 
 
 def _liste_tabelle(typ, zeilen, ordner, flaeche, titel, skala=1.0):
