@@ -123,6 +123,7 @@ ELEKTRO_WERKZEUGE = ("vpunkt", "verbindung", "leitung", "querverweis",
 # macOS: right mouse button = Button-2, middle = Button-3 (reversed on X11/Windows)
 _MAC = sys.platform == "darwin"
 BTN_MITTE, BTN_RECHTS = ("3", "2") if _MAC else ("2", "3")
+_MITTE_MASKE = 0x400 if _MAC else 0x200          # event.state bit of the middle button
 
 
 def _style_setup(root):
@@ -930,8 +931,9 @@ class CadApp(AendernMixin, Ansicht3DMixin, ToolbarDockMixin):
     # --------------------------------------------------------
     def _build_ui(self):
         self._build_menu()
-        self.tb1 = ttk.Frame(self.root, padding=4)
-        self.tb1.pack(side=tk.TOP, fill=tk.X)
+        self.tb1 = ttk.Frame(self.root, padding=4)      # tools
+        self.tbE = ttk.Frame(self.root, padding=4)      # electrical
+        self.tbD = ttk.Frame(self.root, padding=4)      # 3D
         self.tb2 = ttk.Frame(self.root, padding=4)
         self.tb2.pack(side=tk.TOP, fill=tk.X)
         self.tb3 = ttk.Frame(self.root, padding=4)
@@ -1201,9 +1203,14 @@ class CadApp(AendernMixin, Ansicht3DMixin, ToolbarDockMixin):
                        bg=FARBEN["bg_mittel"], fg=FARBEN["cyan"],
                        activebackground=FARBEN["cyan"],
                        activeforeground=FARBEN["bg_dunkel"])
-        for _pos in ("oben", "unten", "rechts"):
-            m_tb.add_command(label=tr("menu.ansicht.tb_" + _pos),
-                             command=lambda p=_pos: self.toolbar_position_setzen(p))
+        for _name in ("werkzeug", "elektro", "3d"):
+            m_n = tk.Menu(m_tb, tearoff=0, bg=FARBEN["bg_mittel"], fg=FARBEN["cyan"],
+                          activebackground=FARBEN["cyan"],
+                          activeforeground=FARBEN["bg_dunkel"])
+            for _pos in ("oben", "unten", "rechts"):
+                m_n.add_command(label=tr("menu.ansicht.tb_" + _pos),
+                                command=lambda p=_pos, n=_name: self.toolbar_position_setzen(p, n))
+            m_tb.add_cascade(label=tr("menu.ansicht.tb_" + _name), menu=m_n)
         m_ansicht.add_cascade(label=tr("menu.ansicht.tb"), menu=m_tb)
         m_ansicht.add_command(label=tr("menu.ansicht.zoom_grenzen"),
                               command=self.zoom_grenzen)
@@ -1356,8 +1363,14 @@ class CadApp(AendernMixin, Ansicht3DMixin, ToolbarDockMixin):
         except tk.TclError:
             return False
 
+    def _leisten_griff(self, tb, name):
+        griff = ttk.Label(tb, text="\u22ee\u22ee", style="Title.TLabel", cursor="fleur")
+        griff.pack(side=tk.LEFT, padx=(0, 4))
+        Tooltip(griff, tr("tb.griff"))
+        self._toolbar_griff_binden(griff, name)
+
     def _build_toolbars(self):
-        for attr in ("tb1", "tb2", "tb3"):
+        for attr in ("tb1", "tbE", "tbD", "tb2", "tb3"):
             if not hasattr(self, attr):
                 frm = ttk.Frame(self.root, padding=4)
                 frm.pack(side=tk.TOP, fill=tk.X)
@@ -1371,10 +1384,7 @@ class CadApp(AendernMixin, Ansicht3DMixin, ToolbarDockMixin):
 
         # --- Toolbar 1 ---
         tb = self.tb1
-        griff = ttk.Label(tb, text="\u22ee\u22ee", style="Title.TLabel", cursor="fleur")
-        griff.pack(side=tk.LEFT, padx=(0, 4))
-        Tooltip(griff, tr("tb.griff"))
-        self._toolbar_griff_binden(griff)
+        self._leisten_griff(tb, "werkzeug")
         ttk.Button(tb, text="\u2630", width=3,
                    command=self.seitenleiste_umschalten).pack(side=tk.LEFT, padx=(0, 8))
         ttk.Label(tb, text=tr("tb.werkzeug"), style="Title.TLabel").pack(side=tk.LEFT, padx=(0, 4))
@@ -1387,14 +1397,18 @@ class CadApp(AendernMixin, Ansicht3DMixin, ToolbarDockMixin):
         self._umschalt_knopf(tb, "manip", FARBEN["cyan"], self._manip_var,
                              lambda: self.manipulator_setzen(self._manip_var.get()))
 
-        ttk.Separator(tb, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=8)
+        # --- Toolbar electrical (own bar) ---
+        tb = self.tbE
+        self._leisten_griff(tb, "elektro")
         ttk.Label(tb, text=tr("menu.elektro") + ":",
                   style="Elektro.TLabel").pack(side=tk.LEFT, padx=(0, 4))
         for key in ("vpunkt", "verbindung", "querverweis",
                     "klemme", "kabel", "koordinatenfeld", "ftext", "maske"):
             self._werkzeug_knopf(tb, key, ICON_ROT)
 
-        ttk.Separator(tb, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=8)
+        # --- Toolbar 3D (own bar) ---
+        tb = self.tbD
+        self._leisten_griff(tb, "3d")
         ttk.Label(tb, text=tr("menu.3d") + ":", style="Title.TLabel"
                   ).pack(side=tk.LEFT, padx=(0, 4))
         self._umschalt_knopf(tb, "ansicht3d", FARBEN["cyan"], self._3d_var,
@@ -2191,6 +2205,13 @@ class CadApp(AendernMixin, Ansicht3DMixin, ToolbarDockMixin):
 
     # --------------------------------------------------------
     def ansicht_wechseln(self):
+        if self._ist_layout() and self._ansicht3d is not None:
+            self._ansicht3d_aus_fenster()          # the 3D window belongs to the model view
+        if self._ist_layout():
+            vp3 = self._vp_fuer_3d() if hasattr(self, "_vp_fuer_3d") else None
+            self._3d_var_holen().set(bool(vp3 is not None and getattr(vp3, "ansicht3d", None)))
+        elif not self._ist_layout() and self._ansicht3d is None:
+            self._3d_var_holen().set(False)
         if self._ist_layout():
             idx = self._layout_index()
             if 0 <= idx < len(self.layouts):
@@ -2541,6 +2562,9 @@ class CadApp(AendernMixin, Ansicht3DMixin, ToolbarDockMixin):
         return (x_px - v["ox"]) / v["zoom"], (v["oy"] - y_px) / v["zoom"]
 
     def _zeichne_raster(self):
+        w3 = getattr(self, "_ansicht3d", None)
+        if w3 is not None:
+            w3.zeichne_spaeter()
         c = self.canvas
         c.delete("raster")
         if self._ist_layout():
@@ -2672,6 +2696,11 @@ class CadApp(AendernMixin, Ansicht3DMixin, ToolbarDockMixin):
     def on_pan_start(self, event):
         v = self.view
         self.pan_start = (event.x, event.y, v["ox"], v["oy"])
+        self._vp_orbit_pos = None
+        vp0 = self._aktiver_viewport
+        if self._ist_layout() and vp0 is not None and getattr(vp0, "ansicht3d", None):
+            self._snapshot()
+            self._vp_orbit_pos = (event.x, event.y)
         if self._ist_layout() and self._aktiver_viewport is not None:
             vp = self._aktiver_viewport
             self._vp_pan_start = (event.x, event.y,
@@ -2682,6 +2711,16 @@ class CadApp(AendernMixin, Ansicht3DMixin, ToolbarDockMixin):
             self._rc_bewegt = True
         if self._ist_layout() and self._aktiver_viewport is not None:
             vp = self._aktiver_viewport
+            a3 = getattr(vp, "ansicht3d", None)
+            if a3 and (event.state & _MITTE_MASKE):          # middle button: orbit the 3D view
+                from katiecad.model.geom3d import Kamera
+                x0, y0 = getattr(self, "_vp_orbit_pos", None) or (event.x, event.y)
+                k = Kamera(yaw=a3.get("yaw", -45.0), pitch=a3.get("pitch", 35.264))
+                k.orbit(event.x - x0, event.y - y0)
+                a3["yaw"], a3["pitch"] = k.yaw, k.pitch
+                self._vp_orbit_pos = (event.x, event.y)
+                self.redraw()
+                return
             if vp.gesperrt:
                 return
             if self._vp_pan_start is None:
@@ -2864,9 +2903,6 @@ class CadApp(AendernMixin, Ansicht3DMixin, ToolbarDockMixin):
             menu.grab_release()
 
     def _vp_aktivieren(self, vp):
-        if getattr(vp, "ansicht3d", None):
-            self.status.set(tr("d3.vp.nicht_aktivierbar"))
-            return
         if self._aktiver_viewport is not None:
             self._aktiver_viewport.aktiv = False
         vp.aktiv = True
@@ -4190,6 +4226,11 @@ class CadApp(AendernMixin, Ansicht3DMixin, ToolbarDockMixin):
         self._auswahl_richtung = None
 
     def on_doppelklick(self, event):
+        if self._op is not None or getattr(self, "_warte_auf_blockpunkt", False):
+            # a fast second click of a running operation (move, copy, manipulator ...)
+            # must count as an ordinary click, not as "edit element"
+            self.on_click(event)
+            return
         if self._paste_aktiv:
             self._paste_abbrechen()
             self.redraw()
@@ -10746,4 +10787,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
