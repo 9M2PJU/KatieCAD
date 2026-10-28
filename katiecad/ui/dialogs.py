@@ -2023,7 +2023,9 @@ class DokumentationDialog(tk.Toplevel):
 
     FELDER = ("anlage", "kunde", "auftrag", "zeichnungsnummer", "firma",
               "gezeichnet", "geprueft", "revision", "datum")
-    TYPEN = ("deckblatt", "inhalt", "geraete", "klemmen", "kabel")
+    STANDARD = ("deckblatt", "inhalt", "geraete", "klemmen", "kabel")
+    TYPEN = STANDARD + ("verbindungen", "stueckliste", "querverweise",
+                        "potenziale", "stecker", "etiketten", "revisionen")
 
     def __init__(self, parent, vorlagen, einst, daten, projektname,
                  vorlage_vorgabe=None):
@@ -2040,12 +2042,16 @@ class DokumentationDialog(tk.Toplevel):
         ttk.Label(f, text=tr("dlg.doku.berichte"), style="Title.TLabel").pack(anchor=tk.W)
         aktiv = einst.get("berichte")
         if not isinstance(aktiv, list):
-            aktiv = list(self.TYPEN)
+            aktiv = list(self.STANDARD)
         self.v_typ = {}
-        for t in self.TYPEN:
+        raster = ttk.Frame(f)
+        raster.pack(anchor=tk.W, padx=10)
+        haelfte = (len(self.TYPEN) + 1) // 2
+        for i, t in enumerate(self.TYPEN):
             self.v_typ[t] = tk.BooleanVar(value=t in aktiv)
-            ttk.Checkbutton(f, text=tr("rep." + t),
-                            variable=self.v_typ[t]).pack(anchor=tk.W, padx=10)
+            ttk.Checkbutton(raster, text=tr("rep." + t),
+                            variable=self.v_typ[t]).grid(
+                row=i % haelfte, column=i // haelfte, sticky=tk.W, padx=(0, 24))
         self.v_klg = tk.BooleanVar(value=bool(einst.get("klemmen_geraete", True)))
         ttk.Checkbutton(f, text=tr("dlg.doku.klemmen_geraete"),
                         variable=self.v_klg).pack(anchor=tk.W, padx=10, pady=(4, 0))
@@ -3110,3 +3116,198 @@ class SuchenErsetzenDialog(tk.Toplevel):
         app.redraw()
         self.suchen()
         self.v_status.set(tr("dlg.sr.fertig", n=n))
+
+
+class SchnellauswahlDialog(tk.Toplevel):
+    """Quick select: choose type / layer / colour / line type.
+    result = dict(kriterien, negiert, hinzufuegen) or None."""
+
+    def __init__(self, parent, werte):
+        """werte: {"typ": [...], "layer": [...], "farbe": [...], "linientyp": [...]}"""
+        super().__init__(parent)
+        de = SPRACHE["aktuell"] == "de"
+        self.result = None
+        self.title("Schnellauswahl" if de else "Quick select")
+        self.transient(parent)
+        _modal(self)
+        self.configure(bg=FARBEN["bg_mittel"])
+        f = ttk.Frame(self, padding=12)
+        f.pack(fill=tk.BOTH, expand=True)
+        alle = "(alle)" if de else "(all)"
+        self._alle = alle
+        self.vars = {}
+        felder = (("typ", "Objektart:" if de else "Object type:"),
+                  ("layer", "Layer:"),
+                  ("farbe", "Farbe:" if de else "Colour:"),
+                  ("linientyp", "Linientyp:" if de else "Line type:"))
+        for row, (key, text) in enumerate(felder):
+            ttk.Label(f, text=text).grid(row=row, column=0, sticky=tk.W, pady=4)
+            v = tk.StringVar(value=alle)
+            self.vars[key] = v
+            ttk.Combobox(f, textvariable=v, state="readonly", width=26,
+                         values=[alle] + list(werte.get(key, []))).grid(
+                row=row, column=1, sticky=tk.W, pady=4, padx=(8, 0))
+        self.negiert = tk.BooleanVar(value=False)
+        self.hinzu = tk.BooleanVar(value=False)
+        ttk.Checkbutton(f, text="Alles AUSSER diesen Treffern auswählen" if de
+                        else "Select everything EXCEPT these matches",
+                        variable=self.negiert).grid(
+            row=4, column=0, columnspan=2, sticky=tk.W, pady=(8, 0))
+        ttk.Checkbutton(f, text="Zur bestehenden Auswahl hinzufügen" if de
+                        else "Add to the current selection",
+                        variable=self.hinzu).grid(
+            row=5, column=0, columnspan=2, sticky=tk.W)
+        bf = ttk.Frame(f)
+        bf.grid(row=6, column=0, columnspan=2, pady=(12, 0))
+        ttk.Button(bf, text=tr("dlg.ok"), command=self._ok).pack(side=tk.LEFT, padx=6)
+        ttk.Button(bf, text=tr("dlg.abbrechen"),
+                   command=self.destroy).pack(side=tk.LEFT, padx=6)
+        self.bind("<Return>", lambda e: self._ok())
+        self.bind("<Escape>", lambda e: self.destroy())
+        self.wait_window(self)
+
+    def _ok(self):
+        krit = {k: (None if v.get() == self._alle else v.get())
+                for k, v in self.vars.items()}
+        self.result = {"kriterien": krit, "negiert": self.negiert.get(),
+                       "hinzufuegen": self.hinzu.get()}
+        self.destroy()
+
+
+
+class BauteilkatalogDialog(tk.Toplevel):
+    """Parts catalogue of the project: manufacturer, order number and
+    description per TYP (used by the parts list).
+
+    katalog:     [{"typ", "hersteller", "bestellnr", "beschreibung"}]
+    vorschlaege: TYP values found in the drawing (button 'Take over types')
+    result:      the new catalogue list or None"""
+
+    SPALTEN = ("typ", "hersteller", "bestellnr", "beschreibung")
+
+    def __init__(self, parent, katalog, vorschlaege=()):
+        super().__init__(parent)
+        de = SPRACHE["aktuell"] == "de"
+        self.result = None
+        self._vorschlaege = list(vorschlaege)
+        self.title("Bauteilkatalog" if de else "Parts catalogue")
+        self.transient(parent)
+        _modal(self)
+        self.configure(bg=FARBEN["bg_mittel"])
+        f = ttk.Frame(self, padding=12)
+        f.pack(fill=tk.BOTH, expand=True)
+        ttk.Label(f, text=("Hersteller, Bestellnummer und Beschreibung je Typ (TYP). "
+                           "Die Stückliste übernimmt die Angaben automatisch."
+                           if de else
+                           "Manufacturer, order number and description per type (TYP). "
+                           "The parts list uses them automatically."),
+                  style="Hint.TLabel", wraplength=620, justify=tk.LEFT).pack(anchor=tk.W)
+        titel = {"typ": "TYP", "hersteller": "Hersteller" if de else "Manufacturer",
+                 "bestellnr": "Bestellnummer" if de else "Order number",
+                 "beschreibung": "Beschreibung" if de else "Description"}
+        breiten = {"typ": 150, "hersteller": 150, "bestellnr": 170, "beschreibung": 260}
+        self.tree = ttk.Treeview(f, columns=self.SPALTEN, show="headings",
+                                 height=12, selectmode="extended")
+        for c in self.SPALTEN:
+            self.tree.heading(c, text=titel[c])
+            self.tree.column(c, width=breiten[c], anchor=tk.W)
+        self.tree.pack(fill=tk.BOTH, expand=True, pady=8)
+        self.tree.bind("<Double-1>", lambda e: self._bearbeiten())
+        for e in katalog or []:
+            if isinstance(e, dict):
+                self._zeile_einfuegen(e)
+        bf = ttk.Frame(f)
+        bf.pack(fill=tk.X)
+        ttk.Button(bf, text="Hinzufügen" if de else "Add",
+                   command=self._hinzufuegen).pack(side=tk.LEFT, padx=2)
+        ttk.Button(bf, text="Bearbeiten" if de else "Edit",
+                   command=self._bearbeiten).pack(side=tk.LEFT, padx=2)
+        ttk.Button(bf, text="Löschen" if de else "Delete",
+                   command=self._loeschen).pack(side=tk.LEFT, padx=2)
+        ttk.Button(bf, text="Typen aus Zeichnung übernehmen" if de
+                   else "Take over types from drawing",
+                   command=self._uebernehmen).pack(side=tk.LEFT, padx=12)
+        ok = ttk.Frame(f)
+        ok.pack(pady=(10, 0))
+        ttk.Button(ok, text=tr("dlg.ok"), command=self._ok).pack(side=tk.LEFT, padx=6)
+        ttk.Button(ok, text=tr("dlg.abbrechen"),
+                   command=self.destroy).pack(side=tk.LEFT, padx=6)
+        self.bind("<Escape>", lambda e: self.destroy())
+        _zentrieren(self, parent)
+        self.wait_window(self)
+
+    def _zeile_einfuegen(self, e):
+        self.tree.insert("", tk.END,
+                         values=[str(e.get(c, "") or "") for c in self.SPALTEN])
+
+    def _alle_typen(self):
+        return {str(self.tree.item(i, "values")[0]).strip().upper()
+                for i in self.tree.get_children()}
+
+    def _uebernehmen(self):
+        vorhanden = self._alle_typen()
+        for t in self._vorschlaege:
+            if t.strip().upper() not in vorhanden:
+                self._zeile_einfuegen({"typ": t})
+
+    def _formular(self, werte):
+        de = SPRACHE["aktuell"] == "de"
+        dlg = tk.Toplevel(self)
+        dlg.title("Bauteil" if de else "Part")
+        dlg.transient(self)
+        _modal(dlg)
+        dlg.configure(bg=FARBEN["bg_mittel"])
+        g = ttk.Frame(dlg, padding=12)
+        g.pack()
+        namen = {"typ": "TYP", "hersteller": "Hersteller:" if de else "Manufacturer:",
+                 "bestellnr": "Bestellnummer:" if de else "Order number:",
+                 "beschreibung": "Beschreibung:" if de else "Description:"}
+        vars_ = {}
+        for i, c in enumerate(self.SPALTEN):
+            ttk.Label(g, text=namen[c]).grid(row=i, column=0, sticky=tk.W, pady=3)
+            vars_[c] = tk.StringVar(value=werte.get(c, ""))
+            ttk.Entry(g, textvariable=vars_[c], width=40).grid(
+                row=i, column=1, pady=3, padx=(8, 0))
+        erg = {}
+
+        def ok():
+            if vars_["typ"].get().strip():
+                erg.update({c: v.get().strip() for c, v in vars_.items()})
+                dlg.destroy()
+        bf = ttk.Frame(g)
+        bf.grid(row=len(self.SPALTEN), column=0, columnspan=2, pady=(10, 0))
+        ttk.Button(bf, text=tr("dlg.ok"), command=ok).pack(side=tk.LEFT, padx=6)
+        ttk.Button(bf, text=tr("dlg.abbrechen"),
+                   command=dlg.destroy).pack(side=tk.LEFT, padx=6)
+        dlg.bind("<Return>", lambda e: ok())
+        dlg.bind("<Escape>", lambda e: dlg.destroy())
+        dlg.wait_window(dlg)
+        return erg or None
+
+    def _hinzufuegen(self):
+        e = self._formular({})
+        if e:
+            self._zeile_einfuegen(e)
+
+    def _bearbeiten(self):
+        sel = self.tree.selection()
+        if not sel:
+            return
+        v = self.tree.item(sel[0], "values")
+        e = self._formular(dict(zip(self.SPALTEN, v)))
+        if e:
+            self.tree.item(sel[0], values=[e[c] for c in self.SPALTEN])
+
+    def _loeschen(self):
+        for i in self.tree.selection():
+            self.tree.delete(i)
+
+    def _ok(self):
+        out = []
+        for i in self.tree.get_children():
+            v = self.tree.item(i, "values")
+            e = dict(zip(self.SPALTEN, [str(x).strip() for x in v]))
+            if e["typ"]:
+                out.append(e)
+        self.result = out
+        self.destroy()
