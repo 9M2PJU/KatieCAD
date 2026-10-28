@@ -58,7 +58,8 @@ def koerper_bauen(art, par, x, y, z):
     if art == "schrank":
         platte = (par["pb"], par["ph"]) if par.get("platte") else None
         return SCHR.schrank_bauen(par["breite"], par["hoehe"], par["tiefe"], x, y, z,
-                                  platte, par.get("sockel", 0.0))
+                                  platte, par.get("sockel", 0.0), bool(par.get("tuer")),
+                                  bool(par.get("seite_l")), bool(par.get("seite_r")))
     raise ValueError(art)
 
 
@@ -99,9 +100,14 @@ class SchrankDialog(tk.Toplevel):
             ttk.Entry(f, textvariable=v, width=12).grid(row=r, column=1, sticky=tk.W, padx=8, pady=3)
             r += 1
         self.platte = tk.BooleanVar(value=True)
-        ttk.Checkbutton(f, text=tr("d3.schrank.platte"), variable=self.platte
-                        ).grid(row=r, column=0, columnspan=2, sticky=tk.W, pady=3)
-        r += 1
+        self.tuer = tk.BooleanVar(value=False)
+        self.seite_l = tk.BooleanVar(value=False)
+        self.seite_r = tk.BooleanVar(value=False)
+        for var, key in ((self.platte, "platte"), (self.tuer, "tuer"),
+                         (self.seite_l, "seite_l"), (self.seite_r, "seite_r")):
+            ttk.Checkbutton(f, text=tr("d3.schrank." + key), variable=var
+                            ).grid(row=r, column=0, columnspan=2, sticky=tk.W, pady=2)
+            r += 1
         ttk.Label(f, text=tr("d3.schrank.sockel")).grid(row=r, column=0, sticky=tk.W, pady=3)
         self.sockel = tk.StringVar(value=tr("d3.schrank.ohne"))
         ttk.Combobox(f, textvariable=self.sockel, width=12, state="readonly",
@@ -141,6 +147,9 @@ class SchrankDialog(tk.Toplevel):
             if min(par.values()) <= 0:
                 raise ValueError
             par["platte"] = 1 if self.platte.get() else 0
+            par["tuer"] = 1 if self.tuer.get() else 0
+            par["seite_l"] = 1 if self.seite_l.get() else 0
+            par["seite_r"] = 1 if self.seite_r.get() else 0
             if par["platte"] and (par["pb"] >= par["breite"] or par["ph"] >= par["hoehe"]):
                 raise ValueError
             sk = self.sockel.get()
