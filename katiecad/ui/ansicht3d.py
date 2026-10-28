@@ -111,6 +111,47 @@ class Koerper3DDialog(tk.Toplevel):
 
 
 
+class DrehDialog(tk.Toplevel):
+    """Axis (X/Y/Z) and angle for rotating 3D objects. result = (axis, degrees)."""
+
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.result = None
+        self.title(tr("d3.drehen.titel"))
+        self.transient(parent)
+        self.configure(bg=FARBEN["bg_mittel"])
+        self.resizable(False, False)
+        f = ttk.Frame(self, padding=12)
+        f.pack(fill=tk.BOTH, expand=True)
+        ttk.Label(f, text=tr("d3.drehen.achse")).grid(row=0, column=0, columnspan=3, sticky=tk.W)
+        self.achse = tk.StringVar(value="z")
+        for i, a in enumerate(("x", "y", "z")):
+            ttk.Radiobutton(f, text=a.upper(), value=a, variable=self.achse
+                            ).grid(row=1, column=i, padx=8, pady=4)
+        ttk.Label(f, text=tr("d3.drehen.winkel"), wraplength=320).grid(
+            row=2, column=0, columnspan=3, sticky=tk.W, pady=(8, 2))
+        self.winkel = tk.StringVar(value="90")
+        e = ttk.Entry(f, textvariable=self.winkel, width=12)
+        e.grid(row=3, column=0, columnspan=3, sticky=tk.W)
+        bt = ttk.Frame(f)
+        bt.grid(row=4, column=0, columnspan=3, pady=(10, 0))
+        ttk.Button(bt, text="OK", command=self._ok).pack(side=tk.LEFT, padx=6)
+        ttk.Button(bt, text=tr("dlg.abbrechen"), command=self.destroy).pack(side=tk.LEFT, padx=6)
+        self.bind("<Return>", lambda ev: self._ok())
+        self.bind("<Escape>", lambda ev: self.destroy())
+        e.focus_set()
+        _modal(self)
+
+    def _ok(self):
+        try:
+            w = float(self.winkel.get().strip().replace(",", "."))
+        except ValueError:
+            messagebox.showerror(tr("d3.titel"), tr("d3.msg.zahl"), parent=self)
+            return
+        self.result = (self.achse.get(), w)
+        self.destroy()
+
+
 class MassDialog(tk.Toplevel):
     """Edit the dimensions of a body / sketch. result = {key: value} in display units."""
 
@@ -182,7 +223,7 @@ def _vorzeichen(k):
 
 
 class Ansicht3D(tk.Frame):
-    MODI = ("flaeche", "linie", "kreis", "rechteck", "poly", "bem")
+    MODI = ("flaeche", "linie", "kreis", "rechteck", "poly", "bem", "pivot")
     SKIZZEN = ("linie", "kreis", "rechteck", "poly")
 
     def __init__(self, app):
@@ -201,6 +242,8 @@ class Ansicht3D(tk.Frame):
         self._skiz = None             # sketch / dimension in progress
         self._maus = None
         self._hover = None
+        self._manip_off = (0.0, 0.0, 0.0)          # manipulator origin relative to the centre
+        self._manip_key = None
         self._spaeter_id = None
         self.wert_var = tk.StringVar()
         self.info_var = _Info(app)
@@ -235,6 +278,10 @@ class Ansicht3D(tk.Frame):
         ttk.Separator(bar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=8)
         a._befehl_knopf(bar, "bem3d", farbe, lambda: self.modus_setzen("bem"))
         a._befehl_knopf(bar, "mass3d", farbe, self.massdialog)
+        ttk.Separator(bar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=8)
+        a._befehl_knopf(bar, "manip_pivot", farbe, lambda: self.modus_setzen("pivot"))
+        a._befehl_knopf(bar, "drehen3d", farbe, self.drehen_dialog)
+        a._befehl_knopf(bar, "abrunden3d", farbe, self.abrunden_dialog)
         ttk.Label(bar, text=tr("d3.wert"), style="Title.TLabel").pack(side=tk.LEFT, padx=(10, 4))
         e = ttk.Entry(bar, textvariable=self.wert_var, width=10)
         e.pack(side=tk.LEFT)
@@ -548,10 +595,27 @@ class Ansicht3D(tk.Frame):
     def _manip_infos(self):
         if not self.app.auswahl:
             return {}
-        z = S.auswahl_zentrum3(self.app.auswahl)
+        z = self._manip_zentrum3()
         if z is None:
             return {}
         return S.achsen_info(self.kamera, z, *self._mitte())
+
+    def _manip_zentrum3(self):
+        """Manipulator origin: centre of the selection plus the user's offset (if any)."""
+        z = S.auswahl_zentrum3(self.app.auswahl)
+        if z is None:
+            return None
+        key = tuple(id(x) for x in self.app.auswahl)
+        if key != self._manip_key:
+            self._manip_key = key
+            self._manip_off = (0.0, 0.0, 0.0)
+        o = self._manip_off
+        return (z[0] + o[0], z[1] + o[1], z[2] + o[2])
+
+    def pivot_zuruecksetzen(self):
+        self._manip_off = (0.0, 0.0, 0.0)
+        self.info_var.set(tr("d3.msg.pivot_zentriert"))
+        self.zeichne()
 
     def _manip_zeichnen(self):
         c = self.canvas
@@ -660,7 +724,7 @@ class Ansicht3D(tk.Frame):
             return
         h = {"fang": None, "flaeche": None}
         erste = self._skiz is None
-        if m == "bem":
+        if m in ("bem", "pivot"):
             h["fang"] = self._fang_raum(e)
             fl = self._flaeche_unter(e) if self.zustand.get("auto", True) else None
             h["flaeche"] = fl[1] if fl else None
@@ -759,6 +823,17 @@ class Ansicht3D(tk.Frame):
                     self._skizze_fertig("rechteck", [q[0], q[1], p[0], p[1]])
             else:
                 sk["pts"].append(p)
+            self.zeichne()
+        elif m == "pivot":
+            p = self._raum_punkt(e)
+            z = S.auswahl_zentrum3(self.app.auswahl)
+            if p is None or z is None:
+                self.info_var.set(tr("d3.msg.nichts_drehbar") if z is None else tr("d3.msg.keine_ebene"))
+                return
+            self._manip_key = tuple(id(x) for x in self.app.auswahl)
+            self._manip_off = (p[0] - z[0], p[1] - z[1], p[2] - z[2])
+            self._modus_ende()
+            self.info_var.set(tr("d3.msg.pivot_ok"))
             self.zeichne()
         elif m == "bem":
             p = self._raum_punkt(e)
@@ -903,7 +978,10 @@ class Ansicht3D(tk.Frame):
         el = S.pick([x for x in self.app.elemente if self._sichtbar(x)], self.kamera,
                     *self._mitte(), e.x, e.y)
         if el is None:
-            self.app.auswahl = []
+            # empty space: drag = selection window (like 2D), plain click = deselect
+            self._drag = {"art": "rahmen", "x": e.x, "y": e.y, "bewegt": False,
+                          "add": bool(e.state & 0x5)}
+            return
         elif bool(e.state & 0x5):                 # Shift / Ctrl: toggle
             if el in self.app.auswahl:
                 self.app.auswahl.remove(el)
@@ -944,6 +1022,11 @@ class Ansicht3D(tk.Frame):
             self.kamera.orbit(e.x - d["x"], e.y - d["y"])
             d["x"], d["y"] = e.x, e.y
             self.zeichne()
+        elif d["art"] == "rahmen":
+            if abs(e.x - d["x"]) + abs(e.y - d["y"]) < 4 and not d["bewegt"]:
+                return
+            d["bewegt"] = True
+            self._rahmen_zeichnen(d, e)
         elif d["art"] == "manip":
             if abs(e.x - d["x"]) + abs(e.y - d["y"]) < 3 and not d["bewegt"]:
                 return
@@ -954,9 +1037,45 @@ class Ansicht3D(tk.Frame):
             self._manip_setzen(d, mm)
             self.zeichne()
 
+    def _rahmen_zeichnen(self, d, e):
+        """Selection window: cyan (left to right) = fully inside, green = touching."""
+        c = self.canvas
+        c.delete("rahmen")
+        kreuz = e.x < d["x"]
+        farbe = FARBEN["gruen"] if kreuz else FARBEN["cyan"]
+        c.create_rectangle(d["x"], d["y"], e.x, e.y, outline=farbe, width=2, dash=(5, 3),
+                           tags="rahmen")
+        r = (min(d["x"], e.x), min(d["y"], e.y), max(d["x"], e.x), max(d["y"], e.y))
+        for el in S.auswahl_im_rahmen([x for x in self.app.elemente if self._sichtbar(x)],
+                                      self.kamera, *self._mitte(), r, kreuz):
+            for nz in (el.netze() if S.ist_3d(el) else []):
+                for (i, j) in nz.kanten:
+                    self._linie(nz.punkte[i], nz.punkte[j], FARBEN["magenta"], 2, None, "rahmen")
+            for zug, geschl in ([] if S.ist_3d(el) else S.zuege3(el)):
+                self._polylinie(zug, FARBEN["magenta"], 2, None, "rahmen", geschl)
+
     def on_los(self, e):
         d, self._drag = self._drag, None
         if not d:
+            return
+        if d["art"] == "rahmen":
+            self.canvas.delete("rahmen")
+            if not d["bewegt"]:
+                if not d["add"]:
+                    self.app.auswahl = []
+            else:
+                r = (min(d["x"], e.x), min(d["y"], e.y), max(d["x"], e.x), max(d["y"], e.y))
+                treffer = S.auswahl_im_rahmen([x for x in self.app.elemente if self._sichtbar(x)],
+                                              self.kamera, *self._mitte(), r, e.x < d["x"])
+                neu = list(self.app.auswahl) if d["add"] else []
+                for t in treffer:
+                    if t not in neu:
+                        neu.append(t)
+                self.app.auswahl = neu
+                self.info_var.set(tr("d3.msg.markiert", n=len(neu)))
+            self._achse = None
+            self.app.redraw()
+            self.zeichne()
             return
         if d["art"] == "wuerfel":
             if not d["bewegt"]:
@@ -1174,6 +1293,44 @@ class Ansicht3D(tk.Frame):
         self.app.redraw()
         self.zeichne()
         self.info_var.set(tr("d3.msg.loch_erzeugt") if n else tr("d3.msg.loch_ausserhalb"))
+
+    def drehen_dialog(self):
+        """Rotate the selection about X, Y or Z through the manipulator origin."""
+        if not self.app.auswahl:
+            self.info_var.set(tr("d3.msg.nichts_drehbar"))
+            return
+        dlg = DrehDialog(self.app.root)
+        self.app.root.wait_window(dlg)
+        if not dlg.result:
+            return
+        achse, winkel = dlg.result
+        richt = S.ACHSEN[achse]
+        p0 = self._manip_zentrum3()
+        self.app._snapshot()
+        n = S.drehen3d(self.app.auswahl, p0, richt, winkel)
+        if not n:
+            self.info_var.set(tr("d3.msg.nichts_drehbar"))
+        else:
+            self.info_var.set(tr("d3.msg.gedreht", n=n, achse=achse.upper(), winkel="%g" % winkel))
+        self.app.redraw()
+        self.zeichne()
+
+    def abrunden_dialog(self):
+        """Round the vertical edges (corners of the base polygon) of the selected bodies."""
+        ziele = [k for x in self.app.auswahl if S.ist_3d(x) for k in x.koerper()
+                 if k.art == "prisma" and not k.rund]
+        if not ziele:
+            self.info_var.set(tr("d3.msg.nichts_abrundbar"))
+            return
+        u = self.app.einheit.get()
+        r = frage_zahl(self.app.root, tr("d3.abrunden.titel"), tr("d3.abrunden.radius") + f" ({u})", "5")
+        if r is None or r <= 0:
+            return
+        self.app._snapshot()
+        n = sum(1 for k in ziele if k.kanten_abrunden(r * self.app._einh_faktor()))
+        self.info_var.set(tr("d3.msg.abgerundet", n=n))
+        self.app.redraw()
+        self.zeichne()
 
     def extrudieren_dialog(self):
         ziele = [x for x in self.app.auswahl if S.extrudierbar(x)]
@@ -1403,6 +1560,10 @@ class Ansicht3DMixin:
 
     def ansicht3d_befehl(self, cmd):
         """cmd: 'neu:<art>', 'extrudieren', 'loch', 'block', 'aufloesen', 'mass'."""
+        if cmd in ("pivot", "pivot_zentrum") and not self.ansicht3d_aktiv():
+            # in the 2D view the same commands move / centre the 2D manipulator
+            (self.manipulator_versetzen if cmd == "pivot" else self.manipulator_zentrieren)()
+            return
         w = self.ansicht3d_oeffnen()
         if cmd.startswith("neu:"):
             w.neuer_koerper(cmd.split(":", 1)[1])
@@ -1416,3 +1577,11 @@ class Ansicht3DMixin:
             w.block_aufloesen()
         elif cmd == "mass":
             w.massdialog()
+        elif cmd == "drehen":
+            w.drehen_dialog()
+        elif cmd == "abrunden":
+            w.abrunden_dialog()
+        elif cmd == "pivot":
+            w.modus_setzen("pivot")
+        elif cmd == "pivot_zentrum":
+            w.pivot_zuruecksetzen()

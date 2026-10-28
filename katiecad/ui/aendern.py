@@ -212,8 +212,43 @@ class AendernMixin:
                  if hasattr(e, "bbox") and hasattr(e, "verschieben")]
         if not boxen:
             return None
-        return ((min(b[0] for b in boxen) + max(b[2] for b in boxen)) / 2,
-                (min(b[1] for b in boxen) + max(b[3] for b in boxen)) / 2)
+        zx = (min(b[0] for b in boxen) + max(b[2] for b in boxen)) / 2
+        zy = (min(b[1] for b in boxen) + max(b[3] for b in boxen)) / 2
+        key = tuple(id(e) for e in self.auswahl)
+        if key != getattr(self, "_manip_key", None):          # new selection: back to the middle
+            self._manip_key = key
+            self._manip_off = (0.0, 0.0)
+        off = getattr(self, "_manip_off", (0.0, 0.0))
+        return (zx + off[0], zy + off[1])
+
+    def manipulator_versetzen(self):
+        """Next click sets the manipulator origin anywhere (object snap works)."""
+        if not self.auswahl:
+            self.status.set(tr("msg.manip.aus"))
+            return
+        self.manipulator_setzen(True)
+        self._manip_pivot_warten = True
+        self.status.set(tr("msg.manip.pivot"))
+
+    def manipulator_zentrieren(self):
+        self._manip_off = (0.0, 0.0)
+        self._manip_pivot_warten = False
+        self.redraw()
+        self.status.set(tr("msg.manip.pivot_zentriert"))
+
+    def _manip_pivot_klick(self, event):
+        """True if the click defined the new manipulator origin."""
+        if not getattr(self, "_manip_pivot_warten", False):
+            return False
+        self._manip_pivot_warten = False
+        pt = self._eingabepunkt(event, None)
+        z0 = self._manip_zentrum()
+        if pt is not None and z0 is not None:
+            off = getattr(self, "_manip_off", (0.0, 0.0))
+            self._manip_off = (off[0] + pt[0] - z0[0], off[1] + pt[1] - z0[1])
+            self.status.set(tr("msg.manip.pivot_ok"))
+        self.redraw()
+        return True
 
     def _manip_sichtbar(self):
         return (getattr(self, "_manip_an", False) and self.auswahl

@@ -203,6 +203,19 @@ def _zeichne(name, d, c, f):
         L([(30, 46), (74, 14)], 7)
         d.ellipse([24 * f, 40 * f, 36 * f, 52 * f], fill=c)
         d.ellipse([68 * f, 8 * f, 80 * f, 20 * f], fill=c)
+    elif name == "drehen3d":
+        d.arc([14 * f, 14 * f, 86 * f, 86 * f], 40, 320, fill=c, width=int(7 * f))
+        d.polygon([(86 * f, 30 * f), (96 * f, 54 * f), (68 * f, 48 * f)], fill=c)
+        P(50, 50, 7)
+    elif name == "abrunden3d":
+        L([(14, 86), (14, 40)], 7); L([(60, 86), (86, 86)], 7)
+        d.arc([14 * f, 14 * f, 86 * f, 86 * f], 180, 270, fill=c, width=int(7 * f))
+        L([(14, 40), (14, 40)], 7); L([(50, 14), (86, 14)], 7); L([(86, 14), (86, 86)], 7)
+        L([(14, 86), (60, 86)], 7)
+    elif name == "manip_pivot":
+        L([(14, 70), (70, 70)], 6); L([(14, 70), (14, 14)], 6)
+        d.ellipse([58 * f, 58 * f, 82 * f, 82 * f], outline=c, width=int(6 * f))
+        L([(70, 50), (70, 90)], 4); L([(50, 70), (90, 70)], 4)
     elif name == "skizze_poly":
         L([(8, 78), (30, 52), (92, 52), (70, 78), (8, 78)], 4)
         L([(30, 46), (46, 12), (74, 30), (62, 46), (30, 46)], 6)
@@ -252,7 +265,7 @@ NAMEN = ("auswahl", "linie", "polylinie", "kreis", "bogen", "ellipse", "spline",
          "ansicht3d", "wuerfel", "k_quader", "k_zylinder", "k_kegel", "k_pyramide",
          "k_kugel", "extrudieren", "loch", "block3d", "aufloesen3d", "persp",
          "einpassen3d", "iso3d", "hoehe3d", "raster3d", "flaeche3d", "skizze_kreis",
-         "skizze_rechteck", "skizze_linie", "skizze_poly", "ebene0", "bem3d", "mass3d")
+         "skizze_rechteck", "skizze_linie", "skizze_poly", "ebene0", "bem3d", "mass3d", "drehen3d", "abrunden3d", "manip_pivot")
 
 
 def icon_png(name, farbe, groesse=26):

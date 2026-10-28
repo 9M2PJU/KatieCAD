@@ -1093,6 +1093,10 @@ class CadApp(AendernMixin, Ansicht3DMixin, ToolbarDockMixin):
                             command=self.laenge_start)
         m_bearb.add_command(label=tr("menu.bearbeiten.manip"),
                             command=self.manipulator_umschalten)
+        m_bearb.add_command(label=tr("menu.bearbeiten.manip_pivot"),
+                            command=self.manipulator_versetzen)
+        m_bearb.add_command(label=tr("menu.bearbeiten.manip_zentrum"),
+                            command=self.manipulator_zentrieren)
         m_ausr = tk.Menu(m_bearb, tearoff=0,
                          bg=FARBEN["bg_mittel"], fg=FARBEN["cyan"],
                          activebackground=FARBEN["cyan"],
@@ -1297,6 +1301,14 @@ class CadApp(AendernMixin, Ansicht3DMixin, ToolbarDockMixin):
                          command=lambda: self.ansicht3d_befehl("loch"))
         m_3d.add_command(label=tr("menu.3d.mass"),
                          command=lambda: self.ansicht3d_befehl("mass"))
+        m_3d.add_command(label=tr("menu.3d.drehen"),
+                         command=lambda: self.ansicht3d_befehl("drehen"))
+        m_3d.add_command(label=tr("menu.3d.abrunden"),
+                         command=lambda: self.ansicht3d_befehl("abrunden"))
+        m_3d.add_command(label=tr("menu.3d.pivot"),
+                         command=lambda: self.ansicht3d_befehl("pivot"))
+        m_3d.add_command(label=tr("menu.3d.pivot_zentrum"),
+                         command=lambda: self.ansicht3d_befehl("pivot_zentrum"))
         m_3d.add_command(label=tr("menu.3d.extrudieren"),
                          command=lambda: self.ansicht3d_befehl("extrudieren"))
         m_3d.add_command(label=tr("menu.3d.block"),
@@ -1421,7 +1433,9 @@ class CadApp(AendernMixin, Ansicht3DMixin, ToolbarDockMixin):
         for key, cmd in (("k_quader", "neu:quader"), ("k_zylinder", "neu:zylinder"),
                          ("k_kegel", "neu:kegel"), ("k_pyramide", "neu:pyramide"),
                          ("k_kugel", "neu:kugel"), ("extrudieren", "extrudieren"),
-                         ("loch", "loch"), ("block3d", "block"), ("aufloesen3d", "aufloesen")):
+                         ("loch", "loch"), ("drehen3d", "drehen"), ("abrunden3d", "abrunden"),
+                         ("manip_pivot", "pivot"), ("block3d", "block"),
+                         ("aufloesen3d", "aufloesen")):
             self._befehl_knopf(tb, key, FARBEN["cyan"],
                                lambda c=cmd: self.ansicht3d_befehl(c))
 
@@ -3707,6 +3721,11 @@ class CadApp(AendernMixin, Ansicht3DMixin, ToolbarDockMixin):
             self.entry_eingabe.focus_set()
             return
         if kind == "vp":
+            return
+        if self._manip_pivot_klick(event):
+            return
+        if (event.state & 0x1) and self._manip_treffer(event) == "frei":
+            self.manipulator_versetzen()               # Shift + click on the centre square
             return
         if self._manip_klick(event):
             return
@@ -7616,6 +7635,8 @@ class CadApp(AendernMixin, Ansicht3DMixin, ToolbarDockMixin):
             self.laenge_start()
         elif cmd == "manip":
             self.manipulator_umschalten()
+        elif cmd == "manip:pivot":
+            self.manipulator_versetzen()
         elif cmd.startswith("3d:"):
             teil = cmd[3:]
             if teil == "oeffnen":
