@@ -23,6 +23,7 @@ from katiecad.model.core import (Text, Linie, Rechteck, FARBEN,
 from katiecad.model import titleblock as TB
 from katiecad.common.i18n import tr
 from katiecad.reports import daten as D
+from katiecad.reports import daten_listen as DL
 from katiecad.reports.netz import Netz
 from katiecad.reports.tabelle import (Spalte, tabellen_seiten,
                                       zeilen_vorbereiten, TEXT, LINIE)
@@ -39,8 +40,13 @@ def format_name(schluessel):
 def skala_fuer(fmt):
     """Scale factor of a format compared to A4 (A3 = 1.414)."""
     return ZEICHNUNGSFORMATE[fmt][0] / ZEICHNUNGSFORMATE[FORMAT][0]
-TYPEN = ("deckblatt", "inhalt", "geraete", "klemmen", "kabel")
-LISTEN = ("geraete", "klemmen", "kabel")
+STANDARD_TYPEN = ("deckblatt", "inhalt", "geraete", "klemmen", "kabel")
+TYPEN = STANDARD_TYPEN + ("verbindungen", "stueckliste", "querverweise",
+                          "potenziale", "stecker", "etiketten", "revisionen")
+LISTEN = ("geraete", "klemmen", "kabel", "verbindungen", "stueckliste",
+          "querverweise", "potenziale", "stecker", "etiketten", "revisionen")
+NETZ_LISTEN = {"klemmen", "kabel", "verbindungen", "stueckliste", "querverweise",
+               "potenziale", "stecker", "etiketten"}
 
 TITEL_TAGS = TB.DATA_TAGS          # (kept for compatibility)
 DATEN_SCHLUESSEL = ("anlage", "kunde", "auftrag", "zeichnungsnummer", "firma",
@@ -103,6 +109,38 @@ _STANDARD = {
               ("typ", "rep.col.typ", 26, "l"),
               ("ader", "rep.col.ader", 10, "l"), ("von", "rep.col.von", 50, "l"),
               ("nach", "rep.col.nach", 50, "l"), ("ort", "rep.col.ort", 18, "l")],
+    "verbindungen": [("pos", "rep.col.pos", 6, "r"), ("von", "rep.col.vl_von", 50, "l"),
+                     ("nach", "rep.col.vl_nach", 50, "l"),
+                     ("kabel", "rep.col.kabelader", 24, "l"),
+                     ("ort", "rep.col.ort", 18, "l"),
+                     ("einbauort", "rep.col.einbauort", 26, "l")],
+    "stueckliste": [("pos", "rep.col.pos", 6, "r"), ("anzahl", "rep.col.anzahl", 8, "r"),
+                    ("typ", "rep.col.typ", 34, "l"),
+                    ("hersteller", "rep.col.hersteller", 26, "l"),
+                    ("bestellnr", "rep.col.bestellnr", 28, "l"),
+                    ("beschreibung", "rep.col.beschreibung", 40, "l"),
+                    ("kennzeichen", "rep.col.kennzeichen", 50, "l")],
+    "querverweise": [("name", "rep.col.qv_name", 30, "l"),
+                     ("abgehend", "rep.col.abgehend", 60, "l"),
+                     ("ankommend", "rep.col.ankommend", 60, "l"),
+                     ("anzahl", "rep.col.anzahl", 9, "r")],
+    "potenziale": [("potenzial", "rep.col.potenzial", 24, "l"),
+                   ("anzahl", "rep.col.anzahl", 9, "r"),
+                   ("anschluesse", "rep.col.anschluesse", 90, "l"),
+                   ("orte", "rep.col.fundstellen", 40, "l")],
+    "stecker": [("stecker", "rep.col.stecker", 18, "l"),
+                ("einbauort", "rep.col.einbauort", 26, "l"),
+                ("pin", "rep.col.pin", 10, "l"),
+                ("ziele", "rep.col.anschluesse", 90, "l"),
+                ("ort", "rep.col.ort", 18, "l")],
+    "etiketten": [("etikett", "rep.col.etikett", 34, "l"),
+                  ("art", "rep.col.art", 16, "l"),
+                  ("einbauort", "rep.col.einbauort", 26, "l"),
+                  ("typ", "rep.col.typ", 34, "l"), ("ort", "rep.col.ort", 18, "l")],
+    "revisionen": [("stand", "rep.col.stand", 12, "l"),
+                   ("aenderung", "rep.col.aenderung", 100, "l"),
+                   ("name", "rep.col.name", 30, "l"),
+                   ("datum", "rep.col.datum", 22, "l")],
 }
 _OPTIONEN = {"textgroesse": 2.5, "zeilenhoehe": 6.0}
 
@@ -240,7 +278,7 @@ def deckblatt_inhalt(daten, projektname, flaeche, heute, sprache, skala=1.0):
 # Rows per report type (also for the CSV export)
 # ------------------------------------------------------------------
 def listen_zeilen(typ, blaetter, nummer, netz=None, klemmen_in_geraeteliste=True,
-                  einbauorte=None):
+                  einbauorte=None, katalog=None, projektdaten=None):
     """Rows of a list report. blaetter: [(idx, elements)];
     einbauorte: {idx: installation location of the sheet}."""
     if typ == "geraete":
@@ -250,6 +288,23 @@ def listen_zeilen(typ, blaetter, nummer, netz=None, klemmen_in_geraeteliste=True
         return D.klemmenplan(netz, blaetter, nummer, einbauorte)
     if typ == "kabel":
         return D.kabelplan(netz, blaetter, nummer, einbauorte)
+    if typ == "verbindungen":
+        return DL.verbindungsliste(netz, blaetter, nummer, einbauorte)
+    if typ == "stueckliste":
+        return DL.stueckliste(blaetter, nummer, netz, katalog, einbauorte)
+    if typ == "querverweise":
+        return DL.querverweisliste(netz, blaetter, nummer)
+    if typ == "potenziale":
+        return DL.potenzialuebersicht(netz, blaetter, nummer)
+    if typ == "stecker":
+        return DL.steckeruebersicht(netz, blaetter, nummer, einbauorte)
+    if typ == "etiketten":
+        return DL.etikettenliste(blaetter, nummer, netz, einbauorte,
+                                 {"geraet": tr("rep.art.geraet"),
+                                  "klemme": tr("rep.art.klemme"),
+                                  "kabel": tr("rep.art.kabel")})
+    if typ == "revisionen":
+        return DL.revisionsuebersicht(projektdaten)
     raise ValueError(typ)
 
 
@@ -266,20 +321,23 @@ def _ohne_leere_einbauorte(spalten, zeilen):
 
 
 def tabellen_fuer_export(blaetter, nummer, ordner=(), klemmen_in_geraeteliste=True,
-                         einbauorte=None):
-    """{type: (columns, rows)} for device list, terminal diagram, cable plan."""
+                         einbauorte=None, katalog=None, projektdaten=None):
+    """{type: (columns, rows)} for all lists (device list, terminal diagram,
+    cable plan, connection list, parts list ...)."""
     netz = netz_aufbauen(blaetter)
     out = {}
     for typ in LISTEN:
         spalten, _opt = lade_spalten(typ, ordner)
         zeilen = listen_zeilen(typ, blaetter, nummer, netz,
-                               klemmen_in_geraeteliste, einbauorte)
+                               klemmen_in_geraeteliste, einbauorte,
+                               katalog, projektdaten)
         out[typ] = (_ohne_leere_einbauorte(spalten, zeilen), zeilen)
     return out
 
 
 _GRUPPE = {"klemmen": ("_gk", ("leiste", "einbauort")),
-           "kabel": ("_gk", ("cab", "einbauort", "typ"))}
+           "kabel": ("_gk", ("cab", "einbauort", "typ")),
+           "stecker": ("_gk", ("stecker", "einbauort"))}
 
 
 def _liste_tabelle(typ, zeilen, ordner, flaeche, titel, skala=1.0):
@@ -326,7 +384,7 @@ def _name(basis, k, n):
 # ------------------------------------------------------------------
 def berichte_erzeugen(blaetter, projektname, daten, aktiv, vorlage, sprache,
                       ordner=(), heute=None, klemmen_in_geraeteliste=True,
-                      format=FORMAT):
+                      format=FORMAT, katalog=None):
     """Creates the requested report sheets (format: drawing format name, A4 or A3;
     texts and row heights are scaled with the sheet).
 
@@ -342,7 +400,7 @@ def berichte_erzeugen(blaetter, projektname, daten, aktiv, vorlage, sprache,
     skala = skala_fuer(format)
     basis = [(i, b.elemente) for i, b in enumerate(blaetter)]
     einbauorte = {i: getattr(b, "einbauort", "") for i, b in enumerate(blaetter)}
-    brauchen_netz = bool(aktiv & {"klemmen", "kabel"}) or (
+    brauchen_netz = bool(aktiv & NETZ_LISTEN) or (
         "geraete" in aktiv and klemmen_in_geraeteliste)
     netz = netz_aufbauen(basis) if brauchen_netz else None
     namen = {t: tr("rep." + t) for t in TYPEN}
@@ -359,7 +417,8 @@ def berichte_erzeugen(blaetter, projektname, daten, aktiv, vorlage, sprache,
         for typ in LISTEN:
             if typ in aktiv:
                 zeilen = listen_zeilen(typ, basis, nummer, netz,
-                                       klemmen_in_geraeteliste, einbauorte)
+                                       klemmen_in_geraeteliste, einbauorte,
+                                       katalog, ctx["daten"])
                 listen[typ] = _liste_tabelle(typ, zeilen, ordner, flaeche,
                                              namen[typ], skala)
         hinten_n = sum(len(p) for p in listen.values())
@@ -426,4 +485,3 @@ def beschreibung_aus_layouts(layouts):
                 if teile:
                     return " - ".join(teile[:2])
     return ""
-
