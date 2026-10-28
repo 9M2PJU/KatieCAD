@@ -4179,6 +4179,56 @@ class Skizze3D(Element):
         return d
 
 
+class Text3D(Element):
+    """Text label at a point in space (3D view). It always faces the viewer; in the 2D
+    drawing it appears as ordinary text at (x, y)."""
+
+    def __init__(self, p=(0, 0, 0), inhalt="", hoehe=3.5, **kw):
+        super().__init__("text3d", **kw)
+        self.p = tuple(float(v) for v in p)
+        self.inhalt = inhalt
+        self.hoehe = float(hoehe)
+
+    def zentrum3(self):
+        return self.p
+
+    def _text2d(self):
+        t = Text(self.p[0], self.p[1], self.inhalt, hoehe=self.hoehe, layer=self.layer,
+                 farbe=self.farbe, linientyp=self.linientyp, eig_farbe=self.eig_farbe,
+                 staerke=self.staerke)
+        return t
+
+    def bbox(self):
+        return self._text2d().bbox()
+
+    def aufgeloest(self):
+        return [self._text2d()]
+
+    def verschieben(self, dx, dy, dz=0.0):
+        self.p = (self.p[0] + dx, self.p[1] + dy, self.p[2] + dz)
+
+    def drehen(self, cx, cy, winkel_deg):
+        x, y = punkte_drehen(self.p[0], self.p[1], cx, cy, winkel_deg)
+        self.p = (x, y, self.p[2])
+
+    def drehen3(self, p0, achse, winkel_deg):
+        self.p = tuple(punkt_rotieren(self.p, p0, achse, winkel_deg))
+
+    def skalieren(self, cx, cy, f):
+        x, y = _skal_pt(self.p[0], self.p[1], cx, cy, f)
+        self.p = (x, y, self.p[2] * f)
+        self.hoehe *= f
+
+    def spiegeln(self, ax, ay, bx, by):
+        x, y = punkt_spiegeln(self.p[0], self.p[1], ax, ay, bx, by)
+        self.p = (x, y, self.p[2])
+
+    def to_dict(self):
+        d = super().to_dict()
+        d["p"] = list(self.p)
+        return d
+
+
 class Bemassung3D(Element):
     """Dimension between two points in space, drawn offset by `versatz`
     (a 3D vector). In the 2D plan it appears projected."""
@@ -4352,7 +4402,7 @@ def kugel(cx, cy, cz, r, **kw):
 
 
 ZUSAMMENGESETZT = (BlockReferenz, Querverweis, Verbindung, ElektroMaske, Klemme,
-                   Kabel, Koordinatenfeld, Koerper3D, Gruppe3D, Skizze3D, Bemassung3D)
+                   Kabel, Koordinatenfeld, Koerper3D, Gruppe3D, Skizze3D, Bemassung3D, Text3D)
 
 
 # ============================================================

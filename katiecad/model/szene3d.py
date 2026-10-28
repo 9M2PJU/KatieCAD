@@ -8,7 +8,7 @@ and does the maths of the 3D manipulator (X/Y/Z arrows).
 
 import math
 
-from katiecad.model.core import (Koerper3D, Gruppe3D, Skizze3D, Bemassung3D, Linie, Rechteck,
+from katiecad.model.core import (Koerper3D, Gruppe3D, Skizze3D, Bemassung3D, Text3D, Linie, Rechteck,
                                  Polylinie, Kreis, Bogen, Ellipse, ZUSAMMENGESETZT, bogen_punkte,
                                  bogen_sweep, profil_aus_element, extrusion)
 from katiecad.model import geom3d as G
@@ -16,7 +16,7 @@ from katiecad.model import geom3d as G
 KOERPER_TYPEN = (Koerper3D, Gruppe3D)
 
 
-RAUM_TYPEN = (Koerper3D, Gruppe3D, Skizze3D, Bemassung3D)
+RAUM_TYPEN = (Koerper3D, Gruppe3D, Skizze3D, Bemassung3D, Text3D)
 
 
 def ist_3d(el):
@@ -138,6 +138,16 @@ def pick(elemente, kamera, cx, cy, mx, my, tol=8.0):
         return best
     for el in reversed(elemente):
         if ist_3d(el):
+            continue
+        if isinstance(el, Text3D):
+            q = kamera.proj(el.p, cx, cy)
+            if q:
+                zeilen = (el.inhalt or " ").split("\n")
+                w = max(len(z) for z in zeilen) * el.hoehe * kamera.skala * 0.65
+                h = len(zeilen) * el.hoehe * kamera.skala * 1.3
+                if q[0] - tol <= mx <= q[0] + w + tol and q[1] - h - tol <= my <= q[1] + tol:
+                    if bd is None or 0.0 < bd:
+                        best, bd = el, 0.0
             continue
         for zug, geschlossen in zuege3(el):
             d = _abstand_zug(kamera, cx, cy, mx, my, zug, geschlossen)
@@ -686,6 +696,10 @@ def szene_segmente(elemente, kamera, cx, cy, sichtbar=None):
             q = kamera.proj(el.text_pos3(), cx, cy)
             if q:
                 texte.append((el, (q[0], q[1]), el.wert_text()))
+        elif isinstance(el, Text3D):
+            q = kamera.proj(el.p, cx, cy)
+            if q:
+                texte.append((el, (q[0], q[1]), el.inhalt))
     return linien, texte
 
 
