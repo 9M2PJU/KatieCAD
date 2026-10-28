@@ -153,7 +153,7 @@ class Netz:
             else:
                 x, y = k.spitze_punkt()
             self._neu(blatt, x, y, "qv", bes=bes, text=k.text.strip(),
-                      qv_art=k.art)
+                      qv_art="extern" if k.extern else k.art)
 
     def _leisten_erben(self, klemmen):
         """Terminals without a terminal strip inherit that of the nearest terminal to
