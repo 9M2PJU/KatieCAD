@@ -3,7 +3,9 @@
 katiecad/model/eigenschaften.py - Common properties of a mixed selection
 (NO Tkinter). Used by the properties palette (Ctrl+1).
 """
-from katiecad.model.core import Text, Viewport
+from katiecad.model.core import Text, Viewport, schrift_fett, schrift_name, schrift_setzen
+
+FETT_ANZEIGE = " fett"      # palette: "Arial fett"
 
 VERSCHIEDEN = "*"          # marker for "values differ"
 ALLGEMEIN = ("layer", "farbe", "linientyp", "staerke")
@@ -15,6 +17,8 @@ def _ziele(auswahl):
 
 
 def _wert(el, feld):
+    if feld == "schriftart":
+        return schrift_name(el.schriftart) + (FETT_ANZEIGE if schrift_fett(el.schriftart) else "")
     if feld == "farbe":
         return el.farbe if el.eig_farbe else None      # None = by layer
     return getattr(el, feld)
@@ -34,7 +38,7 @@ def gemeinsame(auswahl):
         out[f] = werte.pop() if len(werte) == 1 else VERSCHIEDEN
     for f in TEXTFELDER:
         if texte:
-            werte = {getattr(e, f) for e in texte}
+            werte = {_wert(e, f) for e in texte}
             out[f] = werte.pop() if len(werte) == 1 else VERSCHIEDEN
     return out
 
@@ -46,6 +50,12 @@ def anwenden(auswahl, feld, wert):
     for e in _ziele(auswahl):
         if feld in TEXTFELDER:
             if not isinstance(e, Text):
+                continue
+            if feld == "schriftart":
+                w = str(wert)
+                fett = w.endswith(FETT_ANZEIGE)
+                e.schriftart = schrift_setzen(w[:-len(FETT_ANZEIGE)] if fett else w, fett)
+                n += 1
                 continue
             setattr(e, feld, float(wert) if feld in ("hoehe", "winkel") else wert)
         elif feld == "farbe":
