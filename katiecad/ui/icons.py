@@ -105,6 +105,17 @@ def _zeichne(name, d, c, f):
                        ((px - tx * 4 - nx * 11) * f, (py - ty * 4 - ny * 11) * f)],
                       fill=c)
     # ---- electrical
+    elif name == "laenge":
+        L([(10, 62), (66, 62)]); P(10, 62)
+        L([(66, 62), (90, 62)], 5)
+        d.polygon([(90 * f, 62 * f), (74 * f, 52 * f), (74 * f, 72 * f)], fill=c)
+        L([(10, 30), (10, 46)], 5); L([(50, 30), (50, 46)], 5)
+        L([(10, 38), (50, 38)], 4)
+    elif name == "manip":
+        L([(18, 78), (82, 78)]); L([(18, 78), (18, 14)])
+        d.polygon([(90 * f, 78 * f), (74 * f, 68 * f), (74 * f, 88 * f)], fill=c)
+        d.polygon([(18 * f, 6 * f), (8 * f, 22 * f), (28 * f, 22 * f)], fill=c)
+        d.rectangle([34 * f, 40 * f, 54 * f, 60 * f], outline=c, width=int(6 * f))
     elif name == "ftext":
         L([(14, 26), (86, 26)], 5); L([(14, 50), (70, 50)], 5); L([(14, 74), (50, 74)], 5)
         d.polygon([(62 * f, 62 * f), (92 * f, 74 * f), (62 * f, 86 * f)], fill=c)
@@ -139,7 +150,7 @@ NAMEN = ("auswahl", "linie", "polylinie", "kreis", "bogen", "ellipse", "spline",
          "rechteck", "text", "bemassung", "stutzen", "brechen",
          "vpunkt", "verbindung", "querverweis", "maske", "klemme", "kabel",
          "koordinatenfeld", "suchen", "zoom_plus", "zoom_minus",
-         "zoom_grenzen", "reset", "ftext")
+         "zoom_grenzen", "reset", "ftext", "laenge", "manip")
 
 
 def icon_png(name, farbe, groesse=26):
