@@ -79,7 +79,7 @@ def pruefe(blaetter, einbauorte=None):
                 if ind or num:
                     klemmen[(eo_von(b), ind, num)].append((b, el))
                 _klemme_offen(el, elemente, b, res, ind)
-            elif isinstance(el, Querverweis) and el.text.strip():
+            elif isinstance(el, Querverweis) and el.text.strip() and not el.extern:
                 qvs[el.text.strip()].append((b, el))
 
     for (_eo, per), liste in haupt.items():
@@ -140,4 +140,3 @@ def bericht_text(befunde):
     for f in befunde:
         zeilen.append(f"[{tr('pr.stufe.' + f.stufe)}] {f.blatt_name}: {f.text}")
     return "\n".join(zeilen)
-
