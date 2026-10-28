@@ -80,7 +80,34 @@ def _zeichne(name, d, c, f):
     elif name == "suchen":
         d.ellipse([16 * f, 14 * f, 62 * f, 60 * f], outline=c, width=int(w * f))
         L([(54, 54), (86, 86)], 9)
+    elif name in ("zoom_plus", "zoom_minus"):
+        d.ellipse([12 * f, 12 * f, 66 * f, 66 * f], outline=c, width=int(w * f))
+        L([(58, 58), (88, 88)], 9)
+        L([(26, 39), (52, 39)], 6)
+        if name == "zoom_plus":
+            L([(39, 26), (39, 52)], 6)
+    elif name == "zoom_grenzen":
+        d.ellipse([6 * f, 10 * f, 54 * f, 58 * f], outline=c, width=int(w * f))
+        L([(48, 52), (60, 64)], 8)
+        L([(18, 34), (42, 34)], 5); L([(30, 22), (30, 46)], 5)
+        d.arc([64 * f, 46 * f, 96 * f, 88 * f], 0, 315, fill=c, width=int(6 * f))
+        L([(80, 67), (96, 67)], 6)
+    elif name == "reset":
+        d.arc([18 * f, 18 * f, 82 * f, 82 * f], 180, 300, fill=c, width=int(w * f))
+        d.arc([18 * f, 18 * f, 82 * f, 82 * f], 0, 120, fill=c, width=int(w * f))
+        for ang in (300, 120):
+            a = math.radians(ang)
+            px, py = 50 + 32 * math.cos(a), 50 + 32 * math.sin(a)
+            tx, ty = -math.sin(a), math.cos(a)
+            nx, ny = -ty, tx
+            d.polygon([((px + tx * 12) * f, (py + ty * 12) * f),
+                       ((px - tx * 4 + nx * 11) * f, (py - ty * 4 + ny * 11) * f),
+                       ((px - tx * 4 - nx * 11) * f, (py - ty * 4 - ny * 11) * f)],
+                      fill=c)
     # ---- electrical
+    elif name == "ftext":
+        L([(14, 26), (86, 26)], 5); L([(14, 50), (70, 50)], 5); L([(14, 74), (50, 74)], 5)
+        d.polygon([(62 * f, 62 * f), (92 * f, 74 * f), (62 * f, 86 * f)], fill=c)
     elif name == "vpunkt":
         d.ellipse([36 * f, 36 * f, 64 * f, 64 * f], outline=c, width=int(w * f))
         L([(8, 50), (36, 50)]); L([(64, 50), (92, 50)])
@@ -111,7 +138,8 @@ def _zeichne(name, d, c, f):
 NAMEN = ("auswahl", "linie", "polylinie", "kreis", "bogen", "ellipse", "spline",
          "rechteck", "text", "bemassung", "stutzen", "brechen",
          "vpunkt", "verbindung", "querverweis", "maske", "klemme", "kabel",
-         "koordinatenfeld", "suchen")
+         "koordinatenfeld", "suchen", "zoom_plus", "zoom_minus",
+         "zoom_grenzen", "reset", "ftext")
 
 
 def icon_png(name, farbe, groesse=26):
