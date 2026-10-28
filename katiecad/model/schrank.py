@@ -24,6 +24,7 @@ PLATTE_DICKE = 3.0
 PLATTE_ABSTAND = 15.0           # mounting plate: distance to the rear wall
 TUER_DICKE = 2.0                # door sheet thickness
 WAND_DICKE = 1.5                # side panel thickness
+GRIFF_DICKE = 8.0               # handle plate protrudes from the door front
 SPALT = 3.0                     # door / side panels sit slightly inset (gap, visible in wireframe)
 
 
@@ -56,6 +57,17 @@ def schrank_bauen(breite, hoehe, tiefe, x=0.0, y=0.0, z=0.0, platte=None, sockel
     if tuer:                       # door: thin panel on the front face (inside the cabinet depth)
         teile.append(_bez(quader(x + SPALT, y, x + breite - SPALT, y + TUER_DICKE,
                                  z0 + SPALT, hoehe - 2 * SPALT), "Tür"))
+    if tuer:                       # rectangular handle plate with square lock insert, right side
+        gb = min(40.0, breite * 0.15)
+        gh = min(120.0, hoehe * 0.3)
+        gx2 = x + breite - SPALT - 20.0
+        gx1 = max(x + SPALT + 5.0, gx2 - gb)
+        gz = z0 + min(hoehe * 0.55, hoehe - gh - 20.0) - gh / 2.0
+        teile.append(_bez(quader(gx1, y - GRIFF_DICKE, gx2, y, gz, gh), "Türgriff"))
+        sq = min(24.0, gb * 0.6)
+        cx, cz = (gx1 + gx2) / 2.0, gz + gh / 2.0
+        teile.append(_bez(quader(cx - sq / 2, y - GRIFF_DICKE - 4.0, cx + sq / 2, y - GRIFF_DICKE,
+                                 cz - sq / 2, sq), "Schloss"))
     for aktiv, x1, bez in ((seite_l, x, "Seitenwand links"),
                            (seite_r, x + breite - WAND_DICKE, "Seitenwand rechts")):
         if aktiv:                  # side panels: thin panels on the left / right face
