@@ -107,6 +107,20 @@ im Eintrag **Symbole**, je Kategorie ein Unterordner.
 | Voltmeter | Voltmeter | 1, 2 |
 | Ammeter | Amperemeter | 1, 2 |
 
+### 10 PLC
+
+| Name | Deutsch | Pins |
+|---|---|---|
+| PLC DI 8 / DI 16 | SPS Digitaleingang 8 / 16 Kanäle | I0.0 …, 1M |
+| PLC DO 8 / DO 16 | SPS Digitalausgang 8 / 16 Kanäle | Q0.0 …, L+, M |
+| PLC AI 4 | SPS Analogeingang 4 Kanäle | AI0 … AI3, M |
+| PLC AO 4 | SPS Analogausgang 4 Kanäle | AO0 … AO3, M |
+| PLC CPU | SPS Zentraleinheit | L+, M |
+| PLC channel DI / DO | SPS Einzelkanal Ein-/Ausgang | I0.0 / Q0.0, M |
+
+PLC symbols carry the invisible attribute `SPS` (`CPU`, `DI`, `DO`, `AI`, `AO`); the pin name is the
+channel address (rename it in the reference, e.g. `I4.2`). This marks an object as a PLC for the PLC list. Further invisible attributes (edit with **Edit attributes**): `STATION` (controller), `PLATZ` (slot) and per channel `VPn_SYM` (symbol), `VPn_KOM` (comment).
+
 ## Notes
 
 * The symbols are **simplified drawings in the spirit of IEC 60617 / DIN EN 60617**,
