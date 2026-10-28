@@ -937,6 +937,67 @@ class Ansicht3D(tk.Frame):
                 h["fang"] = (r[2], r[1])
         self._hover = h
 
+    @staticmethod
+    def _ecken_von(elemente):
+        """The 8 corners of the bounding box of each object (fixture points of a block)."""
+        out = []
+        for el in elemente:
+            b = None
+            if isinstance(el, Gruppe3D):          # block: ignore thin parts (door, handle, plate)
+                bs = [t.bbox3() for t in el.teile if t.bbox3()]
+                dick = [q for q in bs if min(q[3] - q[0], q[4] - q[1], q[5] - q[2]) >= 20.0]
+                bs = dick or bs
+                if bs:
+                    b = (min(q[0] for q in bs), min(q[1] for q in bs), min(q[2] for q in bs),
+                         max(q[3] for q in bs), max(q[4] for q in bs), max(q[5] for q in bs))
+            elif hasattr(el, "bbox3"):
+                b = el.bbox3()
+            if not b:
+                continue
+            for x in (b[0], b[3]):
+                for y in (b[1], b[4]):
+                    for z in (b[2], b[5]):
+                        out.append((x, y, z))
+        return out
+
+    def _fang_marke(self, punkte):
+        """Yellow snap marker(s) [(3D point, kind)] on the preview layer."""
+        c = self.canvas
+        for p, art in punkte:
+            q = self.kamera.proj(p, *self._mitte())
+            if q is None:
+                continue
+            x, y = q[0], q[1]
+            f = FARBEN["gelb"]
+            c.create_rectangle(x - 6, y - 6, x + 6, y + 6, outline=f, width=2, tags="vorschau")
+            c.create_text(x + 10, y - 12, text=tr("d3.fang." + art), fill=f, anchor="w",
+                          font=(UI_SCHRIFT, 8), tags="vorschau")
+
+    def _achse_fang(self, d, mm):
+        """OSNAP while moving along an axis: a corner/edge/centre of the selection snaps to the
+        coordinate of a snap point of another object. -> (mm, [(point, kind)])"""
+        if not self.app.osnap.get():
+            return mm, []
+        i = "xyz".index(d["achse"])
+        auswahl = [x for x in self.app.auswahl if S.ist_raum(x)]
+        if not auswahl:
+            return mm, []
+        rest = [x for x in self._sichtbare() if x not in self.app.auswahl]
+        eigene = [(c, "end") for c in self._ecken_von([x for x in auswahl if S.ist_3d(x)])]
+        andere = S.fang_kandidaten(rest)
+        tol = 12.0 / max(self.kamera.skala, 1e-6)
+        best, bd = None, tol
+        for q, _a in eigene:
+            q0 = q[i] - d.get("angewandt", 0.0)
+            for pt, art in andere:
+                cand = pt[i] - q0
+                dd = abs(cand - mm)
+                if dd < bd - 1e-9:
+                    best, bd = (cand, pt, art), dd
+        if best is None:
+            return mm, []
+        return best[0], [(best[1], best[2])]
+
     def _hover_zeichnen(self):
         c = self.canvas
         c.delete("hover")
@@ -1156,9 +1217,10 @@ class Ansicht3D(tk.Frame):
         gelb = FARBEN["gelb"]
         if self._platz is not None and self._platz.get("maus"):
             pl = self._platz
-            p = self._bodenpunkt(pl["maus"], pl["z"])
+            p, fang = self._platz_pos(pl["maus"], pl)
             if p is not None:
-                body = koerper_bauen(pl["art"], pl["par"], p[0], p[1], pl["z"])
+                self._fang_marke(fang)
+                body = koerper_bauen(pl["art"], pl["par"], p[0], p[1], p[2])
                 for nz in (body.netze() if hasattr(body, "netze") else [body.netz()]):
                     for (i, j) in nz.kanten:
                         self._linie(nz.punkte[i], nz.punkte[j], gelb, 1, (4, 3), "vorschau")
@@ -1305,8 +1367,12 @@ class Ansicht3D(tk.Frame):
                 d["bewegt"] = True
                 self._manip_beginn(d)
             mm = S.verschiebung_mm(d["info"], e.x - d["x"], e.y - d["y"], self._raster_fang())
+            self._achsfang = []
+            if d.get("modus") == "verschieben":
+                mm, self._achsfang = self._achse_fang(d, mm)
             self._manip_setzen(d, mm)
             self.zeichne()
+            self._fang_marke(self._achsfang)
 
     def _rahmen_zeichnen(self, d, e):
         """Selection window: cyan (left to right) = fully inside, green = touching."""
@@ -1327,6 +1393,7 @@ class Ansicht3D(tk.Frame):
 
     def on_los(self, e):
         d, self._drag = self._drag, None
+        self._achsfang = []
         if not d:
             return
         if d["art"] == "rahmen":
@@ -1568,14 +1635,44 @@ class Ansicht3D(tk.Frame):
         self.zeichne()
         self.info_var.set(tr("d3.msg.erzeugt", art=tr("d3.neu." + art)))
 
-    def _platz_klick(self, e):
-        pl = self._platz
+    def _platz_pos(self, e, pl):
+        """Base point of a body being placed: grid, then OSNAP: a corner/centre of the new body
+        snaps onto a snap point of an existing object (to line bodies up or join them).
+        -> (position or None, [(snap point, kind)])"""
         p = self._bodenpunkt(e, pl["z"])
         if p is None:
+            return None, []
+        if not self.app.osnap.get():
+            return p, []
+        mx, my = self._mitte()
+        body = koerper_bauen(pl["art"], pl["par"], p[0], p[1], p[2])
+        eigene = self._ecken_von([body])
+        andere = S.fang_kandidaten(self._sichtbare())
+        best, bd = None, 16.0
+        for c in eigene:
+            qc = self.kamera.proj(c, mx, my)
+            if qc is None:
+                continue
+            for pt, art in andere:
+                qe = self.kamera.proj(pt, mx, my)
+                if qe is None:
+                    continue
+                d = math.hypot(qe[0] - qc[0], qe[1] - qc[1])
+                if d < bd:
+                    best, bd = (G.v_sub(pt, c), pt, art), d
+        if best is None:
+            return p, []
+        dv, pt, art = best
+        return (p[0] + dv[0], p[1] + dv[1], p[2] + dv[2]), [(pt, art)]
+
+    def _platz_klick(self, e):
+        pl = self._platz
+        pos, _f = self._platz_pos(e, pl)
+        if pos is None:
             self.info_var.set(tr("d3.msg.keine_ebene"))
             return
         self._platz = None
-        self._erzeuge(pl["art"], pl["par"], (p[0], p[1], pl["z"]))
+        self._erzeuge(pl["art"], pl["par"], pos)
 
     def abbrechen(self):
         if self._skiz is not None:
