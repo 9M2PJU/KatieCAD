@@ -123,7 +123,6 @@ TEXTE = {
         "dlg.richtung.90": "Nord",
         "dlg.richtung.0": "Ost",
         "menu.elektro.geraet_laden": "Gerät aus Datei laden...",
-        "menu.elektro.geraet_speichern": "Gerät als Datei speichern...",
         "menu.elektro.klemme": "Klemme setzen (KLEMME)",
         "menu.elektro.maske": "Elektro-Maske setzen (MASKE)",
         "menu.elektro.verbindung": "Verbindung setzen (VERBINDUNG)",
@@ -305,7 +304,7 @@ TEXTE = {
         "blatt.art.uebersicht": "Übersicht",
         "blatt.art.layout": "Layout",
         "dlg.blatt.name": "Blattname:",
-        "dlg.block.speichern.titel": "Block als Datei speichern",
+        "dlg.block.speichern.titel": "Block/Gerät als Datei speichern",
         "dlg.block.speichern.knopf": "Speichern...",
         "dlg.block.speichern.hinweis": "Wähle den Block, der als eigene Datei (*.katieblock) gespeichert werden soll.",
         # --- NEW: projects, sidebar, attributes, block files ---
@@ -355,7 +354,7 @@ TEXTE = {
         "menu.projekt.blatt_loeschen": "Blatt löschen",
         "menu.bloecke.attdef": "Attribut definieren... (ATTDEF)",
         "menu.bloecke.attedit": "Attribute bearbeiten... (ATTEDIT)",
-        "menu.bloecke.speichern": "Block als Datei speichern...",
+        "menu.bloecke.speichern": "Block/Gerät als Datei speichern...",
         "menu.bloecke.laden": "Block aus Datei laden...",
         "sb.undo": "Undo",
         "sb.redo": "Redo",
@@ -775,6 +774,7 @@ TEXTE = {
         "menu.einfuegen.ellipse": "Ellipse",
         "menu.einfuegen.spline": "Spline",
         "tb.wz.ellipse": "Ellipse",
+        "tb.wz.suchen": "Suchen und Ersetzen...",
         "tb.wz.spline": "Spline",
         "menu.einfuegen.winkel": "Winkelbemaßung (3 Punkte)",
         "menu.einfuegen.winkel_linien": "Winkelbemaßung (2 Linien)",
@@ -927,7 +927,6 @@ TEXTE = {
         "dlg.richtung.90": "North",
         "dlg.richtung.0": "East",
         "menu.elektro.geraet_laden": "Load device from file...",
-        "menu.elektro.geraet_speichern": "Save device to file...",
         "menu.elektro.klemme": "Place terminal (KLEMME)",
         "menu.elektro.maske": "Place device mask (MASKE)",
         "menu.elektro.verbindung": "Place junction (VERBINDUNG)",
@@ -1109,7 +1108,7 @@ TEXTE = {
         "blatt.art.uebersicht": "Overview",
         "blatt.art.layout": "Layout",
         "dlg.blatt.name": "Sheet name:",
-        "dlg.block.speichern.titel": "Save block to file",
+        "dlg.block.speichern.titel": "Save block/device to file",
         "dlg.block.speichern.knopf": "Save...",
         "dlg.block.speichern.hinweis": "Choose the block to be saved as a separate file (*.katieblock).",
         # --- NEW: projects, sidebar, attributes, block files ---
@@ -1159,7 +1158,7 @@ TEXTE = {
         "menu.projekt.blatt_loeschen": "Delete sheet",
         "menu.bloecke.attdef": "Define attribute... (ATTDEF)",
         "menu.bloecke.attedit": "Edit attributes... (ATTEDIT)",
-        "menu.bloecke.speichern": "Save block to file...",
+        "menu.bloecke.speichern": "Save block/device to file...",
         "menu.bloecke.laden": "Load block from file...",
         "sb.undo": "Undo",
         "sb.redo": "Redo",
@@ -1579,6 +1578,7 @@ TEXTE = {
         "menu.einfuegen.ellipse": "Ellipse",
         "menu.einfuegen.spline": "Spline",
         "tb.wz.ellipse": "Ellipse",
+        "tb.wz.suchen": "Find and replace...",
         "tb.wz.spline": "Spline",
         "menu.einfuegen.winkel": "Angle dimension (3 points)",
         "menu.einfuegen.winkel_linien": "Angle dimension (2 lines)",
@@ -1638,3 +1638,4 @@ def tr(schluessel, **kwargs):
 def setze_sprache(code):
     if code in TEXTE:
         SPRACHE["aktuell"] = code
+
