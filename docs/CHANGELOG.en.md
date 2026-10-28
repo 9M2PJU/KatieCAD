@@ -24,6 +24,13 @@
 - New electrical tool **Function text** (`FTEXT`): multi-line text on the layer "F-Text"; the device list and the terminal diagram show it at the far right in the column "Function" for all devices/terminals behind the insertion point
 - "Load device from file..." (Electrical) replaced by "Load block/device from file..." in the Blocks menu (loads the file into the block library)
 - Zoom +, Zoom -, Zoom extents and Reset as icons (magnifiers, circular arrows) in the toolbar; the label "Electrical:" is red
+- Blocks menu: entry "Block list..." removed (same function as "Insert block/device"; Ctrl+B and `BL` stay)
+- A cross reference marked "Handover / external" points nowhere and is never targeted: the same text (e.g. `L1`) can be used any number of times, no `L1.1`, `L2.1` ...
+- Change length (`LAENGE`): click a line end, then click the new end or type `+5` / `-5` / `=50`; toolbar icon
+- Align (left, right, top, bottom, centre horizontally/vertically) in the Edit menu
+- Manipulator (`MANIP`): axis cross on the selection; moves only along the chosen axis (object snap counts only along the axis), distance can be typed, free move via the square
+- Text can be **bold** (text dialog, properties, properties palette "Arial fett"); also in the PDF (Helvetica-Bold)
+- Terminal diagram: the same function text appears only at the first terminal of a strip
 - Version jump to 1.1.0
 
 ## 1.0.3

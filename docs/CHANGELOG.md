@@ -24,6 +24,13 @@
 - Neues Elektro-Werkzeug **Funktionstext** (`FTEXT`): mehrzeiliger Text auf dem Layer „F-Text“; die Geräteliste und der Klemmenplan zeigen ihn ganz rechts in der Spalte „Funktion“ bei allen Geräten/Klemmen hinter dem Einfügepunkt
 - „Gerät aus Datei laden…“ (Elektro) ersetzt durch „Block/Gerät aus Datei laden…“ im Menü Blöcke (lädt die Datei in die Blockbibliothek)
 - Zoom +, Zoom −, Zoom Grenzen und Reset als Symbole (Lupen, Pfeilkreise) in der Werkzeugzeile; die Beschriftung „Elektro:“ ist rot
+- Menü Blöcke: Eintrag „Blockliste…“ entfernt (gleiche Funktion wie „Block/Gerät einfügen“; Strg+B und `BL` bleiben)
+- Querverweis mit „Übergabe / extern“ verweist nirgendwohin und wird nicht angesprungen: gleicher Text (z. B. `L1`) beliebig oft möglich, ohne `L1.1`, `L2.1` …
+- Länge ändern (`LAENGE`): Linienende anklicken, dann neues Ende klicken oder `+5` / `-5` / `=50` tippen; Werkzeugleisten-Symbol
+- Ausrichten (links, rechts, oben, unten, Mitte horizontal/vertikal) im Menü Bearbeiten
+- Manipulator (`MANIP`): Achsenkreuz an der Auswahl; Verschieben nur auf der gewählten Achse (Objektfang zählt nur in Achsrichtung), Abstand tippbar, freies Verschieben über das Quadrat
+- Texte können **fett** sein (Textdialog, Eigenschaften, Eigenschaftenpalette „Arial fett“); auch im PDF (Helvetica-Bold)
+- Klemmenplan: gleicher Funktionstext erscheint nur bei der ersten Klemme einer Leiste
 - Versionssprung auf 1.1.0
 
 ## 1.0.3

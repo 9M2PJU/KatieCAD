@@ -102,6 +102,12 @@ und Farbe, Linienart und Linienstärke in der Werkzeugleiste.
 
 **Versatz (Bearbeiten › Versatz, Befehle `VERSATZ` / `O`):** Abstand eingeben, Objekt anklicken, dann die Seite anklicken, auf der die Kopie entstehen soll. Funktioniert mit Linien, Kreisen, Bögen, Rechtecken und Polylinien (Ecken mit Gehrung). Ist der Abstand zu groß (nach innen), meldet KatieCAD „nicht möglich“.
 
+**Länge ändern (Bearbeiten › Länge ändern, Werkzeugleiste, Befehl `LAENGE`):** Linie nahe an dem Ende anklicken, das sich ändern soll. Dann entweder das neue Ende anklicken (es wird auf die Linienrichtung projiziert, Objektfang darf benutzt werden) oder die Änderung in die Eingabezeile tippen: `+5` verlängert um 5, `-5` kürzt um 5, `=50` setzt die Länge auf 50 (Einheit wie im Projekt). Danach die nächste Linie anklicken oder ESC.
+
+**Ausrichten (Bearbeiten › Ausrichten, Befehle `AUSLINKS`, `AUSRECHTS`, `AUSOBEN`, `AUSUNTEN`, `AUSMITTEH`, `AUSMITTEV`):** mindestens zwei Objekte markieren; sie werden an die linke/rechte/obere/untere Kante oder die Mitte des gesamten Auswahlrahmens verschoben.
+
+**Manipulator (Bearbeiten › Manipulator, Werkzeugleiste, Befehl `MANIP`):** Schaltet ein Achsenkreuz an der Auswahl ein/aus. Auf den **roten X-Pfeil** oder den **grünen Y-Pfeil** klicken: Das Objekt bewegt sich nur auf dieser Achse. Beim Klick auf den Zielpunkt zählt nur der Anteil in Achsrichtung – auch wenn der Objektfang einen Punkt neben der Achse trifft, bleibt das Gerät auf seiner Flucht. Alternativ den Abstand tippen (`25`, `-10`). Das **gelbe Quadrat** verschiebt frei. ESC bricht ab.
+
 **Schnellauswahl (Bearbeiten › Schnellauswahl, Befehl `QS`):** wählt alle Objekte mit einer Objektart, einem Layer, einer Farbe oder einem Linientyp. Mehrere Kriterien gelten gemeinsam (UND). Optional: alles außer den Treffern auswählen oder zur bestehenden Auswahl hinzufügen.
 
 **Kettenbemaßung (Einfügen › Kettenbemaßung, Befehl `KETTE`):** zwei Messpunkte und die Lage der Maßlinie wie bei der normalen Bemaßung; danach reicht je ein Klick pro weiterem Punkt, und jede neue Maßzahl setzt am letzten Punkt auf derselben Maßlinie an. ESC oder Rechtsklick beendet.
@@ -172,7 +178,7 @@ Symbol). Menü **Blöcke**:
 - **Block/Gerät einfügen (I)** öffnet den Block-Browser. Doppelklick auf einen Block
   setzt ihn in die Zeichnung. Die Blöcke sind normale Dateien (`*.katieblock`) in
   den Ordnern, die der Browser anzeigt (auch der Projektordner `Bloecke`).
-- **Blockliste (BL)**, **Block auflösen (X)** zerlegt einen Block wieder.
+- **Block auflösen (X)** zerlegt einen Block wieder.
 - **Block/Gerät als Datei speichern / aus Datei laden** (ein gemeinsamer Menüeintrag unter Blöcke; der doppelte Eintrag im Elektro-Menü entfällt).
 - **Attribut definieren (ATTDEF)**: ein Textfeld im Symbol, dessen Wert je
   eingefügtem Block verschieden ist. Markiere es zusammen mit der Symbolgeometrie
@@ -196,7 +202,7 @@ Alle Werkzeuge stehen im Menü **Elektro** und in der Werkzeugleiste.
 | **Klemme** (KLEMME) | Reihenklemme mit zwei Anschlüssen (oben/unten) und den Feldern IND (Klemmleiste), TYP, PER, NUM (Nummer). |
 | **Kabel** (KABEL) | Waagerechte Linie mit Beschriftung. Wo eine senkrechte Leitung sie kreuzt, entsteht automatisch ein Aderstrich (L1, L2, L3, N, PE …), die Bezeichnung ist änderbar. |
 | **Koordinatenfeld** (FELD) | Spalten-/Zeilenraster des Blatts, damit Verweise als „Blatt/Spalte/Zeile“ angegeben werden. Im Dialog wählst du **DIN A4** (287 × 164 mm, 6 × 4) oder **DIN A3** (395 × 252,59 mm, 8 × 5) oder gibst eigene Werte ein. |
-| **Funktionstext** (FTEXT) | Normaler mehrzeiliger Text auf dem Layer **F-Text** (wird automatisch angelegt). Er beschreibt, wofür die Geräte und Klemmen **hinter** seinem Einfügepunkt da sind. Regel: Ein Gerät/eine Klemme gehört zum nächstliegenden Funktionstext **desselben Blatts**, der **links von ihr (oder direkt darüber)** liegt. In Geräteliste und Klemmenplan erscheint der Text ganz **rechts** in der Spalte **Funktion** (ohne Funktionstexte entfällt die Spalte). |
+| **Funktionstext** (FTEXT) | Normaler mehrzeiliger Text auf dem Layer **F-Text** (wird automatisch angelegt). Er beschreibt, wofür die Geräte und Klemmen **hinter** seinem Einfügepunkt da sind. Regel: Ein Gerät/eine Klemme gehört zum nächstliegenden Funktionstext **desselben Blatts**, der **links von ihr (oder direkt darüber)** liegt. Im Klemmenplan steht ein unverändert gleicher Text nur bei der **ersten** Klemme der Leiste. In Geräteliste und Klemmenplan erscheint der Text ganz **rechts** in der Spalte **Funktion** (ohne Funktionstexte entfällt die Spalte). |
 
 ### Fertige Symbole
 
@@ -315,10 +321,10 @@ unverändert.
 | F2 | Blatt-Eigenschaften (Name, Einbauort) |
 | F3 / F7 / F8 / F9 | Objektfang / Raster anzeigen / Ortho / Rasterfang |
 | F4 | Seitenleiste ein-/ausblenden |
-| Strg+B | Blockliste (Blockauswahl) öffnen |
+| Strg+B | Block/Gerät einfügen (Blockauswahl) öffnen |
 | Strg+F | Suchen und Ersetzen |
 | G | Alles anzeigen (Zoom Grenzen) |
-| B / I / BL / X | Block erzeugen / einfügen / Blockliste / auflösen (in der Eingabezeile) |
+| B / I / BL / X | Block erzeugen / einfügen / Blockauswahl (wie I) / auflösen (in der Eingabezeile) |
 
 Auf dem Mac gilt Cmd statt Strg.
 
@@ -346,7 +352,7 @@ Auf dem Mac gilt Cmd statt Strg.
 **Projekt › Projekt prüfen…** prüft alle Zeichnungsblätter: doppelte Hauptgeräte und Kabel, Hilfsteile ohne Hauptgerät,
 doppelte Klemmen, Querverweise mit mehr als zwei Vorkommen / ohne Gegenstück / mit gleicher Pfeilart, offene Klemmenanschlüsse.
 Doppelklick auf einen Befund springt zur Stelle. Querverweise, die bewusst ohne Gegenstück bleiben (Einspeisung, Übergabe),
-im Querverweis-Dialog mit **Übergabe / extern** markieren.
+im Querverweis-Dialog mit **Übergabe / extern** markieren. Solche Querverweise verweisen nirgendwohin und werden von anderen nicht angesprungen: derselbe Text (z. B. `L1`) darf beliebig oft vorkommen, ohne `L1.1`, `L2.1` … Die Potenzialübersicht führt sie weiterhin auf.
 
 **Kontaktspiegel:** Im Geräte-Dialog (Attribute bearbeiten bzw. Betriebsmittelmaske) unter *Darstellung* wählen:
 Referenzliste, Kontaktspiegel rechts vom Symbol oder – für Relais – unterhalb. Die Kontakte werden aus den Hilfsteilen mit

@@ -103,6 +103,12 @@ line weight in the toolbar.
 
 **Offset (Edit > Offset, commands `OFFSET` / `O`):** enter the distance, click an object, then click the side where the copy is to be created. Works with lines, circles, arcs, rectangles and polylines (corners are mitred). If the distance is too large (inwards), KatieCAD says "not possible".
 
+**Change length (Edit > Change length, toolbar, command `LAENGE`):** click the line near the end that is to change. Then either click the new end (it is projected onto the line direction, object snap works) or type the change in the input line: `+5` lengthens by 5, `-5` shortens by 5, `=50` sets the length to 50 (project unit). Then click the next line or ESC.
+
+**Align (Edit > Align, commands `AUSLINKS`, `AUSRECHTS`, `AUSOBEN`, `AUSUNTEN`, `AUSMITTEH`, `AUSMITTEV`):** select at least two objects; they are moved to the left/right/top/bottom edge or the centre of the whole selection box.
+
+**Manipulator (Edit > Manipulator, toolbar, command `MANIP`):** switches an axis cross on the selection on/off. Click the **red X arrow** or the **green Y arrow**: the object moves only along that axis. When you click the target point only its component along the axis counts - even if the object snap hits a point beside the axis, the device stays on its line. Or type the distance (`25`, `-10`). The **yellow square** moves freely. ESC cancels.
+
 **Quick select (Edit > Quick select, command `QS`):** selects all objects of one object type, layer, colour or line type. Several criteria apply together (AND). Optionally select everything except the matches or add to the current selection.
 
 **Chain dimension (Insert > Chain dimension, command `KETTE`):** two measurement points and the position of the dimension line as with the normal dimension; after that one click per further point is enough, and every new dimension starts at the last point on the same dimension line. ESC or right-click ends.
@@ -171,7 +177,7 @@ A **block** is a reusable group of objects (for example a symbol). **Blocks** me
 - **Insert block/device (I)** opens the block browser. A double click on a block places it
   in the drawing. Blocks are ordinary files (`*.katieblock`) in the folders shown by
   the browser (including the project folder `Bloecke`).
-- **Block list (BL)**; **Explode block (X)** breaks a block apart again.
+- **Explode block (X)** breaks a block apart again.
 - **Save block/device to file / load block from file** (one shared entry in the Blocks menu; the duplicate entry in the Electrical menu is gone).
 - **Define attribute (ATTDEF)**: a text field inside the symbol whose value differs
   per inserted block. Select it together with the symbol geometry and create the
@@ -195,7 +201,7 @@ All tools are in the **Electrical** menu and in the toolbar.
 | **Terminal** (KLEMME) | Terminal block with two connections (top/bottom) and the fields IND (terminal strip), TYP, PER, NUM (number). |
 | **Cable** (KABEL) | Horizontal line with a label. Where a vertical wire crosses it, a core marker (L1, L2, L3, N, PE …) appears automatically; the designation can be changed. |
 | **Coordinate field** (FELD) | Column/row grid of the sheet, so that references can be given as "sheet/column/row". In the dialog choose **DIN A4** (287 × 164 mm, 6 × 4), **DIN A3** (395 × 252.59 mm, 8 × 5) or enter your own values. |
-| **Function text** (FTEXT) | Normal multi-line text on the layer **F-Text** (created automatically). It says what the devices and terminals **behind** its insertion point are for. Rule: a device/terminal belongs to the nearest function text **on the same sheet** that lies **to its left (or directly above)**. The text appears at the far **right** of the device list and the terminal diagram in the column **Function** (the column is dropped when there are no function texts). |
+| **Function text** (FTEXT) | Normal multi-line text on the layer **F-Text** (created automatically). It says what the devices and terminals **behind** its insertion point are for. Rule: a device/terminal belongs to the nearest function text **on the same sheet** that lies **to its left (or directly above)**. In the terminal diagram an unchanged text is shown only at the **first** terminal of the strip. The text appears at the far **right** of the device list and the terminal diagram in the column **Function** (the column is dropped when there are no function texts). |
 
 ### Ready-made symbols
 
@@ -309,10 +315,10 @@ changes in them are lost; your drawing sheets stay untouched.
 | F2 | Sheet properties (name, installation location) |
 | F3 / F7 / F8 / F9 | Object snap / show grid / ortho / grid snap |
 | F4 | Show / hide side bar |
-| Ctrl+B | Open the block list (block selection) |
+| Ctrl+B | Insert block/device (block selection) |
 | Ctrl+F | Find and replace |
 | G | Show everything (zoom extents) |
-| B / I / BL / X | Create block / insert / block list / explode (in the input line) |
+| B / I / BL / X | Create block / insert / block selection (like I) / explode (in the input line) |
 
 On the Mac, Cmd replaces Ctrl.
 
@@ -335,7 +341,7 @@ On the Mac, Cmd replaces Ctrl.
 **Linux - menu bar:** on Linux KatieCAD draws its own menu bar (a click opens it; a click elsewhere, ESC or switching to another program closes it; F10 and the arrow keys work). To get the standard Tk menus start with `KATIECAD_NATIVE_MENU=1 python3 main.py`.
 
 ## Project check / contact mirror
-**Project › Check project…** checks all drawing sheets: duplicate main devices and cables, auxiliary parts without a main device, duplicate terminals, cross references that occur more than twice / have no counterpart / use the same arrow type twice, and open terminal connections. Double-click a finding to jump to it. Mark cross references that intentionally have no counterpart (supply, handover) with **Handover / external** in the cross-reference dialog.
+**Project › Check project…** checks all drawing sheets: duplicate main devices and cables, auxiliary parts without a main device, duplicate terminals, cross references that occur more than twice / have no counterpart / use the same arrow type twice, and open terminal connections. Double-click a finding to jump to it. Mark cross references that intentionally have no counterpart (supply, handover) with **Handover / external** in the cross-reference dialog. Such references point nowhere and are never targeted by others: the same text (e.g. `L1`) may appear any number of times, no need for `L1.1`, `L2.1` ... The potential overview still lists them.
 
 **Contact mirror:** In the device dialog (edit attributes or device mask) choose *Display*: reference list, contact mirror right of the symbol, or - for relays - below. The contacts are taken from the auxiliary parts with the same identifier; make/break/changeover is derived from the pin labels (13/14, 21/22, 11/12/14 ...).
 
