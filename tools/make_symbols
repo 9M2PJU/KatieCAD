@@ -18,6 +18,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from katiecad.model.core import (BlockDefinition, Linie, Kreis, Bogen, Rechteck,
                                  Polylinie, Text, Verbindungspunkt, ElektroMaske,
+                                 AttributDefinition,
                                  Schraffur, vp_tags_eindeutig)
 from katiecad.model.blocks import block_speichern, vorschlag_dateiname
 
@@ -60,10 +61,16 @@ class Sym:
                for a in range(0, 360, 30)]
         self.el.append(Schraffur(pts, muster="solid", staerke=None, **STYLE))
 
-    def pin(self, x, y, name):
+    def attr(self, tag, wert, x=0.0, y=0.0):
+        """Invisible block attribute (e.g. SPS = module kind)."""
+        self.el.append(AttributDefinition(x, y, tag=tag, prompt=tag, wert=wert,
+                                          sichtbar=False, hoehe=2.0, staerke=None,
+                                          **STYLE))
+
+    def pin(self, x, y, name, winkel=0.0):
         n = len(self.pin_names) + 1
         self.pin_names.append(name)
-        self.el.append(Verbindungspunkt(x, y, name, 2.0, 0.0, "Arial", None,
+        self.el.append(Verbindungspunkt(x, y, name, 2.0, winkel, "Arial", None,
                                         tag="VP%d" % n, prompt="Pin %d" % n,
                                         wert=name, sichtbar=True, radius=0.5,
                                         staerke=0.25, **STYLE))
@@ -382,6 +389,57 @@ for nm, de, letter in (("Voltmeter", "Voltmeter", "V"), ("Ammeter", "Amperemeter
     s.line(0, 7.5, 0, 3.5); s.line(0, -3.5, 0, -7.5)
     s.circle(0, 0, 3.5); s.text(0, 0, letter, 3.0)
     two_pin(s); s.mask(-4.5, -5.0)
+
+# ===============================================================
+# 10 PLC (SPS)  - modules carry the invisible attribute SPS = CPU/DI/DO/AI/AO;
+# the channel address is the pin name (editable), the pins are the I/O points.
+# ===============================================================
+def plc_module(name, de, kind, label, prefix, n, extra_bottom=()):
+    s = sym(name, "10 PLC", de)
+    w = 5.0 * (n - 1)
+    s.rect(-2.5, -5.0, w + 2.5, 5.0)
+    s.text(w / 2.0, 0.0, label, 2.5)
+    for i in range(n):
+        s.line(5.0 * i, 5.0, 5.0 * i, 7.5)
+        s.pin(5.0 * i, 7.5, "%s%d.%d" % (prefix, 0, i) if prefix in ("I", "Q")
+              else "%s%d" % (prefix, i), winkel=90.0)
+    for j, nm in enumerate(extra_bottom):
+        x = 5.0 * j
+        s.line(x, -5.0, x, -7.5)
+        s.pin(x, -7.5, nm)
+    s.attr("SPS", kind, -2.5, 5.0)
+    s.mask(-3.5, -5.0)
+    return s
+
+
+plc_module("PLC DI 8", "SPS Digitaleingang 8 Kanäle", "DI", "DI 8", "I", 8, ("1M",))
+plc_module("PLC DI 16", "SPS Digitaleingang 16 Kanäle", "DI", "DI 16", "I", 16, ("1M",))
+plc_module("PLC DO 8", "SPS Digitalausgang 8 Kanäle", "DO", "DO 8", "Q", 8, ("L+", "M"))
+plc_module("PLC DO 16", "SPS Digitalausgang 16 Kanäle", "DO", "DO 16", "Q", 16, ("L+", "M"))
+plc_module("PLC AI 4", "SPS Analogeingang 4 Kanäle", "AI", "AI 4", "AI", 4, ("M",))
+plc_module("PLC AO 4", "SPS Analogausgang 4 Kanäle", "AO", "AO 4", "AO", 4, ("M",))
+
+s = sym("PLC CPU", "10 PLC", "SPS Zentraleinheit (CPU) mit Versorgung")
+s.rect(-10.0, -5.0, 10.0, 5.0)
+s.text(0.0, 0.0, "CPU", 3.0)
+for x, nm in ((-5.0, "L+"), (5.0, "M")):
+    s.line(x, -5.0, x, -7.5); s.pin(x, -7.5, nm)
+s.attr("SPS", "CPU", -10.0, 5.0)
+s.mask(-11.0, -5.0)
+
+s = sym("PLC channel DI", "10 PLC", "SPS Eingangskanal (einzeln)")
+s.rect(-3.5, -3.0, 3.5, 3.0); s.text(0.0, 0.0, "DI", 2.5)
+s.line(0, 3.0, 0, 7.5); s.pin(0, 7.5, "I0.0")
+s.line(0, -3.0, 0, -7.5); s.pin(0, -7.5, "M")
+s.attr("SPS", "DI", -3.5, 3.0)
+s.mask(-4.5, -3.0)
+
+s = sym("PLC channel DO", "10 PLC", "SPS Ausgangskanal (einzeln)")
+s.rect(-3.5, -3.0, 3.5, 3.0); s.text(0.0, 0.0, "DO", 2.5)
+s.line(0, 3.0, 0, 7.5); s.pin(0, 7.5, "Q0.0")
+s.line(0, -3.0, 0, -7.5); s.pin(0, -7.5, "M")
+s.attr("SPS", "DO", -3.5, 3.0)
+s.mask(-4.5, -3.0)
 
 
 def main():
