@@ -3447,6 +3447,8 @@ class FarbDialog(tk.Toplevel):
         super().__init__(parent)
         from katiecad.model import ral as RAL
         self.RAL = RAL
+        from katiecad.model import aci as _aci
+        self._aci_mod = _aci
         self.result = None
         self._sperre = False
         self.title(titel or tr("dlg.farbe.titel"))
@@ -3463,7 +3465,10 @@ class FarbDialog(tk.Toplevel):
         feld = ttk.Frame(nb, padding=6)
         nb.add(links, text=tr("dlg.farbe.tab_ral"))
         nb.add(feld, text=tr("dlg.farbe.tab_feld"))
+        aci = ttk.Frame(nb, padding=6)
+        nb.add(aci, text=tr("dlg.farbe.tab_aci"))
         self._feld_bauen(feld)
+        self._aci_bauen(aci)
         kopf = ttk.Frame(links)
         kopf.pack(anchor=tk.W)
         ttk.Label(kopf, text=tr("dlg.farbe.familie"), style="Title.TLabel").pack(side=tk.LEFT, padx=(0, 6))
@@ -3506,30 +3511,36 @@ class FarbDialog(tk.Toplevel):
         e.grid(row=1, column=1, sticky=tk.W, pady=3)
         e.bind("<Return>", lambda ev: (self._aus_ral(), "break")[1])
         e.bind("<KeyRelease>", lambda ev: self._aus_ral(leise=True))
-        ttk.Label(rechts, text=tr("dlg.farbe.hex")).grid(row=2, column=0, sticky=tk.W, pady=3)
-        e = ttk.Entry(rechts, textvariable=self._hex_var, width=12)
+        self._aci_var = tk.StringVar()
+        ttk.Label(rechts, text=tr("dlg.farbe.aci")).grid(row=2, column=0, sticky=tk.W, pady=3)
+        e = ttk.Entry(rechts, textvariable=self._aci_var, width=12)
         e.grid(row=2, column=1, sticky=tk.W, pady=3)
+        e.bind("<Return>", lambda ev: (self._aus_aci(), "break")[1])
+        e.bind("<KeyRelease>", lambda ev: self._aus_aci(leise=True))
+        ttk.Label(rechts, text=tr("dlg.farbe.hex")).grid(row=3, column=0, sticky=tk.W, pady=3)
+        e = ttk.Entry(rechts, textvariable=self._hex_var, width=12)
+        e.grid(row=3, column=1, sticky=tk.W, pady=3)
         e.bind("<Return>", lambda ev: (self._aus_hex(), "break")[1])
         e.bind("<FocusOut>", lambda ev: self._aus_hex())
         for i, key in enumerate(("rot", "gruen", "blau")):
-            ttk.Label(rechts, text=tr("dlg.farbe." + key)).grid(row=3 + i, column=0, sticky=tk.W, pady=2)
+            ttk.Label(rechts, text=tr("dlg.farbe." + key)).grid(row=4 + i, column=0, sticky=tk.W, pady=2)
             sp = ttk.Spinbox(rechts, from_=0, to=255, width=6, textvariable=self._rgb[i],
                              command=self._aus_rgb)
-            sp.grid(row=3 + i, column=1, sticky=tk.W, pady=2)
+            sp.grid(row=4 + i, column=1, sticky=tk.W, pady=2)
             sp.bind("<Return>", lambda ev: self._aus_rgb())
             sp.bind("<FocusOut>", lambda ev: self._aus_rgb())
         self._hsv_var = [tk.StringVar(), tk.StringVar(), tk.StringVar()]
         for i, (key, bis) in enumerate((("farbton", 360), ("saett", 100), ("hell", 100))):
-            ttk.Label(rechts, text=tr("dlg.farbe." + key)).grid(row=6 + i, column=0, sticky=tk.W, pady=2)
+            ttk.Label(rechts, text=tr("dlg.farbe." + key)).grid(row=7 + i, column=0, sticky=tk.W, pady=2)
             sp = ttk.Spinbox(rechts, from_=0, to=bis, width=6, textvariable=self._hsv_var[i],
                              command=self._aus_hsv)
-            sp.grid(row=6 + i, column=1, sticky=tk.W, pady=2)
+            sp.grid(row=7 + i, column=1, sticky=tk.W, pady=2)
             sp.bind("<Return>", lambda ev: (self._aus_hsv(), "break")[1])
             sp.bind("<FocusOut>", lambda ev: self._aus_hsv())
         self._info = ttk.Label(rechts, text="", style="Hint.TLabel", wraplength=190)
-        self._info.grid(row=9, column=0, columnspan=2, sticky=tk.W, pady=(8, 0))
+        self._info.grid(row=10, column=0, columnspan=2, sticky=tk.W, pady=(8, 0))
         ttk.Button(rechts, text=tr("dlg.farbe.system"), command=self._system).grid(
-            row=10, column=0, columnspan=2, sticky=tk.EW, pady=(10, 0))
+            row=11, column=0, columnspan=2, sticky=tk.EW, pady=(10, 0))
 
         bt = ttk.Frame(f)
         bt.grid(row=1, column=0, columnspan=2, pady=(12, 0))
@@ -3571,10 +3582,16 @@ class FarbDialog(tk.Toplevel):
             self._sv = (sa, va)
             self._feld_zeichnen()
             n = self.RAL.naechstes_ral(self._farbe)
+            a = self._aci_mod.naechstes_aci(self._farbe)
             if n:
                 nr, name, _h, exakt = n
-                self._info.configure(text=(f"RAL {nr}  {name}" if exakt
-                                           else tr("dlg.farbe.aehnlich") + f" RAL {nr}  {name}"))
+                txt = (f"RAL {nr}  {name}" if exakt else tr("dlg.farbe.aehnlich") + f" RAL {nr}  {name}")
+                if a:
+                    txt += "\n" + (f"ACI {a[0]}" if a[2] else tr("dlg.farbe.aehnlich") + f" ACI {a[0]}")
+                self._info.configure(text=txt)
+            if quelle != "aci":
+                self._aci_var.set("")
+            self._aci_markieren(a[0] if a and a[2] else None)
             if quelle != "ral":
                 self._ral_var.set("")
         finally:
@@ -3588,6 +3605,71 @@ class FarbDialog(tk.Toplevel):
             t = "#" + t
         if self._gueltig(t):
             self._setze(t, "hex")
+
+    # ---- ACI (AutoCAD Color Index)
+    AW, AH = 12, 14
+
+    def _aci_bauen(self, parent):
+        a = self._aci_mod
+        w, h = self.AW, self.AH
+        self._aci_cv = tk.Canvas(parent, width=w * 24 + 2, height=h * 12 + 14, bg=FARBEN["bg_dunkel"],
+                                 highlightthickness=1, highlightbackground=FARBEN["rand"],
+                                 cursor="hand2")
+        self._aci_cv.pack()
+        self._aci_pos = {}
+        for nr in range(1, 10):
+            self._aci_pos[nr] = (nr - 1, 0)
+        for nr in range(250, 256):
+            self._aci_pos[nr] = (24 - 256 + nr, 0)
+        for nr in range(10, 250):
+            hh, k = divmod(nr - 10, 10)
+            self._aci_pos[nr] = (hh, k + 1.5)
+        for nr, (cx, cy) in self._aci_pos.items():
+            self._aci_cv.create_rectangle(1 + cx * w, 1 + cy * h, 1 + (cx + 1) * w - 1, 1 + (cy + 1) * h - 1,
+                                          fill=a.ACI_TABELLE[nr], width=0, tags=("z", "n%d" % nr))
+        self._aci_hover = ttk.Label(parent, text=" ", style="Hint.TLabel")
+        self._aci_hover.pack(anchor=tk.W, pady=(4, 0))
+        ttk.Label(parent, text=tr("dlg.farbe.aci_hinweis"), style="Hint.TLabel", wraplength=290
+                  ).pack(anchor=tk.W, pady=(4, 0))
+        self._aci_cv.bind("<Button-1>", lambda e: self._aci_klick(e))
+        self._aci_cv.bind("<Motion>", lambda e: self._aci_bewegt(e))
+
+    def _aci_bei(self, e):
+        for nr, (cx, cy) in self._aci_pos.items():
+            if 1 + cx * self.AW <= e.x < 1 + (cx + 1) * self.AW and 1 + cy * self.AH <= e.y < 1 + (cy + 1) * self.AH:
+                return nr
+        return None
+
+    def _aci_klick(self, e):
+        nr = self._aci_bei(e)
+        if nr:
+            self._setze(self._aci_mod.ACI_TABELLE[nr], "")
+            self._aci_var.set(str(nr))
+
+    def _aci_bewegt(self, e):
+        nr = self._aci_bei(e)
+        self._aci_hover.configure(text=(f"ACI {nr}  {self._aci_mod.ACI_TABELLE[nr]}" if nr else " "))
+
+    def _aci_markieren(self, nr):
+        if not hasattr(self, "_aci_cv"):
+            return
+        self._aci_cv.delete("marke")
+        if nr in self._aci_pos:
+            cx, cy = self._aci_pos[nr]
+            w, h = self.AW, self.AH
+            self._aci_cv.create_rectangle(cx * w + 1, cy * h + 1, (cx + 1) * w, (cy + 1) * h, outline="#ffffff",
+                                          width=2, tags="marke")
+
+    def _aus_aci(self, leise=False):
+        if self._sperre:
+            return
+        t = self._aci_var.get().strip().lower().replace("aci", "").strip()
+        h = self._aci_mod.aci_hex(t) if t.isdigit() else None
+        if h:
+            self._setze(h, "aci")
+            self._aci_markieren(int(t))
+        elif not leise and t:
+            self._info.configure(text=tr("dlg.farbe.aci_unbekannt"))
 
     def _aus_hsv(self):
         if self._sperre:

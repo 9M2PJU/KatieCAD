@@ -5371,7 +5371,12 @@ class CadApp(AendernMixin, Ansicht3DMixin, ToolbarDockMixin):
                    "#00ff00": 3, "#00ffff": 4, "#0000ff": 5, "#ff00ff": 6,
                    "#0066cc": 5, "#666666": 8, "#cc0000": 1, "#888888": 8,
                    "#c29bff": 4, "#ff2d95": 6, "#39ff14": 3}
-        return mapping.get(hexfarbe.lower(), 7)
+        h = hexfarbe.lower()
+        if h in mapping:
+            return mapping[h]
+        from katiecad.model.aci import naechstes_aci
+        n = naechstes_aci(h)
+        return n[0] if n else 7
 
     def _element_zu_dxf(self, msp, el):
         attribs = {"layer": el.layer}
