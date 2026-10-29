@@ -1,10 +1,10 @@
 # KatieCAD
 
-**KatieCAD is an open-source electrical CAD for switchgear construction, distribution boards and building installation – built with Python and Tkinter.**
+**KatieCAD is an open-source electrical CAD for switchgear construction, distribution boards and building installation, built with Python and Tkinter.**
 
 It covers the complete workflow of an electrical project: draw circuit diagrams across several sheets, connect devices with wires, let cross references and device designations be generated automatically, and produce the documentation (cover sheet, table of contents, device list, terminal plan, cable plan) at the push of a button. At the same time it is a full 2D CAD with simple 3D modelling: you can draw freely without a project, build bodies in 3D, create, save and reuse your own blocks, and print 2D and 3D views on the same sheet.
 
-KatieCAD brings everything you need for daily work into one tool: electrical diagrams with automatic documentation, a complete 2D CAD and simple 3D modelling – ready to use, free and open source.
+KatieCAD brings everything you need for daily work into one tool: electrical diagrams with automatic documentation, a complete 2D CAD and simple 3D modelling, ready to use, free and open source.
 
 ![Screenshot1](Screenshots/Screenshot1.png)
 
