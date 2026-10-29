@@ -1,5 +1,10 @@
 # Changes
 
+## 1.1.1
+- New: **Project > Export lists as Excel file...** - choose the lists, one .xlsx with one sheet per list (no extra library)
+- New symbols: category "11 Installation" (socket 1-/2-pole, with protective contact, CEE 4-/5-pole, luminaire) and emergency stop (1- and 2-channel)
+- Version jump to 1.1.1
+
 ## 1.1.0
 - Find and replace across the whole project (all sheets); double-click a hit to jump to the object
 - Match properties (layer, colour, line type, weight, text height) from one object to others

@@ -322,6 +322,7 @@ unverändert.
 - **Geräte automatisch nummerieren (Projekt › Geräte automatisch nummerieren, Befehl `NUMMERIEREN`):** Geräte, deren Kennzeichen (IND) nur aus einem Präfix besteht (`-K`, `K?`), bekommen die nächste freie Nummer: `-K1`, `-K2` … Die Nummern setzen hinter der höchsten schon vergebenen im ganzen Projekt fort; vergebene Nummern ändern sich nie. Nummeriert wird nur das Hauptsymbol, von oben nach unten und links nach rechts, wahlweise für das ganze Projekt oder nur das aktuelle Blatt. Hilfsteile (Kontakte) werden nicht verändert.
 - **Listen als CSV exportieren…** schreibt dieselben Tabellen für Excel
   (Semikolon-getrennt, UTF-8).
+- **Listen als Excel-Datei exportieren…** (Projekt-Menü): Du wählst die Listen aus (Geräteliste, Klemmenplan, Kabelplan, Verbindungen, Stückliste, …; die Zahl in Klammern ist die Zeilenanzahl) und bekommst **eine .xlsx-Datei mit einem Tabellenblatt je Liste** (fette Kopfzeile, fixiert, Filter gesetzt, Spaltenbreiten angepasst, Zahlenspalten als Zahlen, Bezeichnungen wie `001` bleiben Text). Dafür ist kein Excel und keine Zusatzbibliothek nötig; die Auswahl wird im Projekt gemerkt.
 - **Spalten anpassen:** Kopiere `report_templates/geraete.example.json` und
   benenne sie zu `geraete.json`, `klemmen.json`, `kabel.json` oder `inhalt.json` um.
   Mehr dazu in `report_templates/README.md`.

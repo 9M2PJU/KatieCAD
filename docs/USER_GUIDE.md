@@ -316,6 +316,7 @@ changes in them are lost; your drawing sheets stay untouched.
 - **Number devices automatically (Project > Number devices automatically, command `NUMMERIEREN`):** devices whose designation (IND) is only a prefix (`-K`, `K?`) get the next free number: `-K1`, `-K2` ... Numbers continue after the highest one already used in the whole project; assigned numbers never change. Only the main symbol is numbered, top to bottom and left to right, for the whole project or the current sheet. Auxiliary parts (contacts) are not changed.
 - **Export lists as CSV…** writes the same tables for Excel (semicolon separated,
   UTF-8).
+- **Export lists as Excel file…** (Project menu): choose the lists (device list, terminal diagram, cable plan, connections, parts list, …; the number in brackets is the row count) and get **one .xlsx file with one sheet per list** (bold frozen header row, filter set, column widths fitted, number columns as numbers, designations such as `001` stay text). Neither Excel nor an extra library is needed; the selection is remembered in the project.
 - **Customise columns:** copy `report_templates/geraete.example.json` and rename it
   to `geraete.json`, `klemmen.json`, `kabel.json` or `inhalt.json`. More in
   `report_templates/README.md`.

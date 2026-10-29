@@ -1,5 +1,10 @@
 # Änderungen
 
+## 1.1.1
+- Neu: **Projekt › Listen als Excel-Datei exportieren…** – Auswahl der Listen, eine .xlsx mit einem Tabellenblatt je Liste (ohne Zusatzbibliothek)
+- Neue Symbole: Kategorie „11 Installation“ (Steckdose 1-/2-polig, mit Schutzkontakt, CEE 4-/5-polig, Leuchte) und Not-Halt (1- und 2-kanalig)
+- Versionssprung auf 1.1.1
+
 ## 1.1.0
 - Suchen und Ersetzen über das ganze Projekt (alle Blätter); Doppelklick auf einen Treffer springt zum Objekt
 - Eigenschaften übertragen (Layer, Farbe, Linientyp, Stärke, Texthöhe) von einem Objekt auf andere
