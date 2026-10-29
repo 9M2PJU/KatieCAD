@@ -286,4 +286,13 @@ _zz = _tf.zuege3()
 check(_zz and all(abs(p[1]) < 1e-9 for z in _zz for p in z), "Text3D liegt in der Fläche (vorne)")
 check(max(p[2] for z in _zz for p in z) <= 30.0 + 1e-9, "Text3D Höhe")
 _ft = core.Text3D((0, 0, 0), "X", 5); check(_ft.zuege3() == [], "Text3D ohne Ebene: kein Strichtext")
+from katiecad.model import ral as RAL
+check(len(RAL.RAL_CLASSIC) > 200 and RAL.ral_suchen("RAL 5015")[2] == "#2874b2" and RAL.ral_suchen("ral3020")[0] == 3020, "RAL-Suche")
+check(RAL.ral_suchen("140") is None and RAL.ral_suchen("abc") is None, "RAL unbekannt")
+check(RAL.naechstes_ral("#c1121c")[0] == 3020 and RAL.naechstes_ral("#c1121c")[3], "nächstes RAL exakt")
+check(all(len(RAL.familie(n)) > 5 for n in range(1, 10)), "RAL-Familien")
+for k in ("dlg.farbe.titel", "dlg.farbe.ral", "dlg.farbe.hex", "dlg.farbe.system", "dlg.farbe.aehnlich",
+          "dlg.farbe.ral_unbekannt", "dlg.farbe.fam_0", "dlg.farbe.fam_9", "dlg.farbe.familie", "dlg.farbe.alle",
+          "dlg.farbe.rot", "dlg.farbe.gruen", "dlg.farbe.blau"):
+    check(k in I.TEXTE["de"] and k in I.TEXTE["en"], k)
 print(f"test_3d - {ok} Checks bestanden")
