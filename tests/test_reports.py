@@ -364,6 +364,25 @@ with tempfile.TemporaryDirectory() as tmp:
     A.CadApp.dokumentation_csv(fake)
     check(sorted(os.listdir(os.path.join(tmp, "out"))) == sorted(t + ".csv" for t in [katiecad_i18n.tr("rep." + k) for k in S.LISTEN]), "App: CSV-Dateien")
     check("1/" in open(os.path.join(tmp, "out", "Klemmenplan.csv"), encoding="utf-8-sig").read().splitlines()[1].split(";")[-1] or True, "CSV lesbar")
+    # Excel
+    xpfad = os.path.join(tmp, "Liste.xlsx")
+    A.ListenAuswahlDialog = lambda *a, **k: SimpleNamespace(result=["geraete", "klemmen", "kabel"])
+    A.filedialog = SimpleNamespace(asksaveasfilename=lambda **k: xpfad)
+    A.CadApp.dokumentation_excel(fake)
+    import zipfile
+    zf = zipfile.ZipFile(xpfad)
+    check(zf.testzip() is None and "xl/worksheets/sheet3.xml" in zf.namelist() and "xl/worksheets/sheet4.xml" not in zf.namelist(), "App: Excel-Datei mit 3 Blaettern")
+    check("3 Liste(n)" in fake.meldung or "3 list(s)" in fake.meldung, f"App: Excel-Meldung {fake.meldung}")
+    wbx = zf.read("xl/workbook.xml").decode("utf-8")
+    check(katiecad_i18n.tr("rep.geraete") in wbx and katiecad_i18n.tr("rep.kabel") in wbx, "Excel: Blattnamen")
+    from katiecad.reports.xlsx import xlsx_schreiben, blattname
+    xp2 = os.path.join(tmp, "t.xlsx")
+    n2 = xlsx_schreiben(xp2, [("A/B:C", [("Pos.", "pos", True), ("IND", "ind", False)],
+                                [{"pos": "7", "ind": "007"}, {"pos": "x", "ind": "a<&>\x01b"}]), ("A/B:C", [("X", "x", False)], [])])
+    check(n2 == ["A-B-C", "A-B-C 2"], f"Excel: Blattnamen eindeutig/gueltig {n2}")
+    sh = zipfile.ZipFile(xp2).read("xl/worksheets/sheet1.xml").decode("utf-8")
+    check("<v>7</v>" in sh and ">007<" in sh and "a&lt;&amp;&gt;b" in sh, "Excel: Zahl/Text/Escape")
+    check(blattname("x" * 40, set()) == "x" * 31, "Excel: Name max. 31 Zeichen")
     # no project
     fake.projekt = None
     A.CadApp.dokumentation_erzeugen(fake)
