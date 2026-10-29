@@ -3457,8 +3457,13 @@ class FarbDialog(tk.Toplevel):
         f.pack(fill=tk.BOTH, expand=True)
 
         # left: families + palette
-        links = ttk.Frame(f)
-        links.grid(row=0, column=0, sticky=tk.N)
+        nb = ttk.Notebook(f)
+        nb.grid(row=0, column=0, sticky=tk.N)
+        links = ttk.Frame(nb, padding=6)
+        feld = ttk.Frame(nb, padding=6)
+        nb.add(links, text=tr("dlg.farbe.tab_ral"))
+        nb.add(feld, text=tr("dlg.farbe.tab_feld"))
+        self._feld_bauen(feld)
         kopf = ttk.Frame(links)
         kopf.pack(anchor=tk.W)
         ttk.Label(kopf, text=tr("dlg.farbe.familie"), style="Title.TLabel").pack(side=tk.LEFT, padx=(0, 6))
@@ -3499,12 +3504,12 @@ class FarbDialog(tk.Toplevel):
         ttk.Label(rechts, text=tr("dlg.farbe.ral")).grid(row=1, column=0, sticky=tk.W, pady=3)
         e = ttk.Entry(rechts, textvariable=self._ral_var, width=12)
         e.grid(row=1, column=1, sticky=tk.W, pady=3)
-        e.bind("<Return>", lambda ev: self._aus_ral())
+        e.bind("<Return>", lambda ev: (self._aus_ral(), "break")[1])
         e.bind("<KeyRelease>", lambda ev: self._aus_ral(leise=True))
         ttk.Label(rechts, text=tr("dlg.farbe.hex")).grid(row=2, column=0, sticky=tk.W, pady=3)
         e = ttk.Entry(rechts, textvariable=self._hex_var, width=12)
         e.grid(row=2, column=1, sticky=tk.W, pady=3)
-        e.bind("<Return>", lambda ev: self._aus_hex())
+        e.bind("<Return>", lambda ev: (self._aus_hex(), "break")[1])
         e.bind("<FocusOut>", lambda ev: self._aus_hex())
         for i, key in enumerate(("rot", "gruen", "blau")):
             ttk.Label(rechts, text=tr("dlg.farbe." + key)).grid(row=3 + i, column=0, sticky=tk.W, pady=2)
@@ -3513,10 +3518,18 @@ class FarbDialog(tk.Toplevel):
             sp.grid(row=3 + i, column=1, sticky=tk.W, pady=2)
             sp.bind("<Return>", lambda ev: self._aus_rgb())
             sp.bind("<FocusOut>", lambda ev: self._aus_rgb())
+        self._hsv_var = [tk.StringVar(), tk.StringVar(), tk.StringVar()]
+        for i, (key, bis) in enumerate((("farbton", 360), ("saett", 100), ("hell", 100))):
+            ttk.Label(rechts, text=tr("dlg.farbe." + key)).grid(row=6 + i, column=0, sticky=tk.W, pady=2)
+            sp = ttk.Spinbox(rechts, from_=0, to=bis, width=6, textvariable=self._hsv_var[i],
+                             command=self._aus_hsv)
+            sp.grid(row=6 + i, column=1, sticky=tk.W, pady=2)
+            sp.bind("<Return>", lambda ev: (self._aus_hsv(), "break")[1])
+            sp.bind("<FocusOut>", lambda ev: self._aus_hsv())
         self._info = ttk.Label(rechts, text="", style="Hint.TLabel", wraplength=190)
-        self._info.grid(row=6, column=0, columnspan=2, sticky=tk.W, pady=(8, 0))
+        self._info.grid(row=9, column=0, columnspan=2, sticky=tk.W, pady=(8, 0))
         ttk.Button(rechts, text=tr("dlg.farbe.system"), command=self._system).grid(
-            row=7, column=0, columnspan=2, sticky=tk.EW, pady=(10, 0))
+            row=10, column=0, columnspan=2, sticky=tk.EW, pady=(10, 0))
 
         bt = ttk.Frame(f)
         bt.grid(row=1, column=0, columnspan=2, pady=(12, 0))
@@ -3526,6 +3539,7 @@ class FarbDialog(tk.Toplevel):
         self.bind("<Escape>", lambda ev: self.destroy())
 
         self._farbe = "#c29bff"
+        self._hue, self._sv = 270.0, (0.5, 1.0)
         self._setze(farbe if self._gueltig(farbe) else "#c29bff")
         self._palette_zeichnen()
         _modal(self)
@@ -3546,6 +3560,16 @@ class FarbDialog(tk.Toplevel):
             if quelle != "rgb":
                 for v, k in zip(self._rgb, (1, 3, 5)):
                     v.set(str(int(self._farbe[k:k + 2], 16)))
+            import colorsys
+            r8, g8, b8 = (int(self._farbe[k:k + 2], 16) for k in (1, 3, 5))
+            h, sa, va = colorsys.rgb_to_hsv(r8 / 255.0, g8 / 255.0, b8 / 255.0)
+            if quelle != "hsv":
+                if sa > 0.0 and va > 0.0:
+                    self._hue = h * 360.0
+                for v, w in zip(self._hsv_var, (round(self._hue), round(sa * 100), round(va * 100))):
+                    v.set(str(int(w)))
+            self._sv = (sa, va)
+            self._feld_zeichnen()
             n = self.RAL.naechstes_ral(self._farbe)
             if n:
                 nr, name, _h, exakt = n
@@ -3565,6 +3589,89 @@ class FarbDialog(tk.Toplevel):
         if self._gueltig(t):
             self._setze(t, "hex")
 
+    def _aus_hsv(self):
+        if self._sperre:
+            return
+        import colorsys
+        try:
+            h = max(0.0, min(360.0, float(self._hsv_var[0].get())))
+            sa = max(0.0, min(100.0, float(self._hsv_var[1].get()))) / 100.0
+            va = max(0.0, min(100.0, float(self._hsv_var[2].get()))) / 100.0
+        except ValueError:
+            return
+        self._hue = h
+        r, g, b = colorsys.hsv_to_rgb((h % 360.0) / 360.0, sa, va)
+        self._setze("#%02x%02x%02x" % (round(r * 255), round(g * 255), round(b * 255)), "hsv")
+
+    # ---- colour field (hue strip + saturation/value square)
+    FW, FH, FZ = 192, 144, 6
+
+    def _feld_bauen(self, parent):
+        self._sv_cv = tk.Canvas(parent, width=self.FW, height=self.FH, bg=FARBEN["bg_dunkel"],
+                                highlightthickness=1, highlightbackground=FARBEN["rand"],
+                                cursor="crosshair")
+        self._sv_cv.grid(row=0, column=0, padx=(0, 8))
+        self._h_cv = tk.Canvas(parent, width=26, height=self.FH, bg=FARBEN["bg_dunkel"],
+                               highlightthickness=1, highlightbackground=FARBEN["rand"],
+                               cursor="sb_v_double_arrow")
+        self._h_cv.grid(row=0, column=1)
+        self._sv_zellen = {}
+        for ix in range(self.FW // self.FZ):
+            for iy in range(self.FH // self.FZ):
+                self._sv_zellen[(ix, iy)] = self._sv_cv.create_rectangle(
+                    ix * self.FZ, iy * self.FZ, (ix + 1) * self.FZ, (iy + 1) * self.FZ, width=0)
+        self._h_zellen = []
+        n = 36
+        hh = self.FH / n
+        import colorsys
+        for i in range(n):
+            r, g, b = colorsys.hsv_to_rgb(i / n, 1.0, 1.0)
+            self._h_cv.create_rectangle(0, i * hh, 26, (i + 1) * hh + 1, width=0,
+                                        fill="#%02x%02x%02x" % (round(r * 255), round(g * 255), round(b * 255)))
+        ttk.Label(parent, text=tr("dlg.farbe.feld_hinweis"), style="Hint.TLabel", wraplength=230
+                  ).grid(row=1, column=0, columnspan=2, sticky=tk.W, pady=(8, 0))
+        for cv, fn in ((self._sv_cv, self._sv_klick), (self._h_cv, self._h_klick)):
+            cv.bind("<Button-1>", fn)
+            cv.bind("<B1-Motion>", fn)
+        self._sv_hue_gezeichnet = None
+
+    def _sv_klick(self, e):
+        sa = max(0.0, min(1.0, e.x / (self.FW - 1)))
+        va = max(0.0, min(1.0, 1.0 - e.y / (self.FH - 1)))
+        self._farbe_aus_hsv(self._hue, sa, va)
+
+    def _h_klick(self, e):
+        h = max(0.0, min(359.9, e.y / (self.FH - 1) * 360.0))
+        self._farbe_aus_hsv(h, self._sv[0] or 1.0, self._sv[1] or 1.0)
+
+    def _farbe_aus_hsv(self, h, sa, va):
+        import colorsys
+        self._hue = h
+        r, g, b = colorsys.hsv_to_rgb(h / 360.0, sa, va)
+        self._setze("#%02x%02x%02x" % (round(r * 255), round(g * 255), round(b * 255)), "")
+
+    def _feld_zeichnen(self):
+        if not hasattr(self, "_sv_zellen"):
+            return
+        import colorsys
+        if self._sv_hue_gezeichnet is None or abs(self._sv_hue_gezeichnet - self._hue) > 0.5:
+            nx, ny = self.FW // self.FZ, self.FH // self.FZ
+            for (ix, iy), item in self._sv_zellen.items():
+                r, g, b = colorsys.hsv_to_rgb((self._hue % 360.0) / 360.0, ix / (nx - 1),
+                                              1.0 - iy / (ny - 1))
+                self._sv_cv.itemconfigure(item, fill="#%02x%02x%02x" % (round(r * 255), round(g * 255), round(b * 255)))
+            self._sv_hue_gezeichnet = self._hue
+        c = self._sv_cv
+        c.delete("marke")
+        x = self._sv[0] * (self.FW - 1)
+        y = (1.0 - self._sv[1]) * (self.FH - 1)
+        c.create_oval(x - 5, y - 5, x + 5, y + 5, outline="#ffffff", width=2, tags="marke")
+        c.create_oval(x - 6, y - 6, x + 6, y + 6, outline="#000000", width=1, tags="marke")
+        h = self._h_cv
+        h.delete("marke")
+        yy = (self._hue % 360.0) / 360.0 * (self.FH - 1)
+        h.create_rectangle(0, yy - 2, 26, yy + 2, outline="#ffffff", width=2, tags="marke")
+
     def _aus_rgb(self):
         if self._sperre:
             return
@@ -3575,11 +3682,25 @@ class FarbDialog(tk.Toplevel):
         self._setze("#%02x%02x%02x" % tuple(w), "rgb")
 
     def _aus_ral(self, leise=False):
-        r = self.RAL.ral_suchen(self._ral_var.get())
+        text = self._ral_var.get()
+        r = self.RAL.ral_suchen(text)
         if r:
             self._setze(r[2], "ral")
             self._info.configure(text=f"RAL {r[0]}  {r[1]}")
-        elif not leise:
+            self._palette_zeichnen(markiere=r[0])
+            return
+        ziffern = "".join(ch for ch in text if ch.isdigit())
+        if not ziffern:
+            if text.strip() == "":
+                self._palette_zeichnen()
+            else:
+                self._info.configure(text=tr("dlg.farbe.ral_unbekannt"))
+            return
+        passend = [x for x in self.RAL.RAL_CLASSIC if str(x[0]).startswith(ziffern)]
+        if passend and len(ziffern) < 4:                   # typing: show the matching colours
+            self._palette_zeichnen(liste=passend)
+            self._info.configure(text=tr("dlg.farbe.ral_tippen", n=len(passend)))
+        else:
             self._info.configure(text=tr("dlg.farbe.ral_unbekannt"))
 
     def _system(self):
@@ -3588,20 +3709,32 @@ class FarbDialog(tk.Toplevel):
             self._setze(hexc)
 
     # ---- palette
-    def _palette_zeichnen(self):
+    def _palette_zeichnen(self, liste=None, markiere=None):
         nr = self._fam.get()
-        liste = self.RAL.RAL_CLASSIC if nr == 0 else self.RAL.familie(nr)
+        if liste is None:
+            liste = self.RAL.RAL_CLASSIC if nr == 0 else self.RAL.familie(nr)
+        if markiere is not None and not any(x[0] == markiere for x in liste):
+            liste = self.RAL.RAL_CLASSIC
         c = self._cv
         c.delete("all")
         self._zellen = []
         z = self.ZELLE
         for i, (n, name, h) in enumerate(liste):
             x, y = 1 + (i % 12) * z, 1 + (i // 12) * z
-            c.create_rectangle(x, y, x + z - 2, y + z - 2, fill=h, outline=FARBEN["rand"])
+            sel = (n == markiere)
+            c.create_rectangle(x, y, x + z - 2, y + z - 2, fill=h,
+                               outline=FARBEN["cyan"] if sel else FARBEN["rand"], width=3 if sel else 1)
             self._zellen.append((x, y, n, name, h))
+            if sel:
+                c.yview_moveto(0)
+                self._sel_y = y
         zeilen = (len(liste) + 11) // 12
         c.configure(scrollregion=(0, 0, z * 12 + 2, max(z * 6 + 2, zeilen * z + 2)))
-        c.yview_moveto(0)
+        gesamt = max(z * 6 + 2, zeilen * z + 2)
+        c.yview_moveto(max(0.0, (getattr(self, "_sel_y", 0) - z) / gesamt) if markiere is not None else 0)
+
+    def _zellen_liste(self):
+        return [(n, name, h) for (_x, _y, n, name, h) in self._zellen]
 
     def _zelle_bei(self, e):
         x, y = self._cv.canvasx(e.x), self._cv.canvasy(e.y)
@@ -3620,6 +3753,8 @@ class FarbDialog(tk.Toplevel):
         if r:
             self._setze(r[2], "")
             self._ral_var.set(str(r[0]))
+            self._info.configure(text=f"RAL {r[0]}  {r[1]}")
+            self._palette_zeichnen(liste=[x for x in self._zellen_liste()], markiere=r[0])
 
     def _ok(self):
         self._aus_hex()
