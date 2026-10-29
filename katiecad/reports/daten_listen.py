@@ -296,4 +296,3 @@ def revisionsuebersicht(projektdaten):
         if any(z.values()):
             zeilen.append(z)
     return zeilen
-

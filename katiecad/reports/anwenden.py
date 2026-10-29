@@ -80,3 +80,17 @@ def csv_exportieren(ordner, tabellen, namen):
         csv_schreiben(pfad, spalten, zeilen)
         out.append(pfad)
     return out
+
+
+def xlsx_exportieren(pfad, tabellen, namen, auswahl=None):
+    """All (or the chosen) lists into ONE Excel workbook, one sheet per list.
+    tabellen: {type: (columns, rows)}, namen: {type: sheet name}, auswahl: list of types.
+    -> list of the sheet names written."""
+    from katiecad.reports.xlsx import xlsx_schreiben
+    blaetter = []
+    for typ, (spalten, zeilen) in tabellen.items():
+        if auswahl is not None and typ not in auswahl:
+            continue
+        sp = [(s.titel, s.key, s.ausr == "r") for s in spalten]
+        blaetter.append((namen.get(typ, typ), sp, zeilen))
+    return xlsx_schreiben(pfad, blaetter)
