@@ -289,10 +289,14 @@ _ft = core.Text3D((0, 0, 0), "X", 5); check(_ft.zuege3() == [], "Text3D ohne Ebe
 from katiecad.model import ral as RAL
 check(len(RAL.RAL_CLASSIC) > 200 and RAL.ral_suchen("RAL 5015")[2] == "#2874b2" and RAL.ral_suchen("ral3020")[0] == 3020, "RAL-Suche")
 check(RAL.ral_suchen("140") is None and RAL.ral_suchen("abc") is None, "RAL unbekannt")
+from katiecad.model import aci as ACI
+check(len(ACI.ACI_TABELLE) == 256 and ACI.aci_hex(1) == "#ff0000" and ACI.aci_hex(5) == "#0000ff" and ACI.aci_hex(10) == "#ff0000", "ACI Basis")
+check(ACI.aci_hex(140) == "#00bfff" and ACI.aci_hex(0) is None and ACI.aci_hex(256) is None and ACI.aci_hex("x") is None, "ACI 140/Grenzen")
+check(ACI.naechstes_aci("#ff0000")[2] and ACI.naechstes_aci("#00bfff")[0] == 140, "ACI naechstes")
 check(RAL.naechstes_ral("#c1121c")[0] == 3020 and RAL.naechstes_ral("#c1121c")[3], "nächstes RAL exakt")
 check(all(len(RAL.familie(n)) > 5 for n in range(1, 10)), "RAL-Familien")
 for k in ("dlg.farbe.titel", "dlg.farbe.ral", "dlg.farbe.hex", "dlg.farbe.system", "dlg.farbe.aehnlich",
           "dlg.farbe.ral_unbekannt", "dlg.farbe.fam_0", "dlg.farbe.fam_9", "dlg.farbe.familie", "dlg.farbe.alle",
-          "dlg.farbe.rot", "dlg.farbe.gruen", "dlg.farbe.blau"):
+          "dlg.farbe.rot", "dlg.farbe.gruen", "dlg.farbe.blau", "dlg.farbe.ral_tippen"):
     check(k in I.TEXTE["de"] and k in I.TEXTE["en"], k)
 print(f"test_3d - {ok} Checks bestanden")
