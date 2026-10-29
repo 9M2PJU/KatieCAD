@@ -18,7 +18,20 @@
         "x1": 0.0,
         "y1": 7.5,
         "x2": 0.0,
-        "y2": -2.0
+        "y2": 4.5
+      },
+      {
+        "typ": "bogen",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "cx": 0.0,
+        "cy": 2.5,
+        "r": 2.0,
+        "start": 0,
+        "ende": 180
       },
       {
         "typ": "vpunkt",
@@ -53,7 +66,20 @@
         "x1": 5.0,
         "y1": 7.5,
         "x2": 5.0,
-        "y2": -2.0
+        "y2": 4.5
+      },
+      {
+        "typ": "bogen",
+        "layer": "0",
+        "farbe": "#c29bff",
+        "linientyp": "Volllinie (schmal)",
+        "eig_farbe": true,
+        "staerke": 0.35,
+        "cx": 5.0,
+        "cy": 2.5,
+        "r": 2.0,
+        "start": 0,
+        "ende": 180
       },
       {
         "typ": "vpunkt",
@@ -79,64 +105,14 @@
         "radius": 0.5
       },
       {
-        "typ": "linie",
-        "layer": "0",
-        "farbe": "#c29bff",
-        "linientyp": "Volllinie (schmal)",
-        "eig_farbe": true,
-        "staerke": 0.35,
-        "x1": -2.5,
-        "y1": 0,
-        "x2": 2.5,
-        "y2": 0
-      },
-      {
-        "typ": "bogen",
-        "layer": "0",
-        "farbe": "#c29bff",
-        "linientyp": "Volllinie (schmal)",
-        "eig_farbe": true,
-        "staerke": 0.35,
-        "cx": 0.0,
-        "cy": 0.0,
-        "r": 2.5,
-        "start": 180.0,
-        "ende": 360.0
-      },
-      {
-        "typ": "linie",
-        "layer": "0",
-        "farbe": "#c29bff",
-        "linientyp": "Volllinie (schmal)",
-        "eig_farbe": true,
-        "staerke": 0.35,
-        "x1": 2.5,
-        "y1": 0,
-        "x2": 7.5,
-        "y2": 0
-      },
-      {
-        "typ": "bogen",
-        "layer": "0",
-        "farbe": "#c29bff",
-        "linientyp": "Volllinie (schmal)",
-        "eig_farbe": true,
-        "staerke": 0.35,
-        "cx": 5.0,
-        "cy": 0.0,
-        "r": 2.5,
-        "start": 180.0,
-        "ende": 360.0
-      },
-      {
         "typ": "maske",
         "layer": "0",
         "farbe": "#c29bff",
         "linientyp": "Volllinie (schmal)",
         "eig_farbe": true,
         "staerke": null,
-        "x": -4.0,
-        "y": -5.0,
+        "x": -3.0,
+        "y": 2.0,
         "versatz": {},
         "werte": {
           "IND": "IND",
