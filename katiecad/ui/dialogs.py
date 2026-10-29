@@ -2132,6 +2132,46 @@ class ProjektDruckDialog(tk.Toplevel):
         self.destroy()
 
 
+class ListenAuswahlDialog(tk.Toplevel):
+    """Choose the lists for the Excel export. eintraege: [(type, name, number of rows)].
+    result: list of the chosen types or None."""
+
+    def __init__(self, parent, eintraege, vorgabe=None):
+        super().__init__(parent)
+        self.result = None
+        self.title(tr("dlg.excel.titel"))
+        self.transient(parent)
+        _modal(self)
+        self.configure(bg=FARBEN["bg_mittel"])
+        f = ttk.Frame(self, padding=14)
+        f.pack(fill=tk.BOTH, expand=True)
+        ttk.Label(f, text=tr("dlg.excel.auswahl"), style="Title.TLabel").pack(anchor=tk.W)
+        self._vars = {}
+        for typ, name, n in eintraege:
+            v = tk.BooleanVar(value=(typ in vorgabe) if vorgabe is not None else n > 0)
+            self._vars[typ] = v
+            ttk.Checkbutton(f, text=f"{name}  ({n})", variable=v).pack(anchor=tk.W, pady=1)
+        bf0 = ttk.Frame(f)
+        bf0.pack(anchor=tk.W, pady=(8, 0))
+        ttk.Button(bf0, text=tr("dlg.excel.alle"),
+                   command=lambda: [v.set(True) for v in self._vars.values()]).pack(side=tk.LEFT, padx=(0, 4))
+        ttk.Button(bf0, text=tr("dlg.excel.keine"),
+                   command=lambda: [v.set(False) for v in self._vars.values()]).pack(side=tk.LEFT)
+        ttk.Label(f, text=tr("dlg.excel.hinweis"), style="Hint.TLabel", wraplength=320
+                  ).pack(anchor=tk.W, pady=(8, 0))
+        bf = ttk.Frame(f)
+        bf.pack(pady=(12, 0))
+        ttk.Button(bf, text=tr("dlg.ok"), command=self._ok).pack(side=tk.LEFT, padx=4)
+        ttk.Button(bf, text=tr("dlg.abbrechen"), command=self.destroy).pack(side=tk.LEFT, padx=4)
+        self.bind("<Return>", lambda e: self._ok())
+        self.bind("<Escape>", lambda e: self.destroy())
+        self.wait_window(self)
+
+    def _ok(self):
+        self.result = [t for t, v in self._vars.items() if v.get()]
+        self.destroy()
+
+
 class DokumentationDialog(tk.Toplevel):
     """Choose report sheets (cover sheet, table of contents, device list,
     terminal diagram, cable plan) and project data.

@@ -97,7 +97,7 @@ from katiecad.ui.dialogs import (
     BauteilkatalogDialog, SchnellauswahlDialog, SuchenErsetzenDialog, QuerverweisDialog, PruefungDialog, EigenschaftenPalette, VerbindungspunkteDialog, ProjektDruckDialog,
     VerbindungspunktDialog, VerbindungDialog, FestMaskeDialog,
     KoordinatenfeldDialog,
-    TitleBlockDialog, DokumentationDialog, ProjektEigenschaftenDialog,
+    TitleBlockDialog, DokumentationDialog, ListenAuswahlDialog, ProjektEigenschaftenDialog,
 )
 from katiecad.reports import seiten as SEI, anwenden as ANW
 from katiecad.fileio.pdf import pdf_erzeugen, pdf_senden, pdf_mehrseitig_erzeugen
@@ -1059,6 +1059,8 @@ class CadApp(AendernMixin, Ansicht3DMixin, ToolbarDockMixin):
                               command=self.dokumentation_erzeugen)
         m_projekt.add_command(label=tr("menu.projekt.doku_csv"),
                               command=self.dokumentation_csv)
+        m_projekt.add_command(label=tr("menu.projekt.doku_excel"),
+                              command=self.dokumentation_excel)
         m_projekt.add_separator()
         m_projekt.add_command(label=tr("menu.projekt.loeschen"),
                               command=self.projekt_loeschen)
@@ -9863,6 +9865,62 @@ class CadApp(AendernMixin, Ansicht3DMixin, ToolbarDockMixin):
                                  tr("msg.doku.fehler", fehler=e), parent=self.root)
             return
         self.status.set(tr("msg.doku.csv_fertig", n=len(pfade), ordner=ziel))
+
+    def dokumentation_excel(self):
+        """Lists (device list, terminal diagram, cable plan, parts list ...) as ONE Excel
+        workbook (.xlsx), one sheet per chosen list."""
+        p = self.projekt
+        if p is None:
+            self.status.set(tr("msg.projekt.kein_projekt"))
+            return
+        if not self._blatt_sichern():
+            return
+        infos, indizes = self._zeichnungsblaetter_einlesen()
+        if infos is None:
+            return
+        programm = os.path.dirname(TB.program_folder())
+        try:
+            tabellen = SEI.tabellen_fuer_export(
+                [(k, b.elemente) for k, b in enumerate(infos)],
+                lambda k: indizes[k] + 1,
+                SEI.spalten_ordner(programm, p.ordner),
+                bool(p.doku.get("klemmen_geraete", True)),
+                {k: b.einbauort for k, b in enumerate(infos)},
+                p.daten.get("bauteile", []), p.daten)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            messagebox.showerror(tr("dlg.doku.titel"),
+                                 tr("msg.doku.fehler", fehler=f"{type(e).__name__}: {e}"),
+                                 parent=self.root)
+            return
+        namen = {t: tr("rep." + t) for t in tabellen}
+        dlg = ListenAuswahlDialog(self.root, [(t, namen[t], len(z)) for t, (_s, z) in tabellen.items()],
+                                  p.doku.get("excel_listen"))
+        auswahl = dlg.result
+        if auswahl is None:
+            return
+        if not auswahl:
+            self.status.set(tr("msg.doku.keine_auswahl"))
+            return
+        pfad = filedialog.asksaveasfilename(
+            parent=self.root, initialdir=p.ordner, initialfile=p.name + ".xlsx",
+            defaultextension=".xlsx", filetypes=[("Excel", "*.xlsx")],
+            title=tr("msg.doku.excel_titel"))
+        if not pfad:
+            return
+        try:
+            blaetter = ANW.xlsx_exportieren(pfad, tabellen, namen, auswahl)
+        except OSError as e:
+            messagebox.showerror(tr("dlg.doku.titel"),
+                                 tr("msg.doku.fehler", fehler=e), parent=self.root)
+            return
+        p.doku = {**p.doku, "excel_listen": list(auswahl)}
+        try:
+            p.speichern()
+        except Exception:
+            pass
+        self.status.set(tr("msg.doku.excel_fertig", n=len(blaetter), datei=os.path.basename(pfad)))
 
     def drucken(self):
         dlg = DruckDialog(self.root, self)
