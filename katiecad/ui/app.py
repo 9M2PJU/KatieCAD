@@ -87,6 +87,7 @@ from katiecad.model.core import (
     teile_bogen_durch_winkel,
 )
 from katiecad.ui.dialogs import (
+    farbe_waehlen,
     MIT_LICENSE_TEXT, zeige_lizenz_fenster,
     _LayoutNameDialog, BlattEigenschaftenDialog, PropertiesDialog, ViewportDialog,
     LayerDialog, LayerEditDialog, TextDialog, ArrayDialog, SchraffurDialog, DruckDialog,
@@ -2281,8 +2282,7 @@ class CadApp(AendernMixin, Ansicht3DMixin, ToolbarDockMixin):
 
     def bg_waehlen(self, bereich):
         aktuell = self.bg_modell if bereich == "modell" else self.bg_layout
-        _, hexc = colorchooser.askcolor(color=aktuell,
-                                        title=tr("tb.hintergrund"))
+        hexc = farbe_waehlen(self.root, aktuell, tr("tb.hintergrund"))
         if not hexc:
             return
         self._bg_setzen(bereich, hexc)
@@ -2579,7 +2579,7 @@ class CadApp(AendernMixin, Ansicht3DMixin, ToolbarDockMixin):
         self.canvas.delete("vorschau")
 
     def farbe_waehlen(self):
-        _, hexc = colorchooser.askcolor(color=self.zeichenfarbe)
+        hexc = farbe_waehlen(self.root, self.zeichenfarbe)
         if hexc:
             self.zeichenfarbe = hexc
             self.farbe_btn.config(bg=hexc)

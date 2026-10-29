@@ -557,7 +557,7 @@ class PropertiesDialog(tk.Toplevel):
             self._sperre = False
 
     def _farbe_waehlen(self):
-        _, hexc = colorchooser.askcolor(color=self.farbe_var.get())
+        hexc = farbe_waehlen(self, self.farbe_var.get())
         if hexc:
             self.farbe_var.set(hexc)
             self.farbe_btn.config(bg=hexc)
@@ -916,7 +916,7 @@ class LayerEditDialog(tk.Toplevel):
         self.wait_window(self)
 
     def _farbe_waehlen(self):
-        _, hexc = colorchooser.askcolor(color=self.farbe_var.get())
+        hexc = farbe_waehlen(self, self.farbe_var.get())
         if hexc:
             self.farbe_var.set(hexc)
             self.farbe_btn.config(bg=hexc)
@@ -1986,8 +1986,7 @@ class EigenschaftenPalette(tk.Toplevel):
 
     def _farbe_waehlen(self):
         akt = self._vars["farbe"].get()
-        _, hexc = colorchooser.askcolor(color=akt if akt.startswith("#") else None,
-                                        parent=self)
+        hexc = farbe_waehlen(self, akt if akt.startswith("#") else "#c29bff")
         if hexc:
             self._anwenden("farbe", hexc)
 
@@ -3433,3 +3432,203 @@ class BauteilkatalogDialog(tk.Toplevel):
                 out.append(e)
         self.result = out
         self.destroy()
+
+
+# ============================================================
+# Colour dialog in the KatieCAD design with RAL Classic
+# ============================================================
+class FarbDialog(tk.Toplevel):
+    """Colour picker: RAL Classic palette (by colour family), RAL number entry, hex entry and
+    RGB fields. result = '#rrggbb' or None."""
+
+    ZELLE = 24
+
+    def __init__(self, parent, farbe="#c29bff", titel=None):
+        super().__init__(parent)
+        from katiecad.model import ral as RAL
+        self.RAL = RAL
+        self.result = None
+        self._sperre = False
+        self.title(titel or tr("dlg.farbe.titel"))
+        self.transient(parent)
+        self.configure(bg=FARBEN["bg_mittel"])
+        self.resizable(False, False)
+        f = ttk.Frame(self, padding=10)
+        f.pack(fill=tk.BOTH, expand=True)
+
+        # left: families + palette
+        links = ttk.Frame(f)
+        links.grid(row=0, column=0, sticky=tk.N)
+        kopf = ttk.Frame(links)
+        kopf.pack(anchor=tk.W)
+        ttk.Label(kopf, text=tr("dlg.farbe.familie"), style="Title.TLabel").pack(side=tk.LEFT, padx=(0, 6))
+        self._fam = tk.IntVar(value=0)
+        self._fam_namen = [tr("dlg.farbe.fam_" + str(n)) for n in range(10)]
+        self._fam_var = tk.StringVar(value=self._fam_namen[0])
+        cb = ttk.Combobox(kopf, textvariable=self._fam_var, values=self._fam_namen, width=34,
+                          state="readonly")
+        cb.pack(side=tk.LEFT)
+        cb.bind("<<ComboboxSelected>>", lambda e: (self._fam.set(self._fam_namen.index(self._fam_var.get())),
+                                                    self._palette_zeichnen()))
+        rahmen = ttk.Frame(links)
+        rahmen.pack(pady=(6, 0))
+        self._cv = tk.Canvas(rahmen, width=self.ZELLE * 12 + 2, height=self.ZELLE * 6 + 2,
+                             bg=FARBEN["bg_dunkel"], highlightthickness=1,
+                             highlightbackground=FARBEN["rand"])
+        sb = ttk.Scrollbar(rahmen, orient=tk.VERTICAL, command=self._cv.yview)
+        self._cv.configure(yscrollcommand=sb.set)
+        self._cv.pack(side=tk.LEFT)
+        sb.pack(side=tk.LEFT, fill=tk.Y)
+        self._cv.bind("<Button-1>", self._palette_klick)
+        self._cv.bind("<Motion>", self._palette_hover)
+        self._cv.bind("<MouseWheel>", lambda e: self._cv.yview_scroll(-1 if e.delta > 0 else 1, "units"))
+        self._cv.bind("<Button-4>", lambda e: self._cv.yview_scroll(-1, "units"))
+        self._cv.bind("<Button-5>", lambda e: self._cv.yview_scroll(1, "units"))
+        self._hover = ttk.Label(links, text=" ", style="Hint.TLabel")
+        self._hover.pack(anchor=tk.W, pady=(4, 0))
+
+        # right: preview, entries
+        rechts = ttk.Frame(f)
+        rechts.grid(row=0, column=1, sticky=tk.N, padx=(14, 0))
+        self._vorschau = tk.Label(rechts, width=22, height=3, relief=tk.RIDGE, bd=2,
+                                  highlightthickness=1, highlightbackground=FARBEN["cyan"])
+        self._vorschau.grid(row=0, column=0, columnspan=2, pady=(0, 8))
+        self._ral_var = tk.StringVar()
+        self._hex_var = tk.StringVar()
+        self._rgb = [tk.StringVar(), tk.StringVar(), tk.StringVar()]
+        ttk.Label(rechts, text=tr("dlg.farbe.ral")).grid(row=1, column=0, sticky=tk.W, pady=3)
+        e = ttk.Entry(rechts, textvariable=self._ral_var, width=12)
+        e.grid(row=1, column=1, sticky=tk.W, pady=3)
+        e.bind("<Return>", lambda ev: self._aus_ral())
+        e.bind("<KeyRelease>", lambda ev: self._aus_ral(leise=True))
+        ttk.Label(rechts, text=tr("dlg.farbe.hex")).grid(row=2, column=0, sticky=tk.W, pady=3)
+        e = ttk.Entry(rechts, textvariable=self._hex_var, width=12)
+        e.grid(row=2, column=1, sticky=tk.W, pady=3)
+        e.bind("<Return>", lambda ev: self._aus_hex())
+        e.bind("<FocusOut>", lambda ev: self._aus_hex())
+        for i, key in enumerate(("rot", "gruen", "blau")):
+            ttk.Label(rechts, text=tr("dlg.farbe." + key)).grid(row=3 + i, column=0, sticky=tk.W, pady=2)
+            sp = ttk.Spinbox(rechts, from_=0, to=255, width=6, textvariable=self._rgb[i],
+                             command=self._aus_rgb)
+            sp.grid(row=3 + i, column=1, sticky=tk.W, pady=2)
+            sp.bind("<Return>", lambda ev: self._aus_rgb())
+            sp.bind("<FocusOut>", lambda ev: self._aus_rgb())
+        self._info = ttk.Label(rechts, text="", style="Hint.TLabel", wraplength=190)
+        self._info.grid(row=6, column=0, columnspan=2, sticky=tk.W, pady=(8, 0))
+        ttk.Button(rechts, text=tr("dlg.farbe.system"), command=self._system).grid(
+            row=7, column=0, columnspan=2, sticky=tk.EW, pady=(10, 0))
+
+        bt = ttk.Frame(f)
+        bt.grid(row=1, column=0, columnspan=2, pady=(12, 0))
+        ttk.Button(bt, text=tr("dlg.ok"), command=self._ok).pack(side=tk.LEFT, padx=6)
+        ttk.Button(bt, text=tr("dlg.abbrechen"), command=self.destroy).pack(side=tk.LEFT, padx=6)
+        self.bind("<Return>", lambda ev: self._ok())
+        self.bind("<Escape>", lambda ev: self.destroy())
+
+        self._farbe = "#c29bff"
+        self._setze(farbe if self._gueltig(farbe) else "#c29bff")
+        self._palette_zeichnen()
+        _modal(self)
+
+    # ---- helpers
+    @staticmethod
+    def _gueltig(h):
+        h = str(h or "").strip()
+        return len(h) == 7 and h[0] == "#" and all(c in "0123456789abcdefABCDEF" for c in h[1:])
+
+    def _setze(self, farbe, quelle=""):
+        self._farbe = farbe.lower()
+        self._sperre = True
+        try:
+            self._vorschau.configure(bg=self._farbe)
+            if quelle != "hex":
+                self._hex_var.set(self._farbe)
+            if quelle != "rgb":
+                for v, k in zip(self._rgb, (1, 3, 5)):
+                    v.set(str(int(self._farbe[k:k + 2], 16)))
+            n = self.RAL.naechstes_ral(self._farbe)
+            if n:
+                nr, name, _h, exakt = n
+                self._info.configure(text=(f"RAL {nr}  {name}" if exakt
+                                           else tr("dlg.farbe.aehnlich") + f" RAL {nr}  {name}"))
+            if quelle != "ral":
+                self._ral_var.set("")
+        finally:
+            self._sperre = False
+
+    def _aus_hex(self):
+        if self._sperre:
+            return
+        t = self._hex_var.get().strip()
+        if t and not t.startswith("#"):
+            t = "#" + t
+        if self._gueltig(t):
+            self._setze(t, "hex")
+
+    def _aus_rgb(self):
+        if self._sperre:
+            return
+        try:
+            w = [max(0, min(255, int(float(v.get())))) for v in self._rgb]
+        except ValueError:
+            return
+        self._setze("#%02x%02x%02x" % tuple(w), "rgb")
+
+    def _aus_ral(self, leise=False):
+        r = self.RAL.ral_suchen(self._ral_var.get())
+        if r:
+            self._setze(r[2], "ral")
+            self._info.configure(text=f"RAL {r[0]}  {r[1]}")
+        elif not leise:
+            self._info.configure(text=tr("dlg.farbe.ral_unbekannt"))
+
+    def _system(self):
+        _, hexc = colorchooser.askcolor(color=self._farbe, parent=self)
+        if hexc:
+            self._setze(hexc)
+
+    # ---- palette
+    def _palette_zeichnen(self):
+        nr = self._fam.get()
+        liste = self.RAL.RAL_CLASSIC if nr == 0 else self.RAL.familie(nr)
+        c = self._cv
+        c.delete("all")
+        self._zellen = []
+        z = self.ZELLE
+        for i, (n, name, h) in enumerate(liste):
+            x, y = 1 + (i % 12) * z, 1 + (i // 12) * z
+            c.create_rectangle(x, y, x + z - 2, y + z - 2, fill=h, outline=FARBEN["rand"])
+            self._zellen.append((x, y, n, name, h))
+        zeilen = (len(liste) + 11) // 12
+        c.configure(scrollregion=(0, 0, z * 12 + 2, max(z * 6 + 2, zeilen * z + 2)))
+        c.yview_moveto(0)
+
+    def _zelle_bei(self, e):
+        x, y = self._cv.canvasx(e.x), self._cv.canvasy(e.y)
+        z = self.ZELLE
+        for (cx, cy, n, name, h) in self._zellen:
+            if cx <= x < cx + z and cy <= y < cy + z:
+                return n, name, h
+        return None
+
+    def _palette_hover(self, e):
+        r = self._zelle_bei(e)
+        self._hover.configure(text=f"RAL {r[0]}  {r[1]}   {r[2]}" if r else " ")
+
+    def _palette_klick(self, e):
+        r = self._zelle_bei(e)
+        if r:
+            self._setze(r[2], "")
+            self._ral_var.set(str(r[0]))
+
+    def _ok(self):
+        self._aus_hex()
+        self.result = self._farbe
+        self.destroy()
+
+
+def farbe_waehlen(parent, farbe="#c29bff", titel=None):
+    """Opens the KatieCAD colour dialog -> '#rrggbb' or None."""
+    dlg = FarbDialog(parent, farbe, titel)
+    parent.wait_window(dlg)
+    return dlg.result
