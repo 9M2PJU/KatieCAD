@@ -52,6 +52,22 @@ KatieCAD brings everything you need for daily work into one tool: electrical dia
 
 Ready-made installers for **Windows**, **Linux** (`.deb` / `.tar.gz`) and **macOS** are available on the [Releases](../../releases) page.
 
+### Linux one-liners
+
+**Debian/Ubuntu** (`.deb` from the Releases page):
+
+```bash
+sudo apt install ./KatieCAD-*-Linux-*.deb
+katiecad
+```
+
+**Arch Linux** ([`katiecad-git`](https://aur.archlinux.org/packages/katiecad-git), tracks `main`):
+
+```bash
+yay -S katiecad-git
+katiecad
+```
+
 ## Run from source
 
 Requirements:
